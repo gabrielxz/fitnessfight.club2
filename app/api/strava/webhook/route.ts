@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 // GET handler for webhook subscription verification
 export async function GET(request: NextRequest) {
@@ -134,8 +135,13 @@ async function refreshStravaToken(refreshToken: string) {
 
 async function fetchAndStoreActivity(
   activityId: number,
-  connection: any,
-  supabase: any
+  connection: {
+    user_id: string
+    access_token: string
+    refresh_token: string
+    expires_at: string
+  },
+  supabase: SupabaseClient
 ) {
   try {
     const response = await fetch(
@@ -204,7 +210,7 @@ async function fetchAndStoreActivity(
   }
 }
 
-async function deleteActivity(activityId: number, supabase: any) {
+async function deleteActivity(activityId: number, supabase: SupabaseClient) {
   try {
     // Soft delete the activity
     await supabase

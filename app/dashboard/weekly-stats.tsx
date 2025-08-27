@@ -56,7 +56,7 @@ export default function WeeklyStats({ userId }: WeeklyStatsProps) {
 
   return (
     <div className="bg-white rounded-lg shadow p-6">
-      <h3 className="text-lg font-semibold text-gray-900 mb-4">This Week's Training</h3>
+      <h3 className="text-lg font-semibold text-gray-900 mb-4">This Week&apos;s Training</h3>
       
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>
