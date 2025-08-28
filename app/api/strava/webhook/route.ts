@@ -212,6 +212,9 @@ async function fetchAndStoreActivity(
     }
 
     console.log(`Activity ${activityId} stored successfully in database`)
+    
+    // Calculate points for this activity
+    await calculateUserPoints(connection.user_id, activity, supabase)
   } catch (error) {
     console.error(`Error fetching/storing activity ${activityId}:`, error)
     throw error
@@ -230,5 +233,107 @@ async function deleteActivity(activityId: number, supabase: SupabaseClient) {
   } catch (error) {
     console.error(`Error deleting activity ${activityId}:`, error)
     throw error
+  }
+}
+
+// Helper functions for week calculations
+function getWeekStart(date: Date): Date {
+  const d = new Date(date)
+  const day = d.getUTCDay()
+  const diff = d.getUTCDate() - day
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), diff, 0, 0, 0, 0))
+}
+
+function getWeekEnd(weekStart: Date): Date {
+  const end = new Date(weekStart)
+  end.setUTCDate(end.getUTCDate() + 6)
+  end.setUTCHours(23, 59, 59, 999)
+  return end
+}
+
+// Calculate and update user points
+interface Activity {
+  start_date: string
+  moving_time: number
+}
+
+async function calculateUserPoints(userId: string, activity: Activity, supabase: SupabaseClient) {
+  try {
+    const weekStart = getWeekStart(new Date(activity.start_date))
+    const weekEnd = getWeekEnd(weekStart)
+    
+    // Get or create user_points record for this week
+    const { data: existingPoints } = await supabase
+      .from('user_points')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('week_start', weekStart.toISOString().split('T')[0])
+      .single()
+    
+    const activityHours = activity.moving_time / 3600
+    
+    if (existingPoints) {
+      const newTotalHours = existingPoints.total_hours + activityHours
+      const newPoints = Math.min(newTotalHours, 10) // Cap at 10 points
+      
+      await supabase
+        .from('user_points')
+        .update({
+          total_hours: newTotalHours,
+          total_points: newPoints,
+          activities_count: existingPoints.activities_count + 1,
+          last_activity_at: activity.start_date,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', existingPoints.id)
+      
+      console.log(`Updated points for user ${userId}: ${newPoints.toFixed(2)} points (${newTotalHours.toFixed(2)} hours)`)
+    } else {
+      const points = Math.min(activityHours, 10)
+      
+      await supabase
+        .from('user_points')
+        .insert({
+          user_id: userId,
+          week_start: weekStart.toISOString().split('T')[0],
+          week_end: weekEnd.toISOString().split('T')[0],
+          total_hours: activityHours,
+          total_points: points,
+          activities_count: 1,
+          last_activity_at: activity.start_date
+        })
+      
+      console.log(`Created points for user ${userId}: ${points.toFixed(2)} points (${activityHours.toFixed(2)} hours)`)
+    }
+    
+    // Ensure user has a division assignment
+    const { data: userDivision } = await supabase
+      .from('user_divisions')
+      .select('id')
+      .eq('user_id', userId)
+      .single()
+    
+    if (!userDivision) {
+      // Assign to Bronze division if not assigned
+      const { data: bronzeDivision } = await supabase
+        .from('divisions')
+        .select('id')
+        .eq('name', 'Bronze')
+        .single()
+      
+      if (bronzeDivision) {
+        await supabase
+          .from('user_divisions')
+          .insert({
+            user_id: userId,
+            division_id: bronzeDivision.id
+          })
+        
+        console.log(`Assigned user ${userId} to Bronze division`)
+      }
+    }
+  } catch (error) {
+    console.error('Error calculating user points:', error)
+    // Don't throw to prevent webhook failure
   }
 }

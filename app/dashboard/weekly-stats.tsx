@@ -9,6 +9,8 @@ interface WeeklyStatsProps {
 interface Stats {
   currentWeekHours: number
   lastWeekHours: number
+  currentWeekPoints: number
+  lastWeekPoints: number
   activityCount: number
   totalDistance: number
 }
@@ -58,7 +60,15 @@ export default function WeeklyStats({ userId }: WeeklyStatsProps) {
     <div className="bg-white rounded-lg shadow p-6">
       <h3 className="text-lg font-semibold text-gray-900 mb-4">This Week&apos;s Training</h3>
       
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div>
+          <p className="text-sm text-gray-600">Weekly Points</p>
+          <p className="text-3xl font-bold text-blue-600">
+            {stats.currentWeekPoints.toFixed(1)}
+          </p>
+          <p className="text-xs text-gray-500">Max 10 pts/week</p>
+        </div>
+
         <div>
           <p className="text-sm text-gray-600">Weekly Hours</p>
           <p className="text-3xl font-bold text-gray-900">
@@ -88,7 +98,9 @@ export default function WeeklyStats({ userId }: WeeklyStatsProps) {
 
       <div className="mt-4 pt-4 border-t">
         <div className="flex items-center justify-between">
-          <span className="text-sm text-gray-600">Last week: {stats.lastWeekHours.toFixed(1)} hours</span>
+          <span className="text-sm text-gray-600">
+            Last week: {stats.lastWeekPoints.toFixed(1)} points • {stats.lastWeekHours.toFixed(1)} hours
+          </span>
           <button 
             onClick={() => window.location.reload()}
             className="text-sm text-blue-600 hover:text-blue-800"

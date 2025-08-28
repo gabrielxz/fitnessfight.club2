@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import StravaConnection from './strava-connection'
 import WeeklyStats from './weekly-stats'
 import SyncActivities from './sync-activities'
+import DivisionDisplay from './division-display'
 
 export default async function DashboardPage() {
   const supabase = await createClient()
@@ -59,6 +60,10 @@ export default async function DashboardPage() {
             {stravaConnection && (
               <>
                 <div className="mt-8">
+                  <DivisionDisplay userId={user.id} />
+                </div>
+
+                <div className="mt-8">
                   <WeeklyStats userId={user.id} />
                 </div>
 
@@ -69,10 +74,10 @@ export default async function DashboardPage() {
                 <div className="mt-8 border-t pt-8">
                   <h3 className="text-lg font-semibold text-gray-900 mb-4">Coming Soon</h3>
                   <ul className="space-y-2 text-gray-600">
+                    <li>• Badge system with achievements</li>
                     <li>• Custom leaderboards for your group</li>
                     <li>• Weekly and monthly challenges</li>
                     <li>• Advanced stats and progress tracking</li>
-                    <li>• Activity comparisons with friends</li>
                   </ul>
                 </div>
               </>

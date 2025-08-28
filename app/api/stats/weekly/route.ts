@@ -11,11 +11,11 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Get current week start (Monday)
+    // Get current week start (Sunday in UTC)
     const now = new Date()
-    const currentWeekStart = new Date(now)
-    currentWeekStart.setDate(now.getDate() - now.getDay() + (now.getDay() === 0 ? -6 : 1))
-    currentWeekStart.setHours(0, 0, 0, 0)
+    const day = now.getUTCDay()
+    const diff = now.getUTCDate() - day
+    const currentWeekStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), diff, 0, 0, 0, 0))
 
     // Get last week start
     const lastWeekStart = new Date(currentWeekStart)
@@ -55,9 +55,29 @@ export async function GET() {
       0
     ) / 1000 // Convert to km
 
+    // Get points data for current week
+    const currentWeekStartStr = currentWeekStart.toISOString().split('T')[0]
+    const lastWeekStartStr = lastWeekStart.toISOString().split('T')[0]
+    
+    const { data: currentWeekPoints } = await supabase
+      .from('user_points')
+      .select('total_points, total_hours')
+      .eq('user_id', user.id)
+      .eq('week_start', currentWeekStartStr)
+      .single()
+    
+    const { data: lastWeekPoints } = await supabase
+      .from('user_points')
+      .select('total_points')
+      .eq('user_id', user.id)
+      .eq('week_start', lastWeekStartStr)
+      .single()
+
     return NextResponse.json({
-      currentWeekHours,
+      currentWeekHours: currentWeekPoints?.total_hours || currentWeekHours,
       lastWeekHours,
+      currentWeekPoints: currentWeekPoints?.total_points || Math.min(currentWeekHours, 10),
+      lastWeekPoints: lastWeekPoints?.total_points || Math.min(lastWeekHours, 10),
       activityCount: currentWeekActivities?.length || 0,
       totalDistance
     })
