@@ -144,6 +144,7 @@ async function fetchAndStoreActivity(
   supabase: SupabaseClient
 ) {
   try {
+    console.log(`Fetching activity ${activityId} from Strava API...`)
     const response = await fetch(
       `https://www.strava.com/api/v3/activities/${activityId}`,
       {
@@ -154,13 +155,15 @@ async function fetchAndStoreActivity(
     )
 
     if (!response.ok) {
+      console.error(`Strava API error: ${response.status} ${response.statusText}`)
       throw new Error(`Failed to fetch activity: ${response.status}`)
     }
 
     const activity = await response.json()
+    console.log(`Fetched activity: ${activity.name}, athlete: ${activity.athlete.id}`)
 
     // Upsert the activity
-    await supabase
+    const { error: dbError } = await supabase
       .from('strava_activities')
       .upsert({
         user_id: connection.user_id,
@@ -202,8 +205,13 @@ async function fetchAndStoreActivity(
       }, {
         onConflict: 'strava_activity_id'
       })
+    
+    if (dbError) {
+      console.error(`Database error storing activity ${activityId}:`, dbError)
+      throw dbError
+    }
 
-    console.log(`Activity ${activityId} stored successfully`)
+    console.log(`Activity ${activityId} stored successfully in database`)
   } catch (error) {
     console.error(`Error fetching/storing activity ${activityId}:`, error)
     throw error

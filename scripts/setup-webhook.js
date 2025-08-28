@@ -9,8 +9,8 @@ const WEBHOOK_VERIFY_TOKEN = process.env.STRAVA_WEBHOOK_VERIFY_TOKEN || 'fitness
 
 // Your callback URL - update this for production
 const CALLBACK_URL = process.env.NODE_ENV === 'production' 
-  ? 'https://your-production-url.vercel.app/api/strava/webhook'
-  : 'http://localhost:3000/api/strava/webhook'
+  ? 'https://fitnessfight-club2.vercel.app/api/strava/webhook'
+  : 'https://fitnessfight-club2.vercel.app/api/strava/webhook' // Using production URL for now
 
 async function viewSubscription() {
   const response = await fetch(
