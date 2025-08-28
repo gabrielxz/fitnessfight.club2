@@ -80,7 +80,6 @@ export default async function DashboardPage() {
               {/* Division Selector */}
               <DivisionSelector 
                 currentDivision={division}
-                onViewChange={(view) => console.log('View changed to:', view)}
               />
               
               {/* Leaderboard */}

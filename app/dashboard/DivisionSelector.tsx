@@ -8,7 +8,6 @@ interface DivisionSelectorProps {
     level: number
     emoji?: string
   }
-  onViewChange?: (view: 'division' | 'global') => void
 }
 
 const divisionEmojis: Record<string, string> = {
@@ -18,12 +17,12 @@ const divisionEmojis: Record<string, string> = {
   'Juicy': '🧃'
 }
 
-export default function DivisionSelector({ currentDivision, onViewChange }: DivisionSelectorProps) {
+export default function DivisionSelector({ currentDivision }: DivisionSelectorProps) {
   const [activeView, setActiveView] = useState<'division' | 'global'>('division')
   
   const handleViewChange = (view: 'division' | 'global') => {
     setActiveView(view)
-    onViewChange?.(view)
+    // TODO: Implement view switching logic
   }
   
   const divisionEmoji = currentDivision.emoji || divisionEmojis[currentDivision.name] || '🏆'
