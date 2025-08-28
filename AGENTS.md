@@ -172,6 +172,11 @@ npm run dev
 # Uses same Supabase cloud database as production
 ```
 
+### Test Credentials
+For local development and testing:
+- Email: `gabrielxz@yahoo.com`
+- Password: `gideonxz`
+
 ### Testing Webhooks Locally
 - Use ngrok for local webhook testing (requires account)
 - Or deploy to Vercel and test with production URL
