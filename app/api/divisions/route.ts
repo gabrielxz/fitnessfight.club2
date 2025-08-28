@@ -26,19 +26,19 @@ export async function GET() {
       .single()
     
     if (!userDivision) {
-      // Assign to Bronze division if not assigned
-      const { data: bronzeDivision } = await supabase
+      // Assign to Noodle division if not assigned
+      const { data: noodleDivision } = await supabase
         .from('divisions')
         .select('id')
-        .eq('name', 'Bronze')
+        .eq('name', 'Noodle')
         .single()
       
-      if (bronzeDivision) {
+      if (noodleDivision) {
         const { data: newUserDivision } = await supabase
           .from('user_divisions')
           .insert({
             user_id: user.id,
-            division_id: bronzeDivision.id
+            division_id: noodleDivision.id
           })
           .select('*, division:divisions(*)')
           .single()
@@ -110,7 +110,7 @@ export async function GET() {
     
     // Determine zone (top 1 promotes, bottom 1 relegates)
     let zone = 'safe'
-    if (position === 1 && userDivision.division.level < 6) {
+    if (position === 1 && userDivision.division.level < 4) {
       zone = 'promotion'
     } else if (position === totalInDivision && totalInDivision > 1 && userDivision.division.level > 1) {
       zone = 'relegation'

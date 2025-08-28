@@ -2,7 +2,7 @@
 CREATE TABLE IF NOT EXISTS divisions (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   name TEXT NOT NULL UNIQUE,
-  level INTEGER NOT NULL UNIQUE CHECK (level >= 1 AND level <= 6),
+  level INTEGER NOT NULL UNIQUE CHECK (level >= 1 AND level <= 4),
   min_users INTEGER DEFAULT 4,
   max_users INTEGER DEFAULT 10,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -10,12 +10,10 @@ CREATE TABLE IF NOT EXISTS divisions (
 
 -- Seed divisions
 INSERT INTO divisions (name, level) VALUES
-  ('Bronze', 1),
-  ('Silver', 2),
-  ('Gold', 3),
-  ('Platinum', 4),
-  ('Diamond', 5),
-  ('Champion', 6);
+  ('Noodle', 1),
+  ('Sweaty', 2),
+  ('Shreddy', 3),
+  ('Juicy', 4);
 
 -- Create user_divisions table
 CREATE TABLE IF NOT EXISTS user_divisions (
@@ -105,11 +103,11 @@ CREATE TRIGGER update_user_points_updated_at
   FOR EACH ROW
   EXECUTE FUNCTION update_updated_at_column();
 
--- Assign existing users to Bronze division (initial assignment)
+-- Assign existing users to Noodle division (initial assignment)
 INSERT INTO user_divisions (user_id, division_id)
 SELECT 
   u.id,
-  (SELECT id FROM divisions WHERE name = 'Bronze')
+  (SELECT id FROM divisions WHERE name = 'Noodle')
 FROM auth.users u
 WHERE NOT EXISTS (
   SELECT 1 FROM user_divisions WHERE user_id = u.id

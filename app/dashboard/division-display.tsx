@@ -84,12 +84,10 @@ export default function DivisionDisplay({ userId }: DivisionDisplayProps) {
   
   // Division emoji map
   const divisionEmojis: Record<string, string> = {
-    'Bronze': '🥉',
-    'Silver': '🥈',
-    'Gold': '🥇',
-    'Platinum': '💎',
-    'Diamond': '💠',
-    'Champion': '👑'
+    'Noodle': '🍜',
+    'Sweaty': '💦',
+    'Shreddy': '💪',
+    'Juicy': '🧃'
   }
   
   return (
@@ -104,7 +102,7 @@ export default function DivisionDisplay({ userId }: DivisionDisplayProps) {
           </div>
           <p className="text-gray-600">
             Your position: <span className="font-semibold">#{position}</span> of {totalInDivision}
-            {division.level < 6 && position === 1 && (
+            {division.level < 4 && position === 1 && (
               <span className="text-green-600 ml-2">• Top 1 promotes to next division</span>
             )}
             {division.level > 1 && position === totalInDivision && totalInDivision > 1 && (
@@ -154,7 +152,7 @@ export default function DivisionDisplay({ userId }: DivisionDisplayProps) {
         <div className="space-y-2">
           {leaderboard.map((user, idx) => {
             const isCurrentUser = user.user_id === userId
-            const isPromotionZone = idx === 0 && division.level < 6
+            const isPromotionZone = idx === 0 && division.level < 4
             const isRelegationZone = idx === leaderboard.length - 1 && leaderboard.length > 1 && division.level > 1
             
             return (

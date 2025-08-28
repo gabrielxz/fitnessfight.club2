@@ -89,8 +89,8 @@ export async function GET(request: NextRequest) {
       }
       
       // Determine promotions and relegations
-      // Promote top user (if not in Champion division and division has more than 1 user)
-      if (division.level < 6 && userPoints.length > 1) {
+      // Promote top user (if not in Juicy division and division has more than 1 user)
+      if (division.level < 4 && userPoints.length > 1) {
         const topUser = userPoints[0]
         const nextDivision = divisions.find(d => d.level === division.level + 1)
         
@@ -107,7 +107,7 @@ export async function GET(request: NextRequest) {
         }
       }
       
-      // Relegate bottom user (if not in Bronze division and division has more than 1 user)
+      // Relegate bottom user (if not in Noodle division and division has more than 1 user)
       if (division.level > 1 && userPoints.length > 1) {
         const bottomUser = userPoints[userPoints.length - 1]
         const prevDivision = divisions.find(d => d.level === division.level - 1)

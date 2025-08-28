@@ -1,7 +1,7 @@
 # Release 1: Core Division & Points System
 
 ## Overview
-This release implements the foundational division system and points calculation for Fitness Fight Club. Users will be assigned to competitive divisions (Bronze, Silver, Gold, Platinum, Diamond, Champion) with weekly promotions/relegations based on performance. Points are earned at 1 point per hour of exercise, capped at 10 points per week.
+This release implements the foundational division system and points calculation for Fitness Fight Club. Users will be assigned to competitive divisions (Noodle, Sweaty, Shreddy, Juicy) with weekly promotions/relegations based on performance. Points are earned at 1 point per hour of exercise, capped at 10 points per week.
 
 ## Key Features
 - Division assignment and management system
@@ -16,8 +16,8 @@ This release implements the foundational division system and points calculation 
 ```sql
 CREATE TABLE divisions (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  name TEXT NOT NULL UNIQUE, -- 'Bronze', 'Silver', 'Gold', 'Platinum', 'Diamond', 'Champion'
-  level INTEGER NOT NULL UNIQUE, -- 1-6, for ordering
+  name TEXT NOT NULL UNIQUE, -- 'Noodle', 'Sweaty', 'Shreddy', 'Juicy'
+  level INTEGER NOT NULL UNIQUE, -- 1-4, for ordering
   min_users INTEGER DEFAULT 4, -- Minimum users per division
   max_users INTEGER DEFAULT 10, -- Maximum users per division
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -25,12 +25,10 @@ CREATE TABLE divisions (
 
 -- Seed divisions
 INSERT INTO divisions (name, level) VALUES
-  ('Bronze', 1),
-  ('Silver', 2),
-  ('Gold', 3),
-  ('Platinum', 4),
-  ('Diamond', 5),
-  ('Champion', 6);
+  ('Noodle', 1),
+  ('Sweaty', 2),
+  ('Shreddy', 3),
+  ('Juicy', 4);
 ```
 
 ### 2. Create `user_divisions` table

@@ -314,22 +314,22 @@ async function calculateUserPoints(userId: string, activity: Activity, supabase:
       .single()
     
     if (!userDivision) {
-      // Assign to Bronze division if not assigned
-      const { data: bronzeDivision } = await supabase
+      // Assign to Noodle division if not assigned
+      const { data: noodleDivision } = await supabase
         .from('divisions')
         .select('id')
-        .eq('name', 'Bronze')
+        .eq('name', 'Noodle')
         .single()
       
-      if (bronzeDivision) {
+      if (noodleDivision) {
         await supabase
           .from('user_divisions')
           .insert({
             user_id: userId,
-            division_id: bronzeDivision.id
+            division_id: noodleDivision.id
           })
         
-        console.log(`Assigned user ${userId} to Bronze division`)
+        console.log(`Assigned user ${userId} to Noodle division`)
       }
     }
   } catch (error) {
