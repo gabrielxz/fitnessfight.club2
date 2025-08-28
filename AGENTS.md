@@ -213,15 +213,26 @@ Run migrations in Supabase SQL Editor (in order):
 
 ## Completed Features
 - ✅ **Release 1**: Division system with points and weekly promotions/relegations
+- ✅ **Release 2**: UI Redesign with dark theme and glassmorphism effects
+
+### Release 2 Details (Completed)
+- **Dark Theme**: Gradient background (#0F0F1E → #1A1A2E → #2A1A3E)
+- **Glassmorphism**: Glass-card components with backdrop blur
+- **Animated Background**: Floating particle effects
+- **New Components**:
+  - AnimatedBackground: Canvas-based particle animation
+  - Navigation: Modern nav with user avatar and glassmorphism
+  - DivisionSelector: Toggle between division/global views
+  - AthleteCard: Individual athlete cards with zone indicators
+  - DivisionLeaderboard: Fetches and displays standings
+  - WeekProgress: Competition timeline with progress bar
+- **Visual Enhancements**:
+  - Orange/yellow gradient accents (#FF6B35, #F7931E)
+  - Promotion/relegation zone badges
+  - Custom CSS animations (fadeIn, slideUp)
+  - Responsive design for all screen sizes
 
 ## Upcoming Releases
-### Release 2: UI Redesign
-- Dark theme with glassmorphism effects
-- Modern card-based layout
-- Animated backgrounds
-- Division/Global view toggle
-- Enhanced visual hierarchy
-
 ### Release 3: Badge System
 - 10+ badge types with Bronze/Silver/Gold tiers
 - Automatic badge calculation on activity sync
