@@ -15,23 +15,31 @@ A web application that syncs with Strava to track exercise data and create custo
 ```
 ├── app/
 │   ├── api/
+│   │   ├── cron/
+│   │   │   └── weekly-division-shuffle/  # Weekly division promotions/relegations
+│   │   ├── divisions/            # Division standings API
 │   │   ├── stats/weekly/         # Weekly activity statistics
 │   │   └── strava/
 │   │       ├── callback/         # Strava OAuth callback
 │   │       ├── connect/          # Initiate Strava OAuth
 │   │       ├── sync/             # Manual activity sync
-│   │       └── webhook/          # Strava webhook receiver
+│   │       └── webhook/          # Strava webhook receiver + points calculation
 │   ├── auth/
 │   │   ├── callback/             # Supabase OAuth callback
 │   │   ├── signout/              # Sign out handler
 │   │   └── auth-code-error/      # OAuth error page
 │   ├── dashboard/
 │   │   ├── page.tsx              # Protected dashboard
+│   │   ├── division-display.tsx  # Division standings & leaderboard
 │   │   ├── strava-connection.tsx # Strava connection UI
 │   │   ├── sync-activities.tsx   # Manual sync button
-│   │   └── weekly-stats.tsx      # Weekly hours display
+│   │   └── weekly-stats.tsx      # Weekly hours & points display
 │   ├── login/                    # Login/signup page
 │   └── page.tsx                  # Landing page
+├── context/                      # Release planning documents
+│   ├── release-1-divisions-and-points.md
+│   ├── release-2-ui-redesign.md
+│   └── release-3-badge-system.md
 ├── lib/supabase/
 │   ├── client.ts                 # Browser client
 │   ├── server.ts                 # Server client
@@ -39,12 +47,13 @@ A web application that syncs with Strava to track exercise data and create custo
 ├── middleware.ts                 # Auth middleware
 ├── scripts/
 │   └── setup-webhook.js          # Strava webhook management
-└── supabase/migrations/          # Database migrations
+├── supabase/migrations/          # Database migrations
+└── vercel.json                   # Cron job configuration
 ```
 
 ## Database Schema
 
-### Tables
+### Core Tables
 1. **strava_connections** - Stores user's Strava OAuth tokens and profile
    - RLS: Public read (for webhooks), user-controlled write
 
@@ -54,6 +63,23 @@ A web application that syncs with Strava to track exercise data and create custo
 
 3. **strava_webhook_events** - Logs all webhook events for debugging
    - Tracks processing status and errors
+
+### Division System Tables (Release 1)
+4. **divisions** - Division definitions (Noodle, Sweaty, Shreddy, Juicy)
+   - 4 levels with fun names and emojis
+   - Min/max user limits per division
+
+5. **user_divisions** - Current division assignments
+   - Tracks which division each user is in
+   - Join date for division tenure tracking
+
+6. **division_history** - Promotion/relegation history
+   - Tracks all division changes
+   - Records final points and position
+
+7. **user_points** - Weekly points cache
+   - Points calculation: 1 point per hour, max 10/week
+   - Cached to avoid recalculation on each page load
 
 ### Views
 - **weekly_activity_stats** - Pre-calculated weekly statistics
@@ -76,6 +102,13 @@ A web application that syncs with Strava to track exercise data and create custo
 - Weekly hours calculation with week-over-week comparison
 - Soft delete for activities removed from Strava
 
+### Division System (Release 1 - Implemented)
+- **4 Divisions**: Noodle 🍜 → Sweaty 💦 → Shreddy 💪 → Juicy 🧃
+- **Points System**: 1 point per hour of exercise, capped at 10 points/week
+- **Weekly Promotions/Relegations**: Top user promotes, bottom user relegates (Sundays 11:59 PM UTC)
+- **Auto-assignment**: New users start in Noodle division
+- **Leaderboards**: Division-specific standings with promotion/relegation zones
+
 ## Environment Variables
 ```bash
 # Supabase
@@ -88,6 +121,9 @@ STRAVA_CLIENT_SECRET=[client-secret]
 
 # Strava Webhooks
 STRAVA_WEBHOOK_VERIFY_TOKEN=[random-string]
+
+# Cron Job Security (Release 1)
+CRON_SECRET=[secure-random-token]
 ```
 
 ## Deployment
@@ -96,6 +132,7 @@ STRAVA_WEBHOOK_VERIFY_TOKEN=[random-string]
 - Auto-deploys from GitHub main branch
 - Environment variables set in Vercel dashboard
 - Function logs available for debugging webhooks
+- **Cron Jobs**: Weekly division shuffle runs Sundays at 11:59 PM UTC
 
 ### Strava Webhook Setup
 ```bash
@@ -140,9 +177,10 @@ npm run dev
 - Or deploy to Vercel and test with production URL
 
 ### Database Migrations
-Run migrations in Supabase SQL Editor:
+Run migrations in Supabase SQL Editor (in order):
 1. `001_create_strava_connections.sql`
 2. `002_create_strava_activities.sql`
+3. `003_create_divisions.sql` (Release 1)
 
 ## Security Considerations
 
@@ -162,12 +200,33 @@ Run migrations in Supabase SQL Editor:
 - `POST /api/strava/webhook` - Webhook events
 
 ### Protected Routes (requires auth)
-- `GET /dashboard` - User dashboard
+- `GET /dashboard` - User dashboard (includes division display)
+- `GET /api/divisions` - Get division standings and leaderboard
 - `GET /api/strava/connect` - Initiate Strava OAuth
 - `GET /api/strava/callback` - Strava OAuth callback
 - `POST /api/strava/sync` - Manual sync
-- `GET /api/stats/weekly` - Weekly statistics
+- `GET /api/stats/weekly` - Weekly statistics (includes points)
 - `POST /auth/signout` - Sign out
+
+### Cron Routes (requires CRON_SECRET)
+- `GET /api/cron/weekly-division-shuffle` - Weekly promotions/relegations
+
+## Completed Features
+- ✅ **Release 1**: Division system with points and weekly promotions/relegations
+
+## Upcoming Releases
+### Release 2: UI Redesign
+- Dark theme with glassmorphism effects
+- Modern card-based layout
+- Animated backgrounds
+- Division/Global view toggle
+- Enhanced visual hierarchy
+
+### Release 3: Badge System
+- 10+ badge types with Bronze/Silver/Gold tiers
+- Automatic badge calculation on activity sync
+- Badge showcase on profiles
+- Progress tracking toward next tier
 
 ## Future Enhancements
 - Custom leaderboards for groups
