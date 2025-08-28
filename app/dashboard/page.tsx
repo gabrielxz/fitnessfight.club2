@@ -1,90 +1,139 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
+import AnimatedBackground from '@/app/components/AnimatedBackground'
+import Navigation from '@/app/components/Navigation'
+import DivisionSelector from './DivisionSelector'
+import DivisionLeaderboard from './DivisionLeaderboard'
+import WeekProgress from './WeekProgress'
 import StravaConnection from './strava-connection'
-import WeeklyStats from './weekly-stats'
 import SyncActivities from './sync-activities'
-import DivisionDisplay from './division-display'
 
 export default async function DashboardPage() {
   const supabase = await createClient()
-  
   const { data: { user } } = await supabase.auth.getUser()
   
-  if (!user) {
-    redirect('/login')
-  }
-
-  // Fetch Strava connection data
+  if (!user) redirect('/login')
+  
+  // Fetch user division and stats
+  const { data: userDivision } = await supabase
+    .from('user_divisions')
+    .select('*, divisions(*)')
+    .eq('user_id', user.id)
+    .single()
+    
+  // Fetch Strava connection
   const { data: stravaConnection } = await supabase
     .from('strava_connections')
     .select('*')
     .eq('user_id', user.id)
     .single()
-
+  
+  const division = userDivision?.divisions || { name: 'Noodle', level: 1, emoji: '🍜' }
+  
   return (
-    <div className="min-h-screen bg-gray-50">
-      <nav className="bg-white shadow">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16">
-            <div className="flex items-center">
-              <h1 className="text-xl font-semibold">Fitness Fight Club</h1>
-            </div>
-            <div className="flex items-center space-x-4">
-              <span className="text-gray-700">{user.email}</span>
-              <form action="/auth/signout" method="post">
-                <button
-                  type="submit"
-                  className="bg-gray-200 hover:bg-gray-300 px-4 py-2 rounded-md text-sm font-medium text-gray-700"
-                >
-                  Sign out
-                </button>
-              </form>
+    <div className="min-h-screen relative">
+      <AnimatedBackground />
+      <Navigation user={user} />
+      
+      <main className="relative z-10 pt-24 pb-12 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto">
+          {/* Hero Section */}
+          <div className="text-center mb-12">
+            <h1 className="text-5xl lg:text-7xl font-black mb-4">
+              <span className="gradient-text">Fitness Fight Club</span>
+            </h1>
+            <p className="text-gray-400 text-lg">Compete. Conquer. Champion.</p>
+            <div className="inline-flex items-center gap-2 mt-4 px-4 py-2 glass-card">
+              <span>📅</span>
+              <span className="text-sm text-gray-300">
+                Week {getWeekNumber()} of {new Date().getFullYear()}
+              </span>
             </div>
           </div>
-        </div>
-      </nav>
-
-      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        <div className="px-4 py-6 sm:px-0">
-          <div className="bg-white shadow rounded-lg p-8">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6">
-              Welcome to your Dashboard!
-            </h2>
-            
-            <StravaConnection 
-              isConnected={!!stravaConnection}
-              stravaName={stravaConnection ? `${stravaConnection.strava_firstname} ${stravaConnection.strava_lastname}` : null}
-              stravaProfile={stravaConnection?.strava_profile}
-            />
-
-            {stravaConnection && (
-              <>
-                <div className="mt-8">
-                  <DivisionDisplay userId={user.id} />
-                </div>
-
-                <div className="mt-8">
-                  <WeeklyStats userId={user.id} />
-                </div>
-
-                <div className="mt-6">
+          
+          {!stravaConnection ? (
+            <div className="glass-card p-8 text-center">
+              <h2 className="text-2xl font-bold mb-4">Connect Your Strava Account</h2>
+              <p className="text-gray-400 mb-6">
+                Link your Strava account to start competing and tracking your fitness journey
+              </p>
+              <StravaConnection 
+                isConnected={false}
+                stravaName={null}
+                stravaProfile={null}
+              />
+            </div>
+          ) : (
+            <>
+              {/* Strava Connection Status */}
+              <div className="glass-card p-6 mb-8">
+                <div className="flex justify-between items-center">
+                  <StravaConnection 
+                    isConnected={true}
+                    stravaName={`${stravaConnection.strava_firstname} ${stravaConnection.strava_lastname}`}
+                    stravaProfile={stravaConnection.strava_profile}
+                  />
                   <SyncActivities />
                 </div>
-
-                <div className="mt-8 border-t pt-8">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Coming Soon</h3>
-                  <ul className="space-y-2 text-gray-600">
-                    <li>• Badge system with achievements</li>
-                    <li>• Custom leaderboards for your group</li>
-                    <li>• Weekly and monthly challenges</li>
-                    <li>• Advanced stats and progress tracking</li>
-                  </ul>
+              </div>
+              
+              {/* Division Selector */}
+              <DivisionSelector 
+                currentDivision={division}
+                onViewChange={(view) => console.log('View changed to:', view)}
+              />
+              
+              {/* Leaderboard */}
+              <DivisionLeaderboard userId={user.id} />
+              
+              {/* Week Progress */}
+              <WeekProgress />
+              
+              {/* Coming Soon Section */}
+              <div className="glass-card p-6 mt-8">
+                <h3 className="text-lg font-bold mb-4">Coming Soon</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="flex items-center gap-3">
+                    <span className="text-2xl">🏅</span>
+                    <div>
+                      <p className="font-semibold">Badge System</p>
+                      <p className="text-sm text-gray-400">Earn achievements for your efforts</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-2xl">👥</span>
+                    <div>
+                      <p className="font-semibold">Custom Groups</p>
+                      <p className="text-sm text-gray-400">Create private leaderboards</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-2xl">🎯</span>
+                    <div>
+                      <p className="font-semibold">Challenges</p>
+                      <p className="text-sm text-gray-400">Weekly and monthly competitions</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-2xl">📊</span>
+                    <div>
+                      <p className="font-semibold">Advanced Stats</p>
+                      <p className="text-sm text-gray-400">Detailed progress tracking</p>
+                    </div>
+                  </div>
                 </div>
-              </>
-            )}
-          </div>
+              </div>
+            </>
+          )}
         </div>
       </main>
     </div>
   )
+}
+
+function getWeekNumber() {
+  const now = new Date()
+  const start = new Date(now.getFullYear(), 0, 1)
+  const diff = now.getTime() - start.getTime()
+  return Math.ceil(diff / (1000 * 60 * 60 * 24 * 7))
 }
