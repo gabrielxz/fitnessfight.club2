@@ -72,10 +72,6 @@ export async function GET(request: NextRequest) {
           strava_firstname,
           strava_lastname,
           strava_profile
-        ),
-        user_badges!left(
-          tier,
-          badge:badges(emoji, name)
         )
       `)
       .eq('division_id', divisionIdToFetch)
@@ -98,12 +94,6 @@ export async function GET(request: NextRequest) {
       }>
       const connection = connections?.[0]
       
-      const badges = (divUser.user_badges as unknown as { tier: string; badge: { emoji: string; name: string } }[])?.map(b => ({
-        emoji: b.badge.emoji,
-        name: b.badge.name,
-        tier: b.tier,
-      })) || []
-
       return {
         user_id: divUser.user_id,
         name: connection
@@ -112,7 +102,7 @@ export async function GET(request: NextRequest) {
         strava_profile: connection?.strava_profile,
         total_points: points?.total_points || 0,
         total_hours: points?.total_hours || 0,
-        badges,
+        badges: [],
       }
     }) || []
     
