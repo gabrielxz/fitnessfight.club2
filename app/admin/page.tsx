@@ -1,6 +1,8 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import AdminDashboard from './AdminDashboard'
+import Navigation from '@/app/components/Navigation'
+import AnimatedBackground from '@/app/components/AnimatedBackground'
 
 export default async function AdminPage() {
   const supabase = await createClient()
@@ -19,11 +21,17 @@ export default async function AdminPage() {
     redirect('/')
   }
 
-  // Fetch all users
-  const { data: users } = await supabase
+  // Fetch all users from strava_connections with proper column names
+  const { data: stravaUsers } = await supabase
     .from('strava_connections')
-    .select('user_id, strava_id, display_name')
-    .order('display_name')
+    .select('user_id, strava_athlete_id, strava_firstname, strava_lastname')
+
+  // Format the users with display names
+  const users = stravaUsers?.map(u => ({
+    user_id: u.user_id,
+    strava_id: u.strava_athlete_id?.toString() || '',
+    display_name: `${u.strava_firstname || ''} ${u.strava_lastname || ''}`.trim() || 'Unknown User'
+  })) || []
 
   // Fetch all badges
   const { data: badges } = await supabase
@@ -49,12 +57,16 @@ export default async function AdminPage() {
     .select('*')
 
   return (
-    <AdminDashboard 
-      users={users || []}
-      badges={badges || []}
-      divisions={divisions || []}
-      userDivisions={userDivisions || []}
-      userBadges={userBadges || []}
-    />
+    <div className="min-h-screen relative">
+      <AnimatedBackground />
+      <Navigation user={user} />
+      <AdminDashboard 
+        users={users}
+        badges={badges || []}
+        divisions={divisions || []}
+        userDivisions={userDivisions || []}
+        userBadges={userBadges || []}
+      />
+    </div>
   )
 }
