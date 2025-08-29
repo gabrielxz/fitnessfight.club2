@@ -79,6 +79,20 @@ export async function GET(request: NextRequest) {
       .in('user_id', userIds)
       .eq('week_start', weekStartStr)
 
+    // Get auth user data for names
+    const { data: authUsers } = await supabase.auth.admin.listUsers()
+    const authUserMap = new Map(
+      authUsers?.users
+        ?.filter(u => userIds.includes(u.id))
+        ?.map(u => [
+          u.id, 
+          u.user_metadata?.full_name || 
+          u.user_metadata?.name || 
+          u.email?.split('@')[0] || 
+          'User'
+        ]) || []
+    )
+
     // Get Strava connections for all users
     const { data: stravaConnections } = await supabase
       .from('strava_connections')
@@ -106,15 +120,20 @@ export async function GET(request: NextRequest) {
           tier: b.tier,
         })) || []
       
+      // Use auth name first, then Strava name, then fallback
+      const authName = authUserMap.get(divUser.user_id)
+      const stravaName = connection
+        ? `${connection.strava_firstname || ''} ${connection.strava_lastname || ''}`.trim()
+        : null
+      
       return {
         user_id: divUser.user_id,
-        name: connection
-          ? `${connection.strava_firstname || ''} ${connection.strava_lastname || ''}`
-          : 'Anonymous',
+        name: stravaName || authName || 'User',
         strava_profile: connection?.strava_profile,
         total_points: points?.total_points || 0,
         total_hours: points?.total_hours || 0,
         badges,
+        has_strava: !!connection,
       }
     }) || []
     

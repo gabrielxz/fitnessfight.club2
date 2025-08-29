@@ -21,17 +21,42 @@ export default async function AdminPage() {
     redirect('/')
   }
 
-  // Fetch all users from strava_connections with proper column names
-  const { data: stravaUsers } = await supabase
+  // Fetch all users from auth
+  const { data: authUsers } = await supabase.auth.admin.listUsers()
+  
+  // Fetch Strava connections
+  const { data: stravaConnections } = await supabase
     .from('strava_connections')
     .select('user_id, strava_athlete_id, strava_firstname, strava_lastname')
-
-  // Format the users with display names
-  const users = stravaUsers?.map(u => ({
-    user_id: u.user_id,
-    strava_id: u.strava_athlete_id?.toString() || '',
-    display_name: `${u.strava_firstname || ''} ${u.strava_lastname || ''}`.trim() || 'Unknown User'
-  })) || []
+  
+  // Create a map of Strava connections for quick lookup
+  const stravaMap = new Map(
+    stravaConnections?.map(s => [
+      s.user_id,
+      {
+        strava_id: s.strava_athlete_id?.toString() || '',
+        strava_name: `${s.strava_firstname || ''} ${s.strava_lastname || ''}`.trim()
+      }
+    ]) || []
+  )
+  
+  // Combine auth users with Strava data
+  const users = authUsers?.users?.map(u => {
+    const stravaData = stravaMap.get(u.id)
+    const authName = u.user_metadata?.full_name || 
+                    u.user_metadata?.name || 
+                    u.email?.split('@')[0] || 
+                    'User'
+    
+    return {
+      user_id: u.id,
+      email: u.email || '',
+      display_name: stravaData?.strava_name || authName,
+      strava_id: stravaData?.strava_id || '',
+      has_strava: !!stravaData,
+      created_at: u.created_at
+    }
+  }) || []
 
   // Fetch all badges
   const { data: badges } = await supabase

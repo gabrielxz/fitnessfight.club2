@@ -7,6 +7,9 @@ interface User {
   user_id: string
   strava_id: string
   display_name: string
+  email: string
+  has_strava: boolean
+  created_at: string
 }
 
 interface Badge {
@@ -140,6 +143,26 @@ export default function AdminDashboard({
       <div className="max-w-7xl mx-auto">
         <h1 className="text-4xl font-bold text-white mb-8">Admin Dashboard</h1>
         
+        {/* User Stats */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+          <div className="glass-card p-4">
+            <div className="text-gray-400 text-sm mb-1">Total Users</div>
+            <div className="text-2xl font-bold text-white">{users.length}</div>
+          </div>
+          <div className="glass-card p-4">
+            <div className="text-gray-400 text-sm mb-1">Strava Connected</div>
+            <div className="text-2xl font-bold text-green-500">
+              {users.filter(u => u.has_strava).length}
+            </div>
+          </div>
+          <div className="glass-card p-4">
+            <div className="text-gray-400 text-sm mb-1">Not Connected</div>
+            <div className="text-2xl font-bold text-gray-500">
+              {users.filter(u => !u.has_strava).length}
+            </div>
+          </div>
+        </div>
+        
         {/* User Management Section */}
         <div className="glass-card p-6 mb-8">
           <h2 className="text-2xl font-bold text-white mb-4">User Management</h2>
@@ -149,6 +172,8 @@ export default function AdminDashboard({
               <thead>
                 <tr className="border-b border-white/10">
                   <th className="pb-3 text-gray-400">Name</th>
+                  <th className="pb-3 text-gray-400">Email</th>
+                  <th className="pb-3 text-gray-400">Strava</th>
                   <th className="pb-3 text-gray-400">Division</th>
                   <th className="pb-3 text-gray-400">Badges</th>
                   <th className="pb-3 text-gray-400">Actions</th>
@@ -158,6 +183,14 @@ export default function AdminDashboard({
                 {users.map(user => (
                   <tr key={user.user_id} className="border-b border-white/5">
                     <td className="py-4 text-white">{user.display_name}</td>
+                    <td className="py-4 text-gray-300 text-sm">{user.email}</td>
+                    <td className="py-4">
+                      {user.has_strava ? (
+                        <span className="text-green-500" title="Connected">✅</span>
+                      ) : (
+                        <span className="text-gray-500" title="Not Connected">❌</span>
+                      )}
+                    </td>
                     <td className="py-4 text-white">{getUserDivision(user.user_id)}</td>
                     <td className="py-4">
                       <div className="flex gap-2 flex-wrap">
