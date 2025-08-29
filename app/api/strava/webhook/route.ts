@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { BadgeCalculator } from '@/lib/badges/BadgeCalculator'
 
 // GET handler for webhook subscription verification
 export async function GET(request: NextRequest) {
@@ -215,6 +216,21 @@ async function fetchAndStoreActivity(
     
     // Calculate points for this activity
     await calculateUserPoints(connection.user_id, activity, supabase)
+
+    // Calculate badges for this activity
+    const badgeCalculator = new BadgeCalculator(supabase)
+    await badgeCalculator.calculateBadgesForActivity({
+      strava_activity_id: activity.id,
+      user_id: connection.user_id,
+      start_date_local: activity.start_date_local,
+      distance: activity.distance,
+      moving_time: activity.moving_time,
+      calories: activity.calories,
+      total_elevation_gain: activity.total_elevation_gain,
+      average_speed: activity.average_speed,
+      type: activity.type,
+      sport_type: activity.sport_type
+    })
   } catch (error) {
     console.error(`Error fetching/storing activity ${activityId}:`, error)
     throw error

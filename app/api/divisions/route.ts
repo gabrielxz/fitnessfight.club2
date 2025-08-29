@@ -68,6 +68,10 @@ export async function GET() {
           strava_firstname,
           strava_lastname,
           strava_profile
+        ),
+        user_badges!left(
+          tier,
+          badge:badges(emoji, name)
         )
       `)
       .eq('division_id', userDivision.division_id)
@@ -90,6 +94,12 @@ export async function GET() {
       }>
       const connection = connections?.[0]
       
+      const badges = (divUser.user_badges as any)?.map((b: any) => ({
+        emoji: b.badge.emoji,
+        name: b.badge.name,
+        tier: b.tier,
+      })) || []
+
       return {
         user_id: divUser.user_id,
         name: connection
@@ -97,7 +107,8 @@ export async function GET() {
           : 'Anonymous',
         strava_profile: connection?.strava_profile,
         total_points: points?.total_points || 0,
-        total_hours: points?.total_hours || 0
+        total_hours: points?.total_hours || 0,
+        badges,
       }
     }) || []
     
