@@ -3,9 +3,9 @@ interface AthleteCardProps {
   name: string
   points: number
   hours: number
-  zone: 'promotion' | 'safe' | 'relegation'
+  zone: 'promotion' | 'safe' | 'relegation' | null
   isCurrentUser?: boolean
-  badges?: Array<{ emoji: string; tier: 'gold' | 'silver' | 'bronze' }>
+  badges?: Array<{ emoji: string; name?: string; tier: 'gold' | 'silver' | 'bronze' | string }>
 }
 
 export default function AthleteCard({

@@ -14,6 +14,11 @@ interface LeaderboardEntry {
   strava_profile?: string
   total_points: number
   total_hours: number
+  badges?: Array<{
+    emoji: string
+    name: string
+    tier: string
+  }>
 }
 
 interface DivisionData {
@@ -24,51 +29,46 @@ interface DivisionData {
   }
   position: number
   totalInDivision: number
-  zone: 'promotion' | 'safe' | 'relegation'
+  zone: string
   leaderboard: LeaderboardEntry[]
+  currentUser?: {
+    id: string
+    points: number
+    hours: number
+  }
 }
 
 export default function DivisionLeaderboard({ userId, divisionId }: DivisionLeaderboardProps) {
   const [data, setData] = useState<DivisionData | null>(null)
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    const fetchLeaderboard = async () => {
-      try {
-        const url = divisionId ? `/api/divisions?divisionId=${divisionId}` : '/api/divisions'
-        const response = await fetch(url)
-        if (!response.ok) {
-          throw new Error('Failed to fetch division standings')
-        }
-        const divisionData = await response.json()
-        setData(divisionData)
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load leaderboard')
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchLeaderboard()
+    fetchDivisionData()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [divisionId])
+
+  async function fetchDivisionData() {
+    try {
+      const params = divisionId ? `?divisionId=${divisionId}` : ''
+      const response = await fetch(`/api/divisions${params}`)
+      const divisionData = await response.json()
+      setData(divisionData)
+    } catch (error) {
+      console.error('Error fetching division data:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   if (loading) {
     return (
-      <div className="space-y-4">
-        {[1, 2, 3, 4].map((i) => (
-          <div key={i} className="glass-card p-6 animate-pulse">
-            <div className="h-20 rounded-xl" style={{ backgroundColor: 'rgba(255, 255, 255, 0.05)' }}></div>
-          </div>
-        ))}
-      </div>
-    )
-  }
-
-  if (error) {
-    return (
-      <div className="glass-card p-6 text-center">
-        <p className="text-red-400">{error}</p>
+      <div className="glass-card p-6 animate-pulse">
+        <div className="h-4 bg-white/10 rounded w-1/3 mb-4"></div>
+        <div className="space-y-3">
+          <div className="h-20 bg-white/10 rounded"></div>
+          <div className="h-20 bg-white/10 rounded"></div>
+          <div className="h-20 bg-white/10 rounded"></div>
+        </div>
       </div>
     )
   }
@@ -81,20 +81,39 @@ export default function DivisionLeaderboard({ userId, divisionId }: DivisionLead
     )
   }
 
+  // Function to determine zone based on rank and division level
+  const getZone = (rank: number): 'promotion' | 'relegation' | null => {
+    // Only top player in divisions 1-3 gets promotion zone
+    if (rank === 1 && data.division.level < 4) {
+      return 'promotion'
+    }
+    // Only last player in divisions 2-4 gets relegation zone
+    if (rank === data.leaderboard.length && data.leaderboard.length > 1 && data.division.level > 1) {
+      return 'relegation'
+    }
+    // No zone indicator for safe positions
+    return null
+  }
+
   return (
     <div className="space-y-4">
-      {data.leaderboard.map((athlete, index) => (
-        <AthleteCard
-          key={athlete.user_id}
-          rank={index + 1}
-          name={athlete.name}
-          points={athlete.total_points}
-          hours={athlete.total_hours}
-          zone={data.zone}
-          isCurrentUser={athlete.user_id === userId}
-          badges={[]}
-        />
-      ))}
+      {data.leaderboard.map((athlete, index) => {
+        const rank = index + 1
+        const zone = getZone(rank)
+        
+        return (
+          <AthleteCard
+            key={athlete.user_id}
+            rank={rank}
+            name={athlete.name}
+            points={athlete.total_points}
+            hours={athlete.total_hours}
+            zone={zone}
+            isCurrentUser={athlete.user_id === userId}
+            badges={athlete.badges || []}
+          />
+        )
+      })}
     </div>
   )
 }

@@ -47,7 +47,7 @@ export default async function Page() {
             <h1 className="text-5xl lg:text-7xl font-black mb-4">
               <span className="gradient-text">Fitness Fight Club</span>
             </h1>
-            <p className="text-gray-400 text-lg">Compete. Conquer. Champion.</p>
+            <p className="text-gray-400 text-lg">Points. Badges. Flex.</p>
             <div className="inline-flex items-center gap-2 mt-4 px-4 py-2 glass-card">
               <span>📅</span>
               <span className="text-sm text-gray-300">
