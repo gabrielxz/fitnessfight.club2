@@ -21,13 +21,21 @@ export default async function AdminPage() {
     redirect('/')
   }
 
-  // Fetch all users from auth
-  const { data: authUsers } = await supabase.auth.admin.listUsers()
+  // Fetch all users who have divisions (which means they've signed up)
+  const { data: allUserDivisions } = await supabase
+    .from('user_divisions')
+    .select('user_id')
   
-  // Fetch Strava connections
+  const userIds = allUserDivisions?.map(ud => ud.user_id) || []
+  
+  // Also fetch users from Strava connections (in case they're not in divisions yet)
   const { data: stravaConnections } = await supabase
     .from('strava_connections')
     .select('user_id, strava_athlete_id, strava_firstname, strava_lastname')
+  
+  // Combine user IDs from both sources
+  const stravaUserIds = stravaConnections?.map(s => s.user_id) || []
+  const allUserIds = Array.from(new Set([...userIds, ...stravaUserIds]))
   
   // Create a map of Strava connections for quick lookup
   const stravaMap = new Map(
@@ -40,23 +48,20 @@ export default async function AdminPage() {
     ]) || []
   )
   
-  // Combine auth users with Strava data
-  const users = authUsers?.users?.map(u => {
-    const stravaData = stravaMap.get(u.id)
-    const authName = u.user_metadata?.full_name || 
-                    u.user_metadata?.name || 
-                    u.email?.split('@')[0] || 
-                    'User'
+  // For now, we'll use the Strava data and user divisions to show users
+  // In production, you'd want to add a profiles table or use auth.users with service role
+  const users = allUserIds.map(userId => {
+    const stravaData = stravaMap.get(userId)
     
     return {
-      user_id: u.id,
-      email: u.email || '',
-      display_name: stravaData?.strava_name || authName,
+      user_id: userId,
+      email: 'N/A', // We don't have access to emails without service role
+      display_name: stravaData?.strava_name || `User ${userId.substring(0, 8)}`,
       strava_id: stravaData?.strava_id || '',
       has_strava: !!stravaData,
-      created_at: u.created_at
+      created_at: new Date().toISOString()
     }
-  }) || []
+  })
 
   // Fetch all badges
   const { data: badges } = await supabase
