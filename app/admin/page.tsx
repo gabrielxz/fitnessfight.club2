@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import AdminDashboard from './AdminDashboard'
 import Navigation from '@/app/components/Navigation'
 import AnimatedBackground from '@/app/components/AnimatedBackground'
@@ -34,11 +35,29 @@ export default async function AdminPage() {
     redirect('/')
   }
 
-  // Fetch all user profiles
+  // Use admin client to fetch ALL users from auth.users
+  let authUsers: any = null
+  try {
+    const adminClient = createAdminClient()
+    const result = await adminClient.auth.admin.listUsers()
+    authUsers = result.data
+    if (result.error) {
+      console.error('Error fetching users:', result.error)
+    }
+  } catch (error) {
+    console.error('Failed to create admin client or fetch users:', error)
+    // Fall back to empty user list if admin client fails
+    authUsers = { users: [] }
+  }
+  
+  // Fetch user profiles (for those who have them)
   const { data: userProfiles } = await supabase
     .from('user_profiles')
     .select('*')
-    .order('created_at', { ascending: false })
+  
+  const profileMap = new Map(
+    userProfiles?.map(p => [p.id, p]) || []
+  )
   
   // Fetch all users who have divisions
   const { data: allUserDivisions } = await supabase
@@ -63,21 +82,30 @@ export default async function AdminPage() {
     ]) || []
   )
   
-  // Combine all users from profiles, showing their actual names
-  const users = userProfiles?.map(profile => {
-    const stravaData = stravaMap.get(profile.id)
-    const hasDivision = divisionUserIds.includes(profile.id)
+  // Combine ALL users from auth.users, enriching with profile/strava data
+  const users = authUsers?.users?.map(authUser => {
+    const profile = profileMap.get(authUser.id)
+    const stravaData = stravaMap.get(authUser.id)
+    const hasDivision = divisionUserIds.includes(authUser.id)
+    
+    // Get name from multiple sources in priority order
+    const displayName = stravaData?.strava_name || 
+                       profile?.full_name || 
+                       authUser.user_metadata?.full_name ||
+                       authUser.user_metadata?.name ||
+                       authUser.email?.split('@')[0] || 
+                       'Unknown User'
     
     return {
-      user_id: profile.id,
-      email: profile.email || 'N/A',
-      display_name: stravaData?.strava_name || profile.full_name || profile.email?.split('@')[0] || 'Unknown User',
+      user_id: authUser.id,
+      email: authUser.email || 'N/A',
+      display_name: displayName,
       strava_id: stravaData?.strava_id || '',
       has_strava: !!stravaData,
       has_division: hasDivision,
-      created_at: profile.created_at
+      created_at: authUser.created_at
     }
-  }) || [] // Show ALL users, even without divisions
+  }) || []
 
   // Fetch all badges
   const { data: badges } = await supabase
