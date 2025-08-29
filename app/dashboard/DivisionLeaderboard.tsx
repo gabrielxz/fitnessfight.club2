@@ -14,7 +14,7 @@ interface LeaderboardEntry {
   strava_profile?: string
   total_points: number
   total_hours: number
-  badges: { emoji: string; name: string; tier: string }[]
+  badges: { emoji: string; name: string; tier: "bronze" | "silver" | "gold" }[]
 }
 
 interface DivisionData {

@@ -38,7 +38,7 @@ export default async function Page() {
           {divisions?.map(division => (
             <div key={division.id} className="mb-8">
               <h2 className="text-3xl font-bold text-white mb-4">{division.name} Division</h2>
-              <DivisionLeaderboard userId={user?.id} divisionId={division.id} />
+              <DivisionLeaderboard userId={user?.id || null} divisionId={division.id} />
             </div>
           ))}
 
