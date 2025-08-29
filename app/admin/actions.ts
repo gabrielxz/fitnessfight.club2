@@ -17,6 +17,11 @@ export async function deleteUser(userId: string) {
 
   // Use admin client for complete deletion
   const adminClient = createAdminClient()
+  
+  // If the user is deleting themselves, sign them out first
+  if (user.id === userId) {
+    await supabase.auth.signOut()
+  }
 
   // Delete from strava_activities first (foreign key constraint)
   const { error: activitiesError } = await adminClient
@@ -89,11 +94,23 @@ export async function deleteUser(userId: string) {
   }
 
   // Finally, delete the user from auth.users (this requires service role)
-  const { error: authError } = await adminClient.auth.admin.deleteUser(userId)
+  try {
+    const { error: authError } = await adminClient.auth.admin.deleteUser(userId)
 
-  if (authError) {
-    console.error('Error deleting from auth.users:', authError)
-    throw new Error(`Failed to delete user account: ${authError.message}`)
+    if (authError) {
+      console.error('Error deleting from auth.users:', authError)
+      // Check if it's a permission error
+      if (authError.message?.includes('not authorized') || authError.message?.includes('permission')) {
+        throw new Error('Service role key is not configured properly. Please check SUPABASE_SERVICE_ROLE_KEY in environment variables.')
+      }
+      throw new Error(`Failed to delete user account: ${authError.message}`)
+    }
+    
+    console.log(`Successfully deleted user ${userId} from auth.users`)
+  } catch (error) {
+    console.error('Critical error during user deletion:', error)
+    // Re-throw to ensure the error is visible
+    throw error
   }
 
   revalidatePath('/admin')
