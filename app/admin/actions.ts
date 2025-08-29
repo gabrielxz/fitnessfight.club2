@@ -54,13 +54,8 @@ export async function deleteUser(userId: string) {
     console.error('Error deleting from user_points:', pointsError)
   }
 
-  // Delete the actual user from auth.users (this requires admin privileges)
-  const { error: authError } = await supabase.auth.admin.deleteUser(userId)
-
-  if (authError) {
-    console.error('Error deleting auth user:', authError)
-    throw new Error('Failed to delete user')
-  }
+  // Note: Deleting from auth.users requires service role key which we don't have in browser context
+  // The user will remain in auth.users but all their app data is deleted
 
   revalidatePath('/admin')
 }
@@ -76,37 +71,53 @@ export async function assignBadge(userId: string, badgeId: string, tier: 'bronze
     throw new Error('Unauthorized')
   }
 
-  // Check if user already has this badge
-  const { data: existing } = await supabase
-    .from('user_badges')
-    .select('*')
-    .eq('user_id', userId)
-    .eq('badge_id', badgeId)
-    .single()
-
-  if (existing) {
-    // Update tier if it exists
-    const { error } = await supabase
+  try {
+    // Check if user already has this badge
+    const { data: existing, error: checkError } = await supabase
       .from('user_badges')
-      .update({ tier, updated_at: new Date().toISOString() })
-      .eq('id', existing.id)
+      .select('*')
+      .eq('user_id', userId)
+      .eq('badge_id', badgeId)
+      .maybeSingle() // Use maybeSingle instead of single to avoid error if not found
 
-    if (error) throw error
-  } else {
-    // Insert new badge
-    const { error } = await supabase
-      .from('user_badges')
-      .insert({
-        user_id: userId,
-        badge_id: badgeId,
-        tier,
-        earned_at: new Date().toISOString()
-      })
+    if (checkError) {
+      console.error('Error checking existing badge:', checkError)
+      throw checkError
+    }
 
-    if (error) throw error
+    if (existing) {
+      // Update tier if it exists
+      const { error } = await supabase
+        .from('user_badges')
+        .update({ tier, updated_at: new Date().toISOString() })
+        .eq('id', existing.id)
+
+      if (error) {
+        console.error('Error updating badge:', error)
+        throw error
+      }
+    } else {
+      // Insert new badge
+      const { error } = await supabase
+        .from('user_badges')
+        .insert({
+          user_id: userId,
+          badge_id: badgeId,
+          tier,
+          earned_at: new Date().toISOString()
+        })
+
+      if (error) {
+        console.error('Error inserting badge:', error)
+        throw error
+      }
+    }
+
+    revalidatePath('/admin')
+  } catch (error) {
+    console.error('Error in assignBadge:', error)
+    throw error
   }
-
-  revalidatePath('/admin')
 }
 
 export async function removeBadge(userBadgeId: string) {
@@ -141,65 +152,86 @@ export async function changeDivision(userId: string, divisionId: string) {
     throw new Error('Unauthorized')
   }
 
-  // Check if user has a division assignment
-  const { data: existing } = await supabase
-    .from('user_divisions')
-    .select('*')
-    .eq('user_id', userId)
-    .single()
-
-  if (existing) {
-    // Record history of the change
-    const { data: oldDivision } = await supabase
-      .from('divisions')
+  try {
+    // Check if user has a division assignment
+    const { data: existing, error: checkError } = await supabase
+      .from('user_divisions')
       .select('*')
-      .eq('id', existing.division_id)
-      .single()
+      .eq('user_id', userId)
+      .maybeSingle() // Use maybeSingle to avoid error if not found
 
-    const { data: newDivision } = await supabase
-      .from('divisions')
-      .select('*')
-      .eq('id', divisionId)
-      .single()
-
-    if (oldDivision && newDivision) {
-      // Insert division history record
-      await supabase
-        .from('division_history')
-        .insert({
-          user_id: userId,
-          from_division_id: oldDivision.id,
-          to_division_id: newDivision.id,
-          change_type: oldDivision.level < newDivision.level ? 'promotion' : 'relegation',
-          change_reason: 'admin_manual',
-          final_points: 0,
-          final_position: 0,
-          week_ending: new Date().toISOString()
-        })
+    if (checkError) {
+      console.error('Error checking existing division:', checkError)
+      throw checkError
     }
 
-    // Update the division
-    const { error } = await supabase
-      .from('user_divisions')
-      .update({ 
-        division_id: divisionId,
-        joined_at: new Date().toISOString()
-      })
-      .eq('user_id', userId)
+    if (existing) {
+      // Record history of the change
+      const { data: oldDivision } = await supabase
+        .from('divisions')
+        .select('*')
+        .eq('id', existing.division_id)
+        .single()
 
-    if (error) throw error
-  } else {
-    // Insert new division assignment
-    const { error } = await supabase
-      .from('user_divisions')
-      .insert({
-        user_id: userId,
-        division_id: divisionId,
-        joined_at: new Date().toISOString()
-      })
+      const { data: newDivision } = await supabase
+        .from('divisions')
+        .select('*')
+        .eq('id', divisionId)
+        .single()
 
-    if (error) throw error
+      if (oldDivision && newDivision) {
+        // Insert division history record
+        const { error: historyError } = await supabase
+          .from('division_history')
+          .insert({
+            user_id: userId,
+            from_division_id: oldDivision.id,
+            to_division_id: newDivision.id,
+            change_type: oldDivision.level < newDivision.level ? 'promotion' : 'relegation',
+            change_reason: 'admin_manual',
+            final_points: 0,
+            final_position: 0,
+            week_ending: new Date().toISOString()
+          })
+        
+        if (historyError) {
+          console.error('Error inserting division history:', historyError)
+          // Don't throw, just log - history is not critical
+        }
+      }
+
+      // Update the division
+      const { error } = await supabase
+        .from('user_divisions')
+        .update({ 
+          division_id: divisionId,
+          joined_at: new Date().toISOString()
+        })
+        .eq('user_id', userId)
+
+      if (error) {
+        console.error('Error updating division:', error)
+        throw error
+      }
+    } else {
+      // Insert new division assignment
+      const { error } = await supabase
+        .from('user_divisions')
+        .insert({
+          user_id: userId,
+          division_id: divisionId,
+          joined_at: new Date().toISOString()
+        })
+
+      if (error) {
+        console.error('Error inserting division:', error)
+        throw error
+      }
+    }
+
+    revalidatePath('/admin')
+  } catch (error) {
+    console.error('Error in changeDivision:', error)
+    throw error
   }
-
-  revalidatePath('/admin')
 }

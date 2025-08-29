@@ -61,7 +61,7 @@ export default function AdminDashboard({
     const userDiv = userDivisions.find(ud => ud.user_id === userId)
     if (userDiv) {
       const division = divisions.find(d => d.id === userDiv.division_id)
-      return division ? `${division.emoji} ${division.name}` : 'No Division'
+      return division ? `${division.emoji || ''} ${division.name || ''}`.trim() : 'No Division'
     }
     return 'No Division'
   }
@@ -209,7 +209,7 @@ export default function AdminDashboard({
             <select
               value={selectedUser}
               onChange={(e) => setSelectedUser(e.target.value)}
-              className="bg-white/10 border border-white/20 rounded px-4 py-2 text-white"
+              className="bg-white/10 border border-white/20 rounded px-4 py-2 text-white [&>option]:text-black [&>option]:bg-white"
             >
               <option value="">Select User</option>
               {users.map(user => (
@@ -222,7 +222,7 @@ export default function AdminDashboard({
             <select
               value={selectedBadge}
               onChange={(e) => setSelectedBadge(e.target.value)}
-              className="bg-white/10 border border-white/20 rounded px-4 py-2 text-white"
+              className="bg-white/10 border border-white/20 rounded px-4 py-2 text-white [&>option]:text-black [&>option]:bg-white"
             >
               <option value="">Select Badge</option>
               {badges.map(badge => (
@@ -235,7 +235,7 @@ export default function AdminDashboard({
             <select
               value={selectedTier}
               onChange={(e) => setSelectedTier(e.target.value as 'bronze' | 'silver' | 'gold')}
-              className="bg-white/10 border border-white/20 rounded px-4 py-2 text-white"
+              className="bg-white/10 border border-white/20 rounded px-4 py-2 text-white [&>option]:text-black [&>option]:bg-white"
             >
               <option value="bronze">Bronze</option>
               <option value="silver">Silver</option>
@@ -260,7 +260,7 @@ export default function AdminDashboard({
             <select
               value={selectedUser}
               onChange={(e) => setSelectedUser(e.target.value)}
-              className="bg-white/10 border border-white/20 rounded px-4 py-2 text-white"
+              className="bg-white/10 border border-white/20 rounded px-4 py-2 text-white [&>option]:text-black [&>option]:bg-white"
             >
               <option value="">Select User</option>
               {users.map(user => (
@@ -273,7 +273,7 @@ export default function AdminDashboard({
             <select
               value={selectedDivision}
               onChange={(e) => setSelectedDivision(e.target.value)}
-              className="bg-white/10 border border-white/20 rounded px-4 py-2 text-white"
+              className="bg-white/10 border border-white/20 rounded px-4 py-2 text-white [&>option]:text-black [&>option]:bg-white"
             >
               <option value="">Select Division</option>
               {divisions.map(division => (
