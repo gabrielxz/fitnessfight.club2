@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { revalidatePath } from 'next/cache'
 
 export async function deleteUser(userId: string) {
@@ -14,8 +15,21 @@ export async function deleteUser(userId: string) {
     throw new Error('Unauthorized')
   }
 
-  // Delete from strava_connections (will cascade to other tables)
-  const { error: stravaError } = await supabase
+  // Use admin client for complete deletion
+  const adminClient = createAdminClient()
+
+  // Delete from strava_activities first (foreign key constraint)
+  const { error: activitiesError } = await adminClient
+    .from('strava_activities')
+    .delete()
+    .eq('user_id', userId)
+
+  if (activitiesError) {
+    console.error('Error deleting from strava_activities:', activitiesError)
+  }
+
+  // Delete from strava_connections
+  const { error: stravaError } = await adminClient
     .from('strava_connections')
     .delete()
     .eq('user_id', userId)
@@ -25,7 +39,7 @@ export async function deleteUser(userId: string) {
   }
 
   // Delete from user_divisions
-  const { error: divisionError } = await supabase
+  const { error: divisionError } = await adminClient
     .from('user_divisions')
     .delete()
     .eq('user_id', userId)
@@ -34,8 +48,18 @@ export async function deleteUser(userId: string) {
     console.error('Error deleting from user_divisions:', divisionError)
   }
 
+  // Delete from division_history
+  const { error: historyError } = await adminClient
+    .from('division_history')
+    .delete()
+    .eq('user_id', userId)
+
+  if (historyError) {
+    console.error('Error deleting from division_history:', historyError)
+  }
+
   // Delete from user_badges
-  const { error: badgeError } = await supabase
+  const { error: badgeError } = await adminClient
     .from('user_badges')
     .delete()
     .eq('user_id', userId)
@@ -45,7 +69,7 @@ export async function deleteUser(userId: string) {
   }
 
   // Delete from user_points
-  const { error: pointsError } = await supabase
+  const { error: pointsError } = await adminClient
     .from('user_points')
     .delete()
     .eq('user_id', userId)
@@ -54,8 +78,13 @@ export async function deleteUser(userId: string) {
     console.error('Error deleting from user_points:', pointsError)
   }
 
-  // Note: Deleting from auth.users requires service role key which we don't have in browser context
-  // The user will remain in auth.users but all their app data is deleted
+  // Finally, delete the user from auth.users (this requires service role)
+  const { error: authError } = await adminClient.auth.admin.deleteUser(userId)
+
+  if (authError) {
+    console.error('Error deleting from auth.users:', authError)
+    throw new Error(`Failed to delete user account: ${authError.message}`)
+  }
 
   revalidatePath('/admin')
 }
