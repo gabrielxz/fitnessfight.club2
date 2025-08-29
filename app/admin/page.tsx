@@ -36,7 +36,13 @@ export default async function AdminPage() {
   }
 
   // Use admin client to fetch ALL users from auth.users
-  let authUsers: any = null
+  let authUsers: { users: Array<{
+    id: string
+    email?: string
+    created_at?: string
+    user_metadata?: Record<string, unknown>
+  }> } | null = null
+  
   try {
     const adminClient = createAdminClient()
     const result = await adminClient.auth.admin.listUsers()
@@ -91,8 +97,8 @@ export default async function AdminPage() {
     // Get name from multiple sources in priority order
     const displayName = stravaData?.strava_name || 
                        profile?.full_name || 
-                       authUser.user_metadata?.full_name ||
-                       authUser.user_metadata?.name ||
+                       (authUser.user_metadata?.full_name as string) ||
+                       (authUser.user_metadata?.name as string) ||
                        authUser.email?.split('@')[0] || 
                        'Unknown User'
     
@@ -103,7 +109,7 @@ export default async function AdminPage() {
       strava_id: stravaData?.strava_id || '',
       has_strava: !!stravaData,
       has_division: hasDivision,
-      created_at: authUser.created_at
+      created_at: authUser.created_at || new Date().toISOString()
     }
   }) || []
 
