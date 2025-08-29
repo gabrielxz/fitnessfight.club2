@@ -16,6 +16,10 @@ A web application that syncs with Strava to track exercise data and create custo
 ## Project Structure
 ```
 ├── app/
+│   ├── admin/
+│   │   ├── page.tsx              # Admin dashboard page (hardcoded for Gabriel Beal)
+│   │   ├── AdminDashboard.tsx    # Admin UI component
+│   │   └── actions.ts            # Server actions for admin operations
 │   ├── api/
 │   │   ├── cron/
 │   │   │   └── weekly-division-shuffle/  # Weekly division promotions/relegations
@@ -35,6 +39,7 @@ A web application that syncs with Strava to track exercise data and create custo
 │   │   ├── DivisionSelector.tsx    # My Division/Global toggle
 │   │   ├── LoggedInView.tsx        # Authenticated user view
 │   │   ├── AthleteCard.tsx         # Individual athlete display
+│   │   ├── Navigation.tsx          # App navigation with admin link
 │   │   ├── strava-connection.tsx   # Strava connection UI
 │   │   ├── sync-activities.tsx     # Manual sync button
 │   │   └── WeekProgress.tsx        # Week progress bar
@@ -56,6 +61,11 @@ A web application that syncs with Strava to track exercise data and create custo
 ├── scripts/
 │   └── setup-webhook.js          # Strava webhook management
 ├── supabase/migrations/          # Database migrations
+│   ├── 001_create_strava_connections.sql
+│   ├── 002_create_strava_activities.sql
+│   ├── 003_create_divisions.sql
+│   ├── 004_create_badges.sql
+│   └── 005_admin_policies.sql   # Admin RLS policies
 └── vercel.json                   # Cron job configuration
 ```
 
@@ -225,6 +235,14 @@ Run migrations in Supabase SQL Editor (in order):
 - `GET /profile` - User profile page
 - `POST /auth/signout` - Sign out
 
+### Admin Routes (requires admin user - Gabriel Beal)
+- `GET /admin` - Admin dashboard
+- Server Actions (via /admin):
+  - `deleteUser` - Remove user from app
+  - `assignBadge` - Manually assign badges
+  - `removeBadge` - Remove badges from users
+  - `changeDivision` - Promote/demote users between divisions
+
 ### Cron Routes (requires CRON_SECRET)
 - `GET /api/cron/weekly-division-shuffle` - Weekly promotions/relegations
 
@@ -232,6 +250,7 @@ Run migrations in Supabase SQL Editor (in order):
 - ✅ **Release 1**: Division system with points and weekly promotions/relegations
 - ✅ **Release 2**: UI Redesign with dark theme and glassmorphism effects
 - ✅ **Release 3**: Badge System with 10 badge types and Bronze/Silver/Gold tiers
+- ✅ **Admin Dashboard**: Complete admin interface for user management (Gabriel Beal only)
 
 ### Release 2 Details (Completed)
 - **Dark Theme**: Gradient background (#0F0F1E → #1A1A2E → #2A1A3E)
@@ -258,6 +277,15 @@ Run migrations in Supabase SQL Editor (in order):
 - **Database Tables**: badges, user_badges, badge_progress
 - **Display**: Badges shown on athlete cards in leaderboards
 - **Note**: Badge removal on activity deletion not yet implemented (badges remain once earned)
+
+### Admin Dashboard Details (Completed)
+- **Access Control**: Hardcoded for Gabriel Beal (gabrielbeal@gmail.com)
+- **User Management**: View all users with divisions and badges
+- **Delete Users**: Remove users from app with confirmation
+- **Badge Management**: Manually assign/remove badges (Bronze/Silver/Gold)
+- **Division Management**: Promote/demote users between divisions
+- **Navigation**: Admin link appears in header for admin user only
+- **RLS Policies**: Custom admin policies in migration 005_admin_policies.sql
 
 ## Future Enhancements
 - Custom leaderboards for groups
