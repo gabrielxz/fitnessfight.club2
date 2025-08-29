@@ -3,6 +3,8 @@
 ## Project Overview
 A web application that syncs with Strava to track exercise data and create custom leaderboards for groups of friends.
 
+**Tagline**: Points. Badges. Flex.
+
 ## Tech Stack
 - **Frontend**: Next.js 14 (App Router), TypeScript, Tailwind CSS
 - **Backend**: Next.js API Routes
@@ -28,19 +30,25 @@ A web application that syncs with Strava to track exercise data and create custo
 │   │   ├── callback/             # Supabase OAuth callback
 │   │   ├── signout/              # Sign out handler
 │   │   └── auth-code-error/      # OAuth error page
-│   ├── dashboard/
-│   │   ├── page.tsx              # Protected dashboard
-│   │   ├── division-display.tsx  # Division standings & leaderboard
-│   │   ├── strava-connection.tsx # Strava connection UI
-│   │   ├── sync-activities.tsx   # Manual sync button
-│   │   └── weekly-stats.tsx      # Weekly hours & points display
-│   ├── login/                    # Login/signup page
-│   └── page.tsx                  # Landing page
+│   ├── components/
+│   │   ├── DivisionLeaderboard.tsx # Division standings & leaderboard
+│   │   ├── DivisionSelector.tsx    # My Division/Global toggle
+│   │   ├── LoggedInView.tsx        # Authenticated user view
+│   │   ├── AthleteCard.tsx         # Individual athlete display
+│   │   ├── strava-connection.tsx   # Strava connection UI
+│   │   ├── sync-activities.tsx     # Manual sync button
+│   │   └── WeekProgress.tsx        # Week progress bar
+│   ├── login/                       # Login/signup page
+│   ├── profile/                     # User profile page
+│   └── page.tsx                     # Landing/Dashboard (conditional based on auth)
 ├── context/                      # Release planning documents
 │   ├── release-1-divisions-and-points.md
 │   ├── release-2-ui-redesign.md
 │   └── release-3-badge-system.md
-├── lib/supabase/
+├── lib/
+│   ├── badges/
+│   │   └── BadgeCalculator.ts    # Badge calculation logic
+│   └── supabase/
 │   ├── client.ts                 # Browser client
 │   ├── server.ts                 # Server client
 │   └── middleware.ts             # Session refresh
@@ -103,11 +111,12 @@ A web application that syncs with Strava to track exercise data and create custo
 - Soft delete for activities removed from Strava
 
 ### Division System (Release 1 - Implemented)
-- **4 Divisions**: Noodle 🍜 → Sweaty 💦 → Shreddy 💪 → Juicy 🧃
+- **4 Divisions**: Noodle 🍜 (Level 1) → Sweaty 💦 (Level 2) → Shreddy 💪 (Level 3) → Juicy 🧃 (Level 4)
+- **Display Order**: Juicy shown first (most competitive), then descending by level
 - **Points System**: 1 point per hour of exercise, capped at 10 points/week
-- **Weekly Promotions/Relegations**: Top user promotes, bottom user relegates (Sundays 11:59 PM UTC)
+- **Weekly Promotions/Relegations**: Top 1 user promotes, bottom 1 user relegates (Sundays 11:59 PM UTC)
 - **Auto-assignment**: New users start in Noodle division
-- **Leaderboards**: Division-specific standings with promotion/relegation zones
+- **Leaderboards**: Division-specific standings with promotion/relegation zones (only rank #1 and last rank show zone indicators)
 
 ## Environment Variables
 ```bash
@@ -198,19 +207,22 @@ Run migrations in Supabase SQL Editor (in order):
 ## API Endpoints
 
 ### Public Routes
-- `GET /` - Landing page
+- `GET /` - Landing page (shows all divisions when not logged in, shows personalized dashboard when logged in)
 - `GET /login` - Authentication page
 - `GET /auth/callback` - OAuth callback
 - `GET /api/strava/webhook` - Webhook verification
 - `POST /api/strava/webhook` - Webhook events
 
 ### Protected Routes (requires auth)
-- `GET /dashboard` - User dashboard (includes division display)
+- `GET /` - Home page shows personalized dashboard when logged in
 - `GET /api/divisions` - Get division standings and leaderboard
+- `GET /api/badges` - Get user's earned badges
+- `GET /api/badges/progress` - Get badge progress for current user
 - `GET /api/strava/connect` - Initiate Strava OAuth
 - `GET /api/strava/callback` - Strava OAuth callback
 - `POST /api/strava/sync` - Manual sync
 - `GET /api/stats/weekly` - Weekly statistics (includes points)
+- `GET /profile` - User profile page
 - `POST /auth/signout` - Sign out
 
 ### Cron Routes (requires CRON_SECRET)
@@ -219,6 +231,7 @@ Run migrations in Supabase SQL Editor (in order):
 ## Completed Features
 - ✅ **Release 1**: Division system with points and weekly promotions/relegations
 - ✅ **Release 2**: UI Redesign with dark theme and glassmorphism effects
+- ✅ **Release 3**: Badge System with 10 badge types and Bronze/Silver/Gold tiers
 
 ### Release 2 Details (Completed)
 - **Dark Theme**: Gradient background (#0F0F1E → #1A1A2E → #2A1A3E)
@@ -227,22 +240,24 @@ Run migrations in Supabase SQL Editor (in order):
 - **New Components**:
   - AnimatedBackground: Canvas-based particle animation
   - Navigation: Modern nav with user avatar and glassmorphism
-  - DivisionSelector: Toggle between division/global views
-  - AthleteCard: Individual athlete cards with zone indicators
-  - DivisionLeaderboard: Fetches and displays standings
+  - DivisionSelector: Toggle between "My Division" and "Global" views (authenticated users only)
+  - AthleteCard: Individual athlete cards with zone indicators and badges
+  - DivisionLeaderboard: Fetches and displays standings with proper zone calculation
   - WeekProgress: Competition timeline with progress bar
+  - LoggedInView: Handles authenticated user view with division/global toggle
 - **Visual Enhancements**:
   - Orange/yellow gradient accents (#FF6B35, #F7931E)
   - Promotion/relegation zone badges
   - Custom CSS animations (fadeIn, slideUp)
   - Responsive design for all screen sizes
 
-## Upcoming Releases
-### Release 3: Badge System
-- 10+ badge types with Bronze/Silver/Gold tiers
-- Automatic badge calculation on activity sync
-- Badge showcase on profiles
-- Progress tracking toward next tier
+### Release 3 Details (Completed)
+- **10 Badge Types**: Early Bird, Night Owl, Power Hour, Consistency King, Globe Trotter, Mountain Climber, Speed Demon, Runner, Cyclist, Variety Pack
+- **3 Tiers**: Bronze, Silver, Gold for each badge
+- **Automatic Calculation**: BadgeCalculator runs on every webhook activity
+- **Database Tables**: badges, user_badges, badge_progress
+- **Display**: Badges shown on athlete cards in leaderboards
+- **Note**: Badge removal on activity deletion not yet implemented (badges remain once earned)
 
 ## Future Enhancements
 - Custom leaderboards for groups
