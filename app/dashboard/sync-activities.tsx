@@ -36,18 +36,18 @@ export default function SyncActivities() {
   }
 
   return (
-    <div className="bg-blue-50 rounded-lg p-6">
+    <div className="glass-card p-6">
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-lg font-medium text-gray-900">Sync Activities</h3>
-          <p className="mt-1 text-sm text-gray-600">
-            Import your recent activities from Strava
+          <h2 className="text-2xl font-bold text-white">Sync Activities</h2>
+          <p className="mt-1 text-sm text-gray-400">
+            Import your recent activities from Strava.
           </p>
         </div>
         <button
           onClick={handleSync}
           disabled={syncing}
-          className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-full text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
         >
           {syncing ? (
             <>
@@ -66,17 +66,12 @@ export default function SyncActivities() {
       {message && (
         <div className={`mt-4 p-3 rounded ${
           message.type === 'success' 
-            ? 'bg-green-100 text-green-700' 
-            : 'bg-red-100 text-red-700'
+            ? 'bg-green-900/50 text-green-300' 
+            : 'bg-red-900/50 text-red-300'
         }`}>
           {message.text}
         </div>
       )}
-
-      <div className="mt-4 text-xs text-gray-500">
-        Activities are automatically synced via webhooks when you record new activities on Strava.
-        Use this button to import your recent history.
-      </div>
     </div>
   )
 }

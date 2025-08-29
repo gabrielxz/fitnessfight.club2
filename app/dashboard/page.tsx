@@ -5,8 +5,6 @@ import Navigation from '@/app/components/Navigation'
 import DivisionSelector from './DivisionSelector'
 import DivisionLeaderboard from './DivisionLeaderboard'
 import WeekProgress from './WeekProgress'
-import StravaConnection from './strava-connection'
-import SyncActivities from './sync-activities'
 
 export default async function DashboardPage() {
   const supabase = await createClient()
@@ -21,13 +19,6 @@ export default async function DashboardPage() {
     .eq('user_id', user.id)
     .single()
     
-  // Fetch Strava connection
-  const { data: stravaConnection } = await supabase
-    .from('strava_connections')
-    .select('*')
-    .eq('user_id', user.id)
-    .single()
-  
   const division = userDivision?.divisions || { name: 'Noodle', level: 1, emoji: '🍜' }
   
   return (
@@ -51,79 +42,51 @@ export default async function DashboardPage() {
             </div>
           </div>
           
-          {!stravaConnection ? (
-            <div className="glass-card p-8 text-center">
-              <h2 className="text-2xl font-bold mb-4">Connect Your Strava Account</h2>
-              <p className="text-gray-400 mb-6">
-                Link your Strava account to start competing and tracking your fitness journey
-              </p>
-              <StravaConnection 
-                isConnected={false}
-                stravaName={null}
-                stravaProfile={null}
-              />
+          {/* Division Selector */}
+          <DivisionSelector 
+            currentDivision={division}
+          />
+          
+          {/* Leaderboard */}
+          <DivisionLeaderboard userId={user.id} />
+          
+          {/* Week Progress */}
+          <WeekProgress />
+          
+          {/* Coming Soon Section */}
+          <div className="glass-card p-6 mt-8">
+            <h3 className="text-lg font-bold mb-4">Coming Soon</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="flex items-center gap-3">
+                <span className="text-2xl">🏅</span>
+                <div>
+                  <p className="font-semibold">Badge System</p>
+                  <p className="text-sm text-gray-400">Earn achievements for your efforts</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-2xl">👥</span>
+                <div>
+                  <p className="font-semibold">Custom Groups</p>
+                  <p className="text-sm text-gray-400">Create private leaderboards</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-2xl">🎯</span>
+                <div>
+                  <p className="font-semibold">Challenges</p>
+                  <p className="text-sm text-gray-400">Weekly and monthly competitions</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-2xl">📊</span>
+                <div>
+                  <p className="font-semibold">Advanced Stats</p>
+                  <p className="text-sm text-gray-400">Detailed progress tracking</p>
+                </div>
+              </div>
             </div>
-          ) : (
-            <>
-              {/* Strava Connection Status */}
-              <div className="glass-card p-6 mb-8">
-                <div className="flex justify-between items-center">
-                  <StravaConnection 
-                    isConnected={true}
-                    stravaName={`${stravaConnection.strava_firstname} ${stravaConnection.strava_lastname}`}
-                    stravaProfile={stravaConnection.strava_profile}
-                  />
-                  <SyncActivities />
-                </div>
-              </div>
-              
-              {/* Division Selector */}
-              <DivisionSelector 
-                currentDivision={division}
-              />
-              
-              {/* Leaderboard */}
-              <DivisionLeaderboard userId={user.id} />
-              
-              {/* Week Progress */}
-              <WeekProgress />
-              
-              {/* Coming Soon Section */}
-              <div className="glass-card p-6 mt-8">
-                <h3 className="text-lg font-bold mb-4">Coming Soon</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="flex items-center gap-3">
-                    <span className="text-2xl">🏅</span>
-                    <div>
-                      <p className="font-semibold">Badge System</p>
-                      <p className="text-sm text-gray-400">Earn achievements for your efforts</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-2xl">👥</span>
-                    <div>
-                      <p className="font-semibold">Custom Groups</p>
-                      <p className="text-sm text-gray-400">Create private leaderboards</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-2xl">🎯</span>
-                    <div>
-                      <p className="font-semibold">Challenges</p>
-                      <p className="text-sm text-gray-400">Weekly and monthly competitions</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-2xl">📊</span>
-                    <div>
-                      <p className="font-semibold">Advanced Stats</p>
-                      <p className="text-sm text-gray-400">Detailed progress tracking</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </>
-          )}
+          </div>
         </div>
       </main>
     </div>

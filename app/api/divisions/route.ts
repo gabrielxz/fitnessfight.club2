@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
 // Helper functions for week calculations
@@ -9,62 +9,66 @@ function getWeekStart(date: Date): Date {
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), diff, 0, 0, 0, 0))
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
-    
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const searchParams = request.nextUrl.searchParams
+    const divisionId = searchParams.get('divisionId')
+
+    let divisionIdToFetch: string | null = divisionId
+
+    if (!divisionIdToFetch && user) {
+      // If no divisionId is provided, fetch the user's division
+      const { data: userDivision } = await supabase
+        .from('user_divisions')
+        .select('division_id')
+        .eq('user_id', user.id)
+        .single()
+      if (userDivision) {
+        divisionIdToFetch = userDivision.division_id
+      }
     }
-    
-    // Get user's current division
-    let { data: userDivision } = await supabase
-      .from('user_divisions')
-      .select('*, division:divisions(*)')
-      .eq('user_id', user.id)
-      .single()
-    
-    if (!userDivision) {
-      // Assign to Noodle division if not assigned
-      const { data: noodleDivision } = await supabase
+
+    if (!divisionIdToFetch) {
+      // If still no divisionId, we can default to the first division or handle as an error
+      // For a public leaderboard, let's default to the lowest level division
+      const { data: lowestDivision } = await supabase
         .from('divisions')
         .select('id')
-        .eq('name', 'Noodle')
+        .order('level', { ascending: true })
+        .limit(1)
         .single()
-      
-      if (noodleDivision) {
-        const { data: newUserDivision } = await supabase
-          .from('user_divisions')
-          .insert({
-            user_id: user.id,
-            division_id: noodleDivision.id
-          })
-          .select('*, division:divisions(*)')
-          .single()
-        
-        userDivision = newUserDivision
-      }
-      
-      if (!userDivision) {
-        return NextResponse.json({ 
-          error: 'Failed to assign division',
-          division: null,
-          newUser: true 
-        }, { status: 500 })
+      if (lowestDivision) {
+        divisionIdToFetch = lowestDivision.id
       }
     }
-    
+
+    if (!divisionIdToFetch) {
+      return NextResponse.json({ error: 'No divisions found' }, { status: 404 })
+    }
+
+    // Fetch division details
+    const { data: division } = await supabase
+      .from('divisions')
+      .select('*')
+      .eq('id', divisionIdToFetch)
+      .single()
+
+    if (!division) {
+      return NextResponse.json({ error: 'Division not found' }, { status: 404 })
+    }
+
     // Get current week
     const weekStart = getWeekStart(new Date())
     const weekStartStr = weekStart.toISOString().split('T')[0]
-    
-    // Get all users in the same division with their points and Strava info
+
+    // Get all users in the division with their points and Strava info
     const { data: divisionUsers } = await supabase
       .from('user_divisions')
       .select(`
         user_id,
-        strava_connections!inner(
+        strava_connections!left(
           strava_firstname,
           strava_lastname,
           strava_profile
@@ -74,8 +78,8 @@ export async function GET() {
           badge:badges(emoji, name)
         )
       `)
-      .eq('division_id', userDivision.division_id)
-    
+      .eq('division_id', divisionIdToFetch)
+
     // Get points for all users in the division
     const userIds = divisionUsers?.map(u => u.user_id) || []
     const { data: userPoints } = await supabase
@@ -83,7 +87,7 @@ export async function GET() {
       .select('user_id, total_points, total_hours')
       .in('user_id', userIds)
       .eq('week_start', weekStartStr)
-    
+
     // Combine user data with points
     const leaderboard = divisionUsers?.map(divUser => {
       const points = userPoints?.find(p => p.user_id === divUser.user_id)
@@ -114,31 +118,30 @@ export async function GET() {
     
     // Sort by points descending
     leaderboard.sort((a, b) => b.total_points - a.total_points)
-    
-    // Find user's position
-    const position = leaderboard.findIndex(u => u.user_id === user.id) + 1
+
+    const position = user ? leaderboard.findIndex(u => u.user_id === user.id) + 1 : 0
     const totalInDivision = leaderboard.length
-    
-    // Determine zone (top 1 promotes, bottom 1 relegates)
+
     let zone = 'safe'
-    if (position === 1 && userDivision.division.level < 4) {
+    if (user && position === 1 && division.level < 4) {
       zone = 'promotion'
-    } else if (position === totalInDivision && totalInDivision > 1 && userDivision.division.level > 1) {
+    } else if (user && position === totalInDivision && totalInDivision > 1 && division.level > 1) {
       zone = 'relegation'
     }
-    
+
     return NextResponse.json({
-      division: userDivision.division,
+      division,
       position,
       totalInDivision,
       zone,
       leaderboard,
-      currentUser: {
+      currentUser: user ? {
         id: user.id,
         points: leaderboard.find(u => u.user_id === user.id)?.total_points || 0,
         hours: leaderboard.find(u => u.user_id === user.id)?.total_hours || 0
-      }
+      } : null
     })
+
   } catch (error) {
     console.error('Error fetching division data:', error)
     return NextResponse.json({ error: 'Failed to fetch division data' }, { status: 500 })

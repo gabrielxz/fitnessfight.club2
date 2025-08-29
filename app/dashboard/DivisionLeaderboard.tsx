@@ -4,33 +4,46 @@ import { useState, useEffect } from 'react'
 import AthleteCard from './AthleteCard'
 
 interface DivisionLeaderboardProps {
-  userId: string
+  userId: string | null
+  divisionId?: string
 }
 
 interface LeaderboardEntry {
   user_id: string
-  strava_firstname: string
-  strava_lastname: string
-  position: number
-  points: number
+  name: string
+  strava_profile?: string
+  total_points: number
   total_hours: number
-  zone: 'promotion' | 'safe' | 'relegation'
+  badges: { emoji: string; name: string; tier: string }[]
 }
 
-export default function DivisionLeaderboard({ userId }: DivisionLeaderboardProps) {
-  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([])
+interface DivisionData {
+  division: {
+    id: string
+    name: string
+    level: number
+  }
+  position: number
+  totalInDivision: number
+  zone: 'promotion' | 'safe' | 'relegation'
+  leaderboard: LeaderboardEntry[]
+}
+
+export default function DivisionLeaderboard({ userId, divisionId }: DivisionLeaderboardProps) {
+  const [data, setData] = useState<DivisionData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     const fetchLeaderboard = async () => {
       try {
-        const response = await fetch('/api/divisions')
+        const url = divisionId ? `/api/divisions?divisionId=${divisionId}` : '/api/divisions'
+        const response = await fetch(url)
         if (!response.ok) {
           throw new Error('Failed to fetch division standings')
         }
-        const data = await response.json()
-        setLeaderboard(data.standings || [])
+        const divisionData = await response.json()
+        setData(divisionData)
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load leaderboard')
       } finally {
@@ -39,7 +52,7 @@ export default function DivisionLeaderboard({ userId }: DivisionLeaderboardProps
     }
 
     fetchLeaderboard()
-  }, [])
+  }, [divisionId])
 
   if (loading) {
     return (
@@ -61,7 +74,7 @@ export default function DivisionLeaderboard({ userId }: DivisionLeaderboardProps
     )
   }
 
-  if (!leaderboard.length) {
+  if (!data || !data.leaderboard.length) {
     return (
       <div className="glass-card p-6 text-center">
         <p className="text-gray-400">No athletes in this division yet</p>
@@ -71,15 +84,16 @@ export default function DivisionLeaderboard({ userId }: DivisionLeaderboardProps
 
   return (
     <div className="space-y-4">
-      {leaderboard.map((athlete) => (
+      {data.leaderboard.map((athlete, index) => (
         <AthleteCard
           key={athlete.user_id}
-          rank={athlete.position}
-          name={`${athlete.strava_firstname} ${athlete.strava_lastname}`.trim()}
-          points={athlete.points}
+          rank={index + 1}
+          name={athlete.name}
+          points={athlete.total_points}
           hours={athlete.total_hours}
-          zone={athlete.zone}
+          zone={data.zone}
           isCurrentUser={athlete.user_id === userId}
+          badges={athlete.badges}
         />
       ))}
     </div>
