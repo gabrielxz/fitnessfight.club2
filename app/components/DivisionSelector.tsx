@@ -1,13 +1,13 @@
 'use client'
 
-import { useState } from 'react'
-
 interface DivisionSelectorProps {
   currentDivision: {
     name: string
     level: number
     emoji?: string
   }
+  onViewChange: (view: 'division' | 'global') => void
+  activeView: 'division' | 'global'
 }
 
 const divisionEmojis: Record<string, string> = {
@@ -17,14 +17,7 @@ const divisionEmojis: Record<string, string> = {
   'Juicy': '🧃'
 }
 
-export default function DivisionSelector({ currentDivision }: DivisionSelectorProps) {
-  const [activeView, setActiveView] = useState<'division' | 'global'>('division')
-  
-  const handleViewChange = (view: 'division' | 'global') => {
-    setActiveView(view)
-    // TODO: Implement view switching logic
-  }
-  
+export default function DivisionSelector({ currentDivision, onViewChange, activeView }: DivisionSelectorProps) {
   const divisionEmoji = currentDivision.emoji || divisionEmojis[currentDivision.name] || '🏆'
   
   return (
@@ -46,7 +39,7 @@ export default function DivisionSelector({ currentDivision }: DivisionSelectorPr
         
         <div className="flex rounded-full p-1" style={{ backgroundColor: 'rgba(255, 255, 255, 0.05)' }}>
           <button
-            onClick={() => handleViewChange('division')}
+            onClick={() => onViewChange('division')}
             className={`px-6 py-2 rounded-full text-sm font-semibold transition-all ${
               activeView === 'division'
                 ? 'bg-gradient-to-r from-orange-500 to-yellow-500 text-white shadow-lg'
@@ -56,7 +49,7 @@ export default function DivisionSelector({ currentDivision }: DivisionSelectorPr
             My Division
           </button>
           <button
-            onClick={() => handleViewChange('global')}
+            onClick={() => onViewChange('global')}
             className={`px-6 py-2 rounded-full text-sm font-semibold transition-all ${
               activeView === 'global'
                 ? 'bg-gradient-to-r from-orange-500 to-yellow-500 text-white shadow-lg'
