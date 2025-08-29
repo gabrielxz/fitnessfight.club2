@@ -14,6 +14,21 @@ export async function GET(request: Request) {
       const { data: { user } } = await supabase.auth.getUser()
       
       if (user) {
+        // Save or update user profile
+        const { error: profileError } = await supabase
+          .from('user_profiles')
+          .upsert({
+            id: user.id,
+            email: user.email,
+            full_name: user.user_metadata?.full_name || user.user_metadata?.name || null,
+            avatar_url: user.user_metadata?.avatar_url || user.user_metadata?.picture || null,
+            updated_at: new Date().toISOString()
+          })
+        
+        if (profileError) {
+          console.error('Error saving user profile:', profileError)
+        }
+        
         // Check if user has a division assignment
         const { data: userDivision } = await supabase
           .from('user_divisions')

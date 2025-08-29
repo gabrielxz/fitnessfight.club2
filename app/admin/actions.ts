@@ -78,6 +78,16 @@ export async function deleteUser(userId: string) {
     console.error('Error deleting from user_points:', pointsError)
   }
 
+  // Delete from user_profiles
+  const { error: profileError } = await adminClient
+    .from('user_profiles')
+    .delete()
+    .eq('id', userId)
+
+  if (profileError) {
+    console.error('Error deleting from user_profiles:', profileError)
+  }
+
   // Finally, delete the user from auth.users (this requires service role)
   const { error: authError } = await adminClient.auth.admin.deleteUser(userId)
 

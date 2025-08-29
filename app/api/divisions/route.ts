@@ -79,8 +79,18 @@ export async function GET(request: NextRequest) {
       .in('user_id', userIds)
       .eq('week_start', weekStartStr)
 
-    // Since we can't use admin.listUsers() without service role,
-    // we'll rely on Strava names for now
+    // Get user profiles for names
+    const { data: userProfiles } = await supabase
+      .from('user_profiles')
+      .select('id, full_name, email')
+      .in('id', userIds)
+    
+    const profileMap = new Map(
+      userProfiles?.map(p => [
+        p.id,
+        p.full_name || p.email?.split('@')[0] || null
+      ]) || []
+    )
 
     // Get Strava connections for all users
     const { data: stravaConnections } = await supabase
@@ -112,10 +122,11 @@ export async function GET(request: NextRequest) {
       const stravaName = connection
         ? `${connection.strava_firstname || ''} ${connection.strava_lastname || ''}`.trim()
         : null
+      const profileName = profileMap.get(divUser.user_id)
       
       return {
         user_id: divUser.user_id,
-        name: stravaName || `User ${divUser.user_id.substring(0, 8)}`,
+        name: stravaName || profileName || `User ${divUser.user_id.substring(0, 8)}`,
         strava_profile: connection?.strava_profile,
         total_points: points?.total_points || 0,
         total_hours: points?.total_hours || 0,
