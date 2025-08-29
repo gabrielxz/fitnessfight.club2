@@ -181,6 +181,12 @@ export async function changeDivision(userId: string, divisionId: string) {
 
       if (oldDivision && newDivision) {
         // Insert division history record
+        const now = new Date()
+        const weekStart = new Date(now)
+        weekStart.setDate(now.getDate() - now.getDay()) // Start of current week
+        const weekEnd = new Date(weekStart)
+        weekEnd.setDate(weekStart.getDate() + 6) // End of current week
+        
         const { error: historyError } = await supabase
           .from('division_history')
           .insert({
@@ -188,10 +194,10 @@ export async function changeDivision(userId: string, divisionId: string) {
             from_division_id: oldDivision.id,
             to_division_id: newDivision.id,
             change_type: oldDivision.level < newDivision.level ? 'promotion' : 'relegation',
-            change_reason: 'admin_manual',
+            week_start: weekStart.toISOString().split('T')[0],
+            week_end: weekEnd.toISOString().split('T')[0],
             final_points: 0,
-            final_position: 0,
-            week_ending: new Date().toISOString()
+            final_position: 0
           })
         
         if (historyError) {
@@ -205,7 +211,7 @@ export async function changeDivision(userId: string, divisionId: string) {
         .from('user_divisions')
         .update({ 
           division_id: divisionId,
-          joined_at: new Date().toISOString()
+          joined_division_at: new Date().toISOString()
         })
         .eq('user_id', userId)
 
@@ -220,7 +226,7 @@ export async function changeDivision(userId: string, divisionId: string) {
         .insert({
           user_id: userId,
           division_id: divisionId,
-          joined_at: new Date().toISOString()
+          joined_division_at: new Date().toISOString()
         })
 
       if (error) {
