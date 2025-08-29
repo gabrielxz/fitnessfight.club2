@@ -11,12 +11,18 @@ interface NavigationProps {
 export default function Navigation({ user }: NavigationProps) {
   const pathname = usePathname()
 
+  // Check if user is admin
+  const isAdmin = user?.email === 'gabrielbeal@gmail.com' || 
+                  user?.user_metadata?.full_name === 'Gabriel Beal' ||
+                  user?.user_metadata?.name === 'Gabriel Beal'
+
   const navItems = [
     { href: '/', label: 'Leaderboard', icon: '🏆' },
     ...(user ? [
       { href: '/profile', label: 'Profile', icon: '👤' },
       { href: '/stats', label: 'Stats', icon: '📊' },
       { href: '/history', label: 'History', icon: '📜' },
+      ...(isAdmin ? [{ href: '/admin', label: 'Admin', icon: '⚙️' }] : [])
     ] : [])
   ]
 

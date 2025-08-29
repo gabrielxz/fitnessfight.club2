@@ -1,0 +1,298 @@
+'use client'
+
+import { useState } from 'react'
+import { deleteUser, assignBadge, removeBadge, changeDivision } from './actions'
+
+interface User {
+  user_id: string
+  strava_id: string
+  display_name: string
+}
+
+interface Badge {
+  id: string
+  code: string
+  name: string
+  emoji: string
+}
+
+interface Division {
+  id: string
+  name: string
+  level: number
+  emoji: string
+}
+
+interface UserDivision {
+  user_id: string
+  division_id: string
+}
+
+interface UserBadge {
+  id: string
+  user_id: string
+  badge_id: string
+  tier: string
+}
+
+interface AdminDashboardProps {
+  users: User[]
+  badges: Badge[]
+  divisions: Division[]
+  userDivisions: UserDivision[]
+  userBadges: UserBadge[]
+}
+
+export default function AdminDashboard({ 
+  users, 
+  badges, 
+  divisions, 
+  userDivisions,
+  userBadges 
+}: AdminDashboardProps) {
+  const [selectedUser, setSelectedUser] = useState<string>('')
+  const [selectedBadge, setSelectedBadge] = useState<string>('')
+  const [selectedTier, setSelectedTier] = useState<'bronze' | 'silver' | 'gold'>('bronze')
+  const [selectedDivision, setSelectedDivision] = useState<string>('')
+  const [deleteConfirm, setDeleteConfirm] = useState<string>('')
+  const [loading, setLoading] = useState(false)
+
+  const getUserDivision = (userId: string) => {
+    const userDiv = userDivisions.find(ud => ud.user_id === userId)
+    if (userDiv) {
+      const division = divisions.find(d => d.id === userDiv.division_id)
+      return division ? `${division.emoji} ${division.name}` : 'No Division'
+    }
+    return 'No Division'
+  }
+
+  const getUserBadges = (userId: string) => {
+    return userBadges.filter(ub => ub.user_id === userId)
+  }
+
+  const handleDeleteUser = async (userId: string) => {
+    if (deleteConfirm !== userId) {
+      setDeleteConfirm(userId)
+      setTimeout(() => setDeleteConfirm(''), 5000)
+      return
+    }
+
+    setLoading(true)
+    try {
+      await deleteUser(userId)
+      window.location.reload()
+    } catch (error) {
+      console.error('Error deleting user:', error)
+      alert('Failed to delete user')
+    }
+    setLoading(false)
+    setDeleteConfirm('')
+  }
+
+  const handleAssignBadge = async () => {
+    if (!selectedUser || !selectedBadge) {
+      alert('Please select a user and badge')
+      return
+    }
+
+    setLoading(true)
+    try {
+      await assignBadge(selectedUser, selectedBadge, selectedTier)
+      window.location.reload()
+    } catch (error) {
+      console.error('Error assigning badge:', error)
+      alert('Failed to assign badge')
+    }
+    setLoading(false)
+  }
+
+  const handleRemoveBadge = async (userBadgeId: string) => {
+    setLoading(true)
+    try {
+      await removeBadge(userBadgeId)
+      window.location.reload()
+    } catch (error) {
+      console.error('Error removing badge:', error)
+      alert('Failed to remove badge')
+    }
+    setLoading(false)
+  }
+
+  const handleChangeDivision = async () => {
+    if (!selectedUser || !selectedDivision) {
+      alert('Please select a user and division')
+      return
+    }
+
+    setLoading(true)
+    try {
+      await changeDivision(selectedUser, selectedDivision)
+      window.location.reload()
+    } catch (error) {
+      console.error('Error changing division:', error)
+      alert('Failed to change division')
+    }
+    setLoading(false)
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-[#0F0F1E] via-[#1A1A2E] to-[#2A1A3E] pt-20 px-4">
+      <div className="max-w-7xl mx-auto">
+        <h1 className="text-4xl font-bold text-white mb-8">Admin Dashboard</h1>
+        
+        {/* User Management Section */}
+        <div className="glass-card p-6 mb-8">
+          <h2 className="text-2xl font-bold text-white mb-4">User Management</h2>
+          
+          <div className="overflow-x-auto">
+            <table className="w-full text-left">
+              <thead>
+                <tr className="border-b border-white/10">
+                  <th className="pb-3 text-gray-400">Name</th>
+                  <th className="pb-3 text-gray-400">Division</th>
+                  <th className="pb-3 text-gray-400">Badges</th>
+                  <th className="pb-3 text-gray-400">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {users.map(user => (
+                  <tr key={user.user_id} className="border-b border-white/5">
+                    <td className="py-4 text-white">{user.display_name}</td>
+                    <td className="py-4 text-white">{getUserDivision(user.user_id)}</td>
+                    <td className="py-4">
+                      <div className="flex gap-2 flex-wrap">
+                        {getUserBadges(user.user_id).map(ub => {
+                          const badge = badges.find(b => b.id === ub.badge_id)
+                          if (!badge) return null
+                          return (
+                            <div key={ub.id} className="group relative">
+                              <span className="text-2xl cursor-pointer" title={`${badge.name} (${ub.tier})`}>
+                                {badge.emoji}
+                              </span>
+                              <button
+                                onClick={() => handleRemoveBadge(ub.id)}
+                                disabled={loading}
+                                className="absolute -top-2 -right-2 hidden group-hover:block bg-red-600 text-white rounded-full w-4 h-4 text-xs leading-none"
+                              >
+                                ×
+                              </button>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </td>
+                    <td className="py-4">
+                      <button
+                        onClick={() => handleDeleteUser(user.user_id)}
+                        disabled={loading}
+                        className={`px-4 py-2 rounded text-white font-medium transition-colors ${
+                          deleteConfirm === user.user_id
+                            ? 'bg-red-700 hover:bg-red-800'
+                            : 'bg-red-600 hover:bg-red-700'
+                        }`}
+                      >
+                        {deleteConfirm === user.user_id ? 'Confirm Delete?' : 'Delete'}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Badge Assignment Section */}
+        <div className="glass-card p-6 mb-8">
+          <h2 className="text-2xl font-bold text-white mb-4">Assign Badge</h2>
+          
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <select
+              value={selectedUser}
+              onChange={(e) => setSelectedUser(e.target.value)}
+              className="bg-white/10 border border-white/20 rounded px-4 py-2 text-white"
+            >
+              <option value="">Select User</option>
+              {users.map(user => (
+                <option key={user.user_id} value={user.user_id}>
+                  {user.display_name}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={selectedBadge}
+              onChange={(e) => setSelectedBadge(e.target.value)}
+              className="bg-white/10 border border-white/20 rounded px-4 py-2 text-white"
+            >
+              <option value="">Select Badge</option>
+              {badges.map(badge => (
+                <option key={badge.id} value={badge.id}>
+                  {badge.emoji} {badge.name}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={selectedTier}
+              onChange={(e) => setSelectedTier(e.target.value as 'bronze' | 'silver' | 'gold')}
+              className="bg-white/10 border border-white/20 rounded px-4 py-2 text-white"
+            >
+              <option value="bronze">Bronze</option>
+              <option value="silver">Silver</option>
+              <option value="gold">Gold</option>
+            </select>
+
+            <button
+              onClick={handleAssignBadge}
+              disabled={loading}
+              className="bg-green-600 hover:bg-green-700 text-white font-medium px-4 py-2 rounded transition-colors"
+            >
+              Assign Badge
+            </button>
+          </div>
+        </div>
+
+        {/* Division Management Section */}
+        <div className="glass-card p-6">
+          <h2 className="text-2xl font-bold text-white mb-4">Change Division</h2>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <select
+              value={selectedUser}
+              onChange={(e) => setSelectedUser(e.target.value)}
+              className="bg-white/10 border border-white/20 rounded px-4 py-2 text-white"
+            >
+              <option value="">Select User</option>
+              {users.map(user => (
+                <option key={user.user_id} value={user.user_id}>
+                  {user.display_name}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={selectedDivision}
+              onChange={(e) => setSelectedDivision(e.target.value)}
+              className="bg-white/10 border border-white/20 rounded px-4 py-2 text-white"
+            >
+              <option value="">Select Division</option>
+              {divisions.map(division => (
+                <option key={division.id} value={division.id}>
+                  {division.emoji} {division.name} (Level {division.level})
+                </option>
+              ))}
+            </select>
+
+            <button
+              onClick={handleChangeDivision}
+              disabled={loading}
+              className="bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded transition-colors"
+            >
+              Change Division
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
