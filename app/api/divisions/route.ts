@@ -101,8 +101,8 @@ export async function GET(request: NextRequest) {
       const connection = stravaConnections?.find(c => c.user_id === divUser.user_id)
       const badges = userBadges?.filter(b => b.user_id === divUser.user_id)
         .map(b => ({
-          emoji: (b.badge as any)?.emoji,
-          name: (b.badge as any)?.name,
+          emoji: (b.badge as { emoji?: string; name?: string })?.emoji,
+          name: (b.badge as { emoji?: string; name?: string })?.name,
           tier: b.tier,
         })) || []
       
