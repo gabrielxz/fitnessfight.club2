@@ -37,21 +37,33 @@ export async function GET(request: Request) {
           .single()
         
         if (!userDivision) {
-          // User was deleted and is signing in again - assign them to Noodle division
-          const { data: noodleDivision } = await supabase
+          // New user or deleted user signing in - assign them to Noodle division
+          console.log(`No division found for user ${user.id}, assigning to Noodle division`)
+          
+          const { data: noodleDivision, error: divError } = await supabase
             .from('divisions')
             .select('id')
             .eq('name', 'Noodle')
             .single()
           
+          if (divError) {
+            console.error('Error fetching Noodle division:', divError)
+          }
+          
           if (noodleDivision) {
-            await supabase
+            const { error: insertError } = await supabase
               .from('user_divisions')
               .insert({
                 user_id: user.id,
                 division_id: noodleDivision.id,
                 joined_division_at: new Date().toISOString()
               })
+            
+            if (insertError) {
+              console.error('Error assigning user to division:', insertError)
+            } else {
+              console.log(`Successfully assigned user ${user.id} to Noodle division`)
+            }
           }
         }
       }

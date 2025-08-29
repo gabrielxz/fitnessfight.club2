@@ -64,9 +64,9 @@ export default function AdminDashboard({
     const userDiv = userDivisions.find(ud => ud.user_id === userId)
     if (userDiv) {
       const division = divisions.find(d => d.id === userDiv.division_id)
-      return division ? `${division.emoji || ''} ${division.name || ''}`.trim() : 'No Division'
+      return division ? `${division.emoji || ''} ${division.name || ''}`.trim() : 'Not Assigned'
     }
-    return 'No Division'
+    return 'Not Assigned'
   }
 
   const getUserBadges = (userId: string) => {
@@ -191,7 +191,26 @@ export default function AdminDashboard({
                         <span className="text-gray-500" title="Not Connected">❌</span>
                       )}
                     </td>
-                    <td className="py-4 text-white">{getUserDivision(user.user_id)}</td>
+                    <td className="py-4 text-white">
+                      {getUserDivision(user.user_id)}
+                      {getUserDivision(user.user_id) === 'Not Assigned' && (
+                        <button
+                          onClick={async () => {
+                            setSelectedUser(user.user_id)
+                            // Find Noodle division ID
+                            const noodleDiv = divisions.find(d => d.name === 'Noodle')
+                            if (noodleDiv) {
+                              setSelectedDivision(noodleDiv.id)
+                              // Auto-assign to Noodle
+                              await handleChangeDivision()
+                            }
+                          }}
+                          className="ml-2 text-xs px-2 py-1 bg-orange-600 hover:bg-orange-700 rounded text-white"
+                        >
+                          Assign to Noodle
+                        </button>
+                      )}
+                    </td>
                     <td className="py-4">
                       <div className="flex gap-2 flex-wrap">
                         {getUserBadges(user.user_id).map(ub => {

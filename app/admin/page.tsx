@@ -77,7 +77,7 @@ export default async function AdminPage() {
       has_division: hasDivision,
       created_at: profile.created_at
     }
-  }).filter(u => u.has_division) || [] // Only show users with divisions for now
+  }) || [] // Show ALL users, even without divisions
 
   // Fetch all badges
   const { data: badges } = await supabase
