@@ -63,36 +63,48 @@ export async function GET(request: NextRequest) {
     const weekStart = getWeekStart(new Date())
     const weekStartStr = weekStart.toISOString().split('T')[0]
 
-    // Get all users in the division with their points and Strava info
+    // Get all users in the division
     const { data: divisionUsers } = await supabase
       .from('user_divisions')
-      .select(`
-        user_id,
-        strava_connections!left(
-          strava_firstname,
-          strava_lastname,
-          strava_profile
-        )
-      `)
+      .select('user_id')
       .eq('division_id', divisionIdToFetch)
 
-    // Get points for all users in the division
+    // Get user IDs for batch queries
     const userIds = divisionUsers?.map(u => u.user_id) || []
+    
+    // Get points for all users in the division
     const { data: userPoints } = await supabase
       .from('user_points')
       .select('user_id, total_points, total_hours')
       .in('user_id', userIds)
       .eq('week_start', weekStartStr)
 
-    // Combine user data with points
+    // Get Strava connections for all users
+    const { data: stravaConnections } = await supabase
+      .from('strava_connections')
+      .select('user_id, strava_firstname, strava_lastname, strava_profile')
+      .in('user_id', userIds)
+
+    // Get badges for all users
+    const { data: userBadges } = await supabase
+      .from('user_badges')
+      .select(`
+        user_id,
+        tier,
+        badge:badges(emoji, name)
+      `)
+      .in('user_id', userIds)
+
+    // Combine all data
     const leaderboard = divisionUsers?.map(divUser => {
       const points = userPoints?.find(p => p.user_id === divUser.user_id)
-      const connections = divUser.strava_connections as unknown as Array<{
-        strava_firstname: string | null
-        strava_lastname: string | null  
-        strava_profile: string | null
-      }>
-      const connection = connections?.[0]
+      const connection = stravaConnections?.find(c => c.user_id === divUser.user_id)
+      const badges = userBadges?.filter(b => b.user_id === divUser.user_id)
+        .map(b => ({
+          emoji: (b.badge as any)?.emoji,
+          name: (b.badge as any)?.name,
+          tier: b.tier,
+        })) || []
       
       return {
         user_id: divUser.user_id,
@@ -102,7 +114,7 @@ export async function GET(request: NextRequest) {
         strava_profile: connection?.strava_profile,
         total_points: points?.total_points || 0,
         total_hours: points?.total_hours || 0,
-        badges: [],
+        badges,
       }
     }) || []
     
