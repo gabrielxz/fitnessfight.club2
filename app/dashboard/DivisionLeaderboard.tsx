@@ -14,6 +14,7 @@ interface LeaderboardEntry {
   strava_profile?: string
   total_points: number
   total_hours: number
+  badges: { emoji: string; name: string; tier: "bronze" | "silver" | "gold" }[]
 }
 
 interface DivisionData {
@@ -92,7 +93,7 @@ export default function DivisionLeaderboard({ userId, divisionId }: DivisionLead
           hours={athlete.total_hours}
           zone={data.zone}
           isCurrentUser={athlete.user_id === userId}
-          badges={[]}
+          badges={athlete.badges}
         />
       ))}
     </div>

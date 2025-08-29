@@ -66,7 +66,18 @@ export async function GET(request: NextRequest) {
     // Get all users in the division with their points and Strava info
     const { data: divisionUsers } = await supabase
       .from('user_divisions')
-      .select(`user_id`)
+      .select(`
+        user_id,
+        strava_connections!left(
+          strava_firstname,
+          strava_lastname,
+          strava_profile
+        ),
+        user_badges!left(
+          tier,
+          badge:badges(emoji, name)
+        )
+      `)
       .eq('division_id', divisionIdToFetch)
 
     // Get points for all users in the division
@@ -80,13 +91,28 @@ export async function GET(request: NextRequest) {
     // Combine user data with points
     const leaderboard = divisionUsers?.map(divUser => {
       const points = userPoints?.find(p => p.user_id === divUser.user_id)
+      const connections = divUser.strava_connections as unknown as Array<{
+        strava_firstname: string | null
+        strava_lastname: string | null  
+        strava_profile: string | null
+      }>
+      const connection = connections?.[0]
+      
+      const badges = (divUser.user_badges as unknown as { tier: string; badge: { emoji: string; name: string } }[])?.map(b => ({
+        emoji: b.badge.emoji,
+        name: b.badge.name,
+        tier: b.tier,
+      })) || []
+
       return {
         user_id: divUser.user_id,
-        name: 'Anonymous', // Default name
-        strava_profile: null, // Default profile
+        name: connection
+          ? `${connection.strava_firstname || ''} ${connection.strava_lastname || ''}`
+          : 'Anonymous',
+        strava_profile: connection?.strava_profile,
         total_points: points?.total_points || 0,
         total_hours: points?.total_hours || 0,
-        badges: [],
+        badges,
       }
     }) || []
     
