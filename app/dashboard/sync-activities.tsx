@@ -25,7 +25,7 @@ export default function SyncActivities() {
           text: 'Failed to sync activities. Please try again.' 
         })
       }
-    } catch (error) {
+    } catch {
       setMessage({ 
         type: 'error', 
         text: 'An error occurred while syncing.' 

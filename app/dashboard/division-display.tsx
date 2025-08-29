@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Image from 'next/image'
 
 interface DivisionDisplayProps {
   userId: string
@@ -179,9 +180,11 @@ export default function DivisionDisplay({ userId }: DivisionDisplayProps) {
                   </span>
                   <div className="flex items-center gap-2">
                     {user.strava_profile ? (
-                      <img 
+                      <Image 
                         src={user.strava_profile} 
                         alt={user.name}
+                        width={32}
+                        height={32}
                         className="w-8 h-8 rounded-full"
                       />
                     ) : (

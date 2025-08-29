@@ -2,11 +2,21 @@
 
 import { useEffect, useState } from 'react'
 
+interface BadgeCriteria {
+  type: string;
+  condition?: string;
+  bronze: number;
+  silver: number;
+  gold: number;
+  metric?: string;
+  activity_type?: string;
+}
+
 interface BadgeProgressData {
   badge: {
     name: string
     emoji: string
-    criteria: any
+    criteria: BadgeCriteria
   }
   current_value: number
   next_tier: string | null

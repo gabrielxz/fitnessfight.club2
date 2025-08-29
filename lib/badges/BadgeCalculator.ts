@@ -13,35 +13,58 @@ interface Activity {
   sport_type: string
 }
 
+interface BadgeCriteria {
+  type: string;
+  condition?: string;
+  bronze: number;
+  silver: number;
+  gold: number;
+  metric?: string;
+  activity_type?: string;
+}
+
 interface Badge {
   id: string
   code: string
   name: string
   emoji: string
-  criteria: any
+  criteria: BadgeCriteria
 }
+
+interface BadgeProgress {
+  user_id: string;
+  badge_id: string;
+  current_value: number;
+  bronze_achieved: boolean;
+  silver_achieved: boolean;
+  gold_achieved: boolean;
+  last_activity_id?: number;
+  last_updated?: string;
+  metadata?: { sports: string[] };
+}
+
 
 export class BadgeCalculator {
   constructor(private supabase: SupabaseClient) {}
-  
+
   async calculateBadgesForActivity(activity: Activity) {
     // Get all active badges
     const { data: badges } = await this.supabase
       .from('badges')
       .select('*')
       .eq('active', true)
-    
+
     if (!badges) return
-    
+
     for (const badge of badges) {
       await this.evaluateBadge(badge, activity)
     }
   }
-  
+
   private async evaluateBadge(badge: Badge, activity: Activity) {
     const { criteria } = badge
     const userId = activity.user_id
-    
+
     // Get or create progress record
     const { data: progress } = await this.supabase
       .from('badge_progress')
@@ -49,8 +72,8 @@ export class BadgeCalculator {
       .eq('user_id', userId)
       .eq('badge_id', badge.id)
       .single()
-    
-    let currentProgress = progress || {
+
+    const currentProgress: BadgeProgress = progress || {
       user_id: userId,
       badge_id: badge.id,
       current_value: 0,
@@ -58,7 +81,7 @@ export class BadgeCalculator {
       silver_achieved: false,
       gold_achieved: false
     }
-    
+
     // Calculate based on badge type
     switch (criteria.type) {
       case 'count':
@@ -78,11 +101,11 @@ export class BadgeCalculator {
         break
     }
   }
-  
-  private async handleCountBadge(badge: Badge, activity: Activity, progress: any) {
+
+  private async handleCountBadge(badge: Badge, activity: Activity, progress: BadgeProgress) {
     const { criteria } = badge
     let qualifies = false
-    
+
     // Check if activity meets condition
     if (criteria.condition === 'start_hour < 7') {
       const hour = new Date(activity.start_date_local).getHours()
@@ -91,21 +114,21 @@ export class BadgeCalculator {
       const hour = new Date(activity.start_date_local).getHours()
       qualifies = hour >= 21
     }
-    
+
     if (qualifies) {
       progress.current_value += 1
-      
+
       // Check tier achievements
       const tierAchieved = this.checkTierProgress(
         progress.current_value,
         criteria,
         progress
       )
-      
+
       if (tierAchieved) {
         await this.awardBadge(badge, activity.user_id, tierAchieved, progress.current_value)
       }
-      
+
       // Update progress
       await this.supabase
         .from('badge_progress')
@@ -116,16 +139,16 @@ export class BadgeCalculator {
         })
     }
   }
-  
-  private async handleCumulativeBadge(badge: Badge, activity: Activity, progress: any) {
+
+  private async handleCumulativeBadge(badge: Badge, activity: Activity, progress: BadgeProgress) {
     const { criteria } = badge
     let increment = 0
-    
+
     // Check activity type filter
     if (criteria.activity_type && activity.type !== criteria.activity_type) {
       return
     }
-    
+
     // Calculate increment based on metric
     switch (criteria.metric) {
       case 'distance_km':
@@ -135,19 +158,19 @@ export class BadgeCalculator {
         increment = activity.total_elevation_gain || 0
         break
     }
-    
+
     progress.current_value += increment
-    
+
     const tierAchieved = this.checkTierProgress(
       progress.current_value,
       criteria,
       progress
     )
-    
+
     if (tierAchieved) {
       await this.awardBadge(badge, activity.user_id, tierAchieved, progress.current_value)
     }
-    
+
     await this.supabase
       .from('badge_progress')
       .upsert({
@@ -156,16 +179,16 @@ export class BadgeCalculator {
         last_updated: new Date().toISOString()
       })
   }
-  
-  private async handleSingleActivityBadge(badge: Badge, activity: Activity, progress: any) {
+
+  private async handleSingleActivityBadge(badge: Badge, activity: Activity, progress: BadgeProgress) {
     const { criteria } = badge
     let value = 0
-    
+
     // Check activity type filter
     if (criteria.activity_type && activity.type !== criteria.activity_type) {
       return
     }
-    
+
     switch (criteria.metric) {
       case 'calories_per_hour':
         const hours = activity.moving_time / 3600
@@ -175,7 +198,7 @@ export class BadgeCalculator {
         value = (activity.average_speed || 0) * 3.6 // Convert m/s to km/h
         break
     }
-    
+
     // Check if this activity achieves any tier
     let tierAchieved = null
     if (!progress.gold_achieved && value >= criteria.gold) {
@@ -185,12 +208,15 @@ export class BadgeCalculator {
     } else if (!progress.bronze_achieved && value >= criteria.bronze) {
       tierAchieved = 'bronze'
     }
-    
+
     if (tierAchieved) {
       await this.awardBadge(badge, activity.user_id, tierAchieved, value)
-      
+
       // Update progress flags
-      progress[`${tierAchieved}_achieved`] = true
+      if (tierAchieved === 'bronze') progress.bronze_achieved = true;
+      if (tierAchieved === 'silver') progress.silver_achieved = true;
+      if (tierAchieved === 'gold') progress.gold_achieved = true;
+
       await this.supabase
         .from('badge_progress')
         .upsert({
@@ -201,8 +227,8 @@ export class BadgeCalculator {
         })
     }
   }
-  
-  private async handleWeeklyStreakBadge(badge: Badge, activity: Activity, progress: any) {
+
+  private async handleWeeklyStreakBadge(badge: Badge, activity: Activity, progress: BadgeProgress) {
     // Get all weeks with activities for this user
     const { data: weeklyActivity } = await this.supabase
       .from('user_points')
@@ -210,22 +236,22 @@ export class BadgeCalculator {
       .eq('user_id', activity.user_id)
       .gt('total_hours', 0)
       .order('week_start', { ascending: false })
-    
+
     if (!weeklyActivity) return
-    
+
     // Calculate consecutive weeks
     let streak = 0
-    let lastWeek = null
-    
+    let lastWeek: Date | null = null
+
     for (const week of weeklyActivity) {
       const weekDate = new Date(week.week_start)
-      
+
       if (!lastWeek) {
         streak = 1
         lastWeek = weekDate
       } else {
         const diffDays = (lastWeek.getTime() - weekDate.getTime()) / (1000 * 60 * 60 * 24)
-        
+
         if (diffDays === 7) {
           streak++
           lastWeek = weekDate
@@ -234,19 +260,19 @@ export class BadgeCalculator {
         }
       }
     }
-    
+
     progress.current_value = streak
-    
+
     const tierAchieved = this.checkTierProgress(
       streak,
       badge.criteria,
       progress
     )
-    
+
     if (tierAchieved) {
       await this.awardBadge(badge, activity.user_id, tierAchieved, streak)
     }
-    
+
     await this.supabase
       .from('badge_progress')
       .upsert({
@@ -255,32 +281,32 @@ export class BadgeCalculator {
         last_updated: new Date().toISOString()
       })
   }
-  
-  private async handleVarietyBadge(badge: Badge, activity: Activity, progress: any) {
+
+  private async handleVarietyBadge(badge: Badge, activity: Activity, progress: BadgeProgress) {
     // Get unique sport types for this user
     const { data: uniqueSports } = await this.supabase
       .from('strava_activities')
       .select('sport_type')
       .eq('user_id', activity.user_id)
       .is('deleted_at', null)
-    
+
     if (!uniqueSports) return
-    
+
     const uniqueTypes = new Set(uniqueSports.map(s => s.sport_type))
     const count = uniqueTypes.size
-    
+
     progress.current_value = count
-    
+
     const tierAchieved = this.checkTierProgress(
       count,
       badge.criteria,
       progress
     )
-    
+
     if (tierAchieved) {
       await this.awardBadge(badge, activity.user_id, tierAchieved, count)
     }
-    
+
     await this.supabase
       .from('badge_progress')
       .upsert({
@@ -290,8 +316,8 @@ export class BadgeCalculator {
         last_updated: new Date().toISOString()
       })
   }
-  
-  private checkTierProgress(value: number, criteria: any, progress: any): string | null {
+
+  private checkTierProgress(value: number, criteria: BadgeCriteria, progress: BadgeProgress): string | null {
     if (!progress.gold_achieved && value >= criteria.gold) {
       return 'gold'
     } else if (!progress.silver_achieved && value >= criteria.silver) {
@@ -301,7 +327,7 @@ export class BadgeCalculator {
     }
     return null
   }
-  
+
   private async awardBadge(badge: Badge, userId: string, tier: string, value: number) {
     // Check if already awarded
     const { data: existing } = await this.supabase
@@ -310,10 +336,10 @@ export class BadgeCalculator {
       .eq('user_id', userId)
       .eq('badge_id', badge.id)
       .single()
-    
+
     if (existing) {
       // Update to higher tier if achieved
-      const tierOrder = { bronze: 1, silver: 2, gold: 3 }
+      const tierOrder: { [key: string]: number } = { bronze: 1, silver: 2, gold: 3 }
       if (tierOrder[tier] > tierOrder[existing.tier]) {
         await this.supabase
           .from('user_badges')

@@ -94,7 +94,7 @@ export async function GET() {
       }>
       const connection = connections?.[0]
       
-      const badges = (divUser.user_badges as any)?.map((b: any) => ({
+      const badges = (divUser.user_badges as unknown as { tier: string; badge: { emoji: string; name: string } }[])?.map(b => ({
         emoji: b.badge.emoji,
         name: b.badge.name,
         tier: b.tier,
