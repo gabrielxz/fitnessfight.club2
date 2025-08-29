@@ -12,6 +12,19 @@ export default async function AdminPage() {
     redirect('/login')
   }
 
+  // Verify the user still exists in user_divisions (hasn't been deleted)
+  const { data: userExists } = await supabase
+    .from('user_divisions')
+    .select('user_id')
+    .eq('user_id', user.id)
+    .single()
+
+  if (!userExists) {
+    // User was deleted but session still exists - sign them out
+    await supabase.auth.signOut()
+    redirect('/login')
+  }
+
   // Hardcoded admin check
   const isAdmin = user.email === 'gabrielbeal@gmail.com' || 
                   user.user_metadata?.full_name === 'Gabriel Beal' ||

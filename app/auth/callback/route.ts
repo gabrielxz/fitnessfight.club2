@@ -10,6 +10,37 @@ export async function GET(request: Request) {
     const supabase = await createClient()
     const { error } = await supabase.auth.exchangeCodeForSession(code)
     if (!error) {
+      // Check if user needs to be re-initialized after deletion
+      const { data: { user } } = await supabase.auth.getUser()
+      
+      if (user) {
+        // Check if user has a division assignment
+        const { data: userDivision } = await supabase
+          .from('user_divisions')
+          .select('*')
+          .eq('user_id', user.id)
+          .single()
+        
+        if (!userDivision) {
+          // User was deleted and is signing in again - assign them to Noodle division
+          const { data: noodleDivision } = await supabase
+            .from('divisions')
+            .select('id')
+            .eq('name', 'Noodle')
+            .single()
+          
+          if (noodleDivision) {
+            await supabase
+              .from('user_divisions')
+              .insert({
+                user_id: user.id,
+                division_id: noodleDivision.id,
+                joined_division_at: new Date().toISOString()
+              })
+          }
+        }
+      }
+      
       return NextResponse.redirect(`${origin}${next}`)
     }
   }

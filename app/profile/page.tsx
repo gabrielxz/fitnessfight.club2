@@ -13,6 +13,19 @@ export default async function ProfilePage() {
     redirect('/login')
   }
 
+  // Verify the user still exists in user_divisions (hasn't been deleted)
+  const { data: userExists } = await supabase
+    .from('user_divisions')
+    .select('user_id')
+    .eq('user_id', user.id)
+    .single()
+
+  if (!userExists) {
+    // User was deleted but session still exists - sign them out
+    await supabase.auth.signOut()
+    redirect('/login')
+  }
+
   const { data: stravaConnection } = await supabase
     .from('strava_connections')
     .select('*')
