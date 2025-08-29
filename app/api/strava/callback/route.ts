@@ -36,11 +36,11 @@ export async function GET(request: NextRequest) {
   const error = searchParams.get('error')
 
   if (error) {
-    return NextResponse.redirect(new URL(`/dashboard?error=${error}`, request.url))
+    return NextResponse.redirect(new URL(`/?error=${error}`, request.url))
   }
 
   if (!code || !state) {
-    return NextResponse.redirect(new URL('/dashboard?error=missing_params', request.url))
+    return NextResponse.redirect(new URL('/?error=missing_params', request.url))
   }
 
   const supabase = await createClient()
@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   
   if (!user || user.id !== state) {
-    return NextResponse.redirect(new URL('/dashboard?error=unauthorized', request.url))
+    return NextResponse.redirect(new URL('/?error=unauthorized', request.url))
   }
 
   try {
@@ -92,12 +92,12 @@ export async function GET(request: NextRequest) {
 
     if (dbError) {
       console.error('Database error:', dbError)
-      return NextResponse.redirect(new URL('/dashboard?error=database_error', request.url))
+      return NextResponse.redirect(new URL('/?error=database_error', request.url))
     }
 
-    return NextResponse.redirect(new URL('/dashboard?strava=connected', request.url))
+    return NextResponse.redirect(new URL('/?strava=connected', request.url))
   } catch (error) {
     console.error('Strava OAuth error:', error)
-    return NextResponse.redirect(new URL('/dashboard?error=oauth_error', request.url))
+    return NextResponse.redirect(new URL('/?error=oauth_error', request.url))
   }
 }

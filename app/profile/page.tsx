@@ -2,8 +2,8 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import AnimatedBackground from '@/app/components/AnimatedBackground'
 import Navigation from '@/app/components/Navigation'
-import StravaConnection from '@/app/dashboard/strava-connection'
-import SyncActivities from '@/app/dashboard/sync-activities'
+import StravaConnection from '@/app/components/strava-connection'
+import SyncActivities from '@/app/components/sync-activities'
 
 export default async function ProfilePage() {
   const supabase = await createClient()

@@ -12,7 +12,7 @@ export default function Navigation({ user }: NavigationProps) {
   const pathname = usePathname()
 
   const navItems = [
-    { href: '/dashboard', label: 'Leaderboard', icon: '🏆' },
+    { href: '/', label: 'Leaderboard', icon: '🏆' },
     ...(user ? [
       { href: '/profile', label: 'Profile', icon: '👤' },
       { href: '/stats', label: 'Stats', icon: '📊' },
