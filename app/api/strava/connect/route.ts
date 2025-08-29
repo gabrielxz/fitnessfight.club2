@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { headers } from 'next/headers'
 
 export async function GET() {
   const supabase = await createClient()
@@ -11,8 +12,13 @@ export async function GET() {
     return NextResponse.redirect(new URL('/login', process.env.NEXT_PUBLIC_SUPABASE_URL))
   }
 
+  // Get the actual host from the request headers
+  const headersList = await headers()
+  const host = headersList.get('host') || 'fitnessfight.club'
+  const protocol = host.includes('localhost') ? 'http' : 'https'
+  
   const clientId = process.env.STRAVA_CLIENT_ID
-  const redirectUri = `${process.env.NEXT_PUBLIC_SUPABASE_URL?.replace('https://xynzdausjczbxjvalacf.supabase.co', 'http://localhost:3000')}/api/strava/callback`
+  const redirectUri = `${protocol}://${host}/api/strava/callback`
   
   // Strava OAuth authorization URL
   const stravaAuthUrl = new URL('https://www.strava.com/oauth/authorize')
