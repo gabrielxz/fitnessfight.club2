@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { BadgeCalculator } from '@/lib/badges/BadgeCalculator'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 export async function POST() {
   try {
@@ -55,8 +57,13 @@ export async function POST() {
 
     const activities = await response.json()
 
+    // Create badge calculator instance
+    const badgeCalculator = new BadgeCalculator(supabase)
+
     // Store activities in database
     let syncedCount = 0
+    const affectedWeeks = new Set<string>()
+    
     for (const activity of activities) {
       const { error } = await supabase
         .from('strava_activities')
@@ -103,6 +110,56 @@ export async function POST() {
 
       if (!error) {
         syncedCount++
+        
+        // Track which weeks are affected
+        const weekStart = getWeekStart(new Date(activity.start_date))
+        affectedWeeks.add(weekStart.toISOString().split('T')[0])
+        
+        // Calculate badges for this activity
+        await badgeCalculator.calculateBadgesForActivity({
+          strava_activity_id: activity.id,
+          user_id: user.id,
+          start_date_local: activity.start_date_local,
+          distance: activity.distance,
+          moving_time: activity.moving_time,
+          calories: activity.calories || 0,
+          total_elevation_gain: activity.total_elevation_gain,
+          average_speed: activity.average_speed,
+          type: activity.type,
+          sport_type: activity.sport_type
+        })
+      }
+    }
+    
+    // Recalculate points for all affected weeks
+    for (const weekStartStr of affectedWeeks) {
+      await recalculateWeeklyPoints(user.id, new Date(weekStartStr), supabase)
+    }
+    
+    // Ensure user has a division assignment (if they don't have one yet)
+    const { data: userDivision } = await supabase
+      .from('user_divisions')
+      .select('id')
+      .eq('user_id', user.id)
+      .single()
+    
+    if (!userDivision) {
+      // Assign to Noodle division if not assigned
+      const { data: noodleDivision } = await supabase
+        .from('divisions')
+        .select('id')
+        .eq('name', 'Noodle')
+        .single()
+      
+      if (noodleDivision) {
+        await supabase
+          .from('user_divisions')
+          .insert({
+            user_id: user.id,
+            division_id: noodleDivision.id
+          })
+        
+        console.log(`Assigned user ${user.id} to Noodle division`)
       }
     }
 
@@ -140,5 +197,85 @@ async function refreshStravaToken(refreshToken: string) {
   } catch (error) {
     console.error('Token refresh error:', error)
     return null
+  }
+}
+
+// Helper functions for week calculations
+function getWeekStart(date: Date): Date {
+  const d = new Date(date)
+  const day = d.getUTCDay()
+  const diff = d.getUTCDate() - day
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), diff, 0, 0, 0, 0))
+}
+
+function getWeekEnd(weekStart: Date): Date {
+  const end = new Date(weekStart)
+  end.setUTCDate(end.getUTCDate() + 6)
+  end.setUTCHours(23, 59, 59, 999)
+  return end
+}
+
+// Recalculate all points for a user for a given week
+async function recalculateWeeklyPoints(userId: string, weekStart: Date, supabase: SupabaseClient) {
+  try {
+    const weekEnd = getWeekEnd(weekStart)
+    
+    // Get all activities for this user in this week
+    const { data: activities, error } = await supabase
+      .from('strava_activities')
+      .select('moving_time, start_date')
+      .eq('user_id', userId)
+      .gte('start_date', weekStart.toISOString())
+      .lte('start_date', weekEnd.toISOString())
+      .is('deleted_at', null)
+    
+    if (error) {
+      console.error('Error fetching activities for points calculation:', error)
+      return
+    }
+    
+    // Calculate total hours and points
+    const totalHours = activities.reduce((sum, activity) => sum + (activity.moving_time / 3600), 0)
+    const totalPoints = Math.min(totalHours, 10) // Cap at 10 points
+    
+    // Update or insert user_points record
+    const { data: existingPoints } = await supabase
+      .from('user_points')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('week_start', weekStart.toISOString().split('T')[0])
+      .single()
+    
+    if (existingPoints) {
+      await supabase
+        .from('user_points')
+        .update({
+          total_hours: totalHours,
+          total_points: totalPoints,
+          activities_count: activities.length,
+          last_activity_at: activities.length > 0 ? activities[activities.length - 1].start_date : null,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', existingPoints.id)
+      
+      console.log(`Updated weekly points for user ${userId}: ${totalPoints.toFixed(2)} points (${totalHours.toFixed(2)} hours) from ${activities.length} activities`)
+    } else if (activities.length > 0) {
+      await supabase
+        .from('user_points')
+        .insert({
+          user_id: userId,
+          week_start: weekStart.toISOString().split('T')[0],
+          week_end: weekEnd.toISOString().split('T')[0],
+          total_hours: totalHours,
+          total_points: totalPoints,
+          activities_count: activities.length,
+          last_activity_at: activities[activities.length - 1].start_date
+        })
+      
+      console.log(`Created weekly points for user ${userId}: ${totalPoints.toFixed(2)} points (${totalHours.toFixed(2)} hours) from ${activities.length} activities`)
+    }
+  } catch (error) {
+    console.error('Error calculating user points:', error)
+    // Don't throw to prevent sync failure
   }
 }

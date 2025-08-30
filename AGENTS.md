@@ -198,21 +198,30 @@ ALTER TABLE strava_activities DISABLE ROW LEVEL SECURITY;
 ### 2. Manual Activities
 **Note**: Manual activities entered on Strava website may not trigger webhooks immediately. Activities recorded through Strava app are more reliable.
 
-### 3. Google OAuth Configuration
+### 3. Manual Sync Points Calculation (Fixed)
+**Issue**: The "Sync Now" button was fetching activities but not calculating points/badges
+**Solution**: Updated `/api/strava/sync` endpoint to:
+- Track affected weeks during sync
+- Recalculate points for each affected week (prevents double-counting)
+- Calculate badges for each synced activity
+- Ensure division assignment for new users
+**Implementation**: Uses `recalculateWeeklyPoints` function that fetches all activities for a week and calculates totals from scratch
+
+### 4. Google OAuth Configuration
 **Setup Required**:
 - Add redirect URI in Google Cloud Console: `https://[supabase-id].supabase.co/auth/v1/callback`
 - Update Application Name in Google Cloud Console OAuth Consent Screen
 - Update Authorized Domains to include your production domain
 - Strava Callback Domain should match production domain (e.g., `fitnessfight.club`)
 
-### 4. User Display Issues
+### 5. User Display Issues
 **Issue**: Users not showing with real names or appearing as UUID fragments
 **Solution**: Run migration 006_create_user_profiles.sql to create profiles table
 - Profiles store Google OAuth metadata (name, email, avatar)
 - Admin dashboard fetches from auth.users using service role key
 - All users visible regardless of when they signed up
 
-### 5. Complete User Deletion
+### 6. Complete User Deletion
 **Requirement**: SUPABASE_SERVICE_ROLE_KEY must be set in environment variables
 **Behavior**: Deletes user from:
 - auth.users (authentication account)
