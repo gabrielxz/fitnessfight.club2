@@ -21,14 +21,16 @@ A web application that syncs with Strava to track exercise data and create custo
 │   │   ├── AdminDashboard.tsx    # Admin UI component with user management
 │   │   └── actions.ts            # Server actions (deleteUser, assignBadge, changeDivision)
 │   ├── api/
+│   │   ├── badges/
+│   │   │   └── progress/         # Badge progress API with period support
 │   │   ├── cron/
-│   │   │   └── weekly-division-shuffle/  # Weekly division promotions/relegations
+│   │   │   └── weekly-division-shuffle/  # Weekly division promotions/relegations + badge resets
 │   │   ├── divisions/            # Division standings API
 │   │   ├── stats/weekly/         # Weekly activity statistics
 │   │   └── strava/
 │   │       ├── callback/         # Strava OAuth callback
 │   │       ├── connect/          # Initiate Strava OAuth
-│   │       ├── sync/             # Manual activity sync
+│   │       ├── sync/             # Manual activity sync (with points/badges calculation)
 │   │       └── webhook/          # Strava webhook receiver + points calculation
 │   ├── auth/
 │   │   ├── callback/             # Supabase OAuth callback
@@ -45,6 +47,9 @@ A web application that syncs with Strava to track exercise data and create custo
 │   │   └── WeekProgress.tsx        # Week progress bar
 │   ├── login/                       # Login/signup page
 │   ├── profile/                     # User profile page
+│   ├── stats/                       # Stats page (NEW)
+│   │   ├── page.tsx                 # Stats page server component
+│   │   └── BadgeProgressDisplay.tsx # Badge progress visualization
 │   └── page.tsx                     # Landing/Dashboard (conditional based on auth)
 ├── context/                      # Release planning documents
 │   ├── release-1-divisions-and-points.md
@@ -67,7 +72,8 @@ A web application that syncs with Strava to track exercise data and create custo
 │   ├── 003_create_divisions.sql
 │   ├── 004_create_badges.sql
 │   ├── 005_admin_policies.sql   # Admin RLS policies
-│   └── 006_create_user_profiles.sql # User profiles for names/emails
+│   ├── 006_create_user_profiles.sql # User profiles for names/emails
+│   └── 007_add_weekly_badge_support.sql # Periodic badge support (NEW)
 └── vercel.json                   # Cron job configuration
 ```
 
@@ -275,12 +281,13 @@ Run migrations in Supabase SQL Editor (in order):
 - `GET /` - Home page shows personalized dashboard when logged in
 - `GET /api/divisions` - Get division standings and leaderboard
 - `GET /api/badges` - Get user's earned badges
-- `GET /api/badges/progress` - Get badge progress for current user
+- `GET /api/badges/progress` - Get badge progress for current user (with period support)
 - `GET /api/strava/connect` - Initiate Strava OAuth
 - `GET /api/strava/callback` - Strava OAuth callback
-- `POST /api/strava/sync` - Manual sync
+- `POST /api/strava/sync` - Manual sync (calculates points and badges)
 - `GET /api/stats/weekly` - Weekly statistics (includes points)
 - `GET /profile` - User profile page
+- `GET /stats` - Stats page showing badge progress with visual bars
 - `POST /auth/signout` - Sign out
 
 ### Admin Routes (requires admin user - Gabriel Beal)
@@ -318,12 +325,15 @@ Run migrations in Supabase SQL Editor (in order):
   - Custom CSS animations (fadeIn, slideUp)
   - Responsive design for all screen sizes
 
-### Release 3 Details (Completed)
+### Release 3 Details (Completed + Enhanced)
 - **10 Badge Types**: Early Bird, Night Owl, Power Hour, Consistency King, Globe Trotter, Mountain Climber, Speed Demon, Runner, Cyclist, Variety Pack
 - **3 Tiers**: Bronze, Silver, Gold for each badge
-- **Automatic Calculation**: BadgeCalculator runs on every webhook activity
-- **Database Tables**: badges, user_badges, badge_progress
-- **Display**: Badges shown on athlete cards in leaderboards
+- **Automatic Calculation**: BadgeCalculator runs on every webhook activity and manual sync
+- **Database Tables**: badges, user_badges, badge_progress (with periodic support)
+- **Display**: Badges shown on athlete cards in leaderboards + detailed progress on Stats page
+- **Stats Page**: New page showing visual progress bars for all badges
+- **Periodic Badge Support**: Infrastructure for weekly/monthly/yearly badges that reset but preserve achievements
+- **Weekly Reset**: Cron job resets weekly badge progress every Sunday
 - **Note**: Badge removal on activity deletion not yet implemented (badges remain once earned)
 
 ### Admin Dashboard Details (Completed)
