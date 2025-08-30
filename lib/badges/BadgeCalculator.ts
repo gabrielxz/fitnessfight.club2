@@ -21,6 +21,7 @@ interface BadgeCriteria {
   gold: number;
   metric?: string;
   activity_type?: string;
+  reset_period?: 'weekly' | 'monthly' | 'yearly';
 }
 
 interface Badge {
@@ -41,11 +42,47 @@ interface BadgeProgress {
   last_activity_id?: number;
   last_updated?: string;
   metadata?: { sports: string[] };
+  period_start?: string;
+  period_end?: string;
+  last_reset_at?: string;
 }
 
 
 export class BadgeCalculator {
   constructor(private supabase: SupabaseClient) {}
+
+  // Helper functions for period calculations
+  private getWeekStart(date: Date): Date {
+    const d = new Date(date)
+    const day = d.getUTCDay()
+    const diff = d.getUTCDate() - day
+    return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), diff, 0, 0, 0, 0))
+  }
+
+  private getWeekEnd(weekStart: Date): Date {
+    const end = new Date(weekStart)
+    end.setUTCDate(end.getUTCDate() + 6)
+    end.setUTCHours(23, 59, 59, 999)
+    return end
+  }
+
+  private getCurrentPeriod(resetPeriod: string | undefined, activityDate: string) {
+    if (!resetPeriod) return { start: null, end: null }
+    
+    const date = new Date(activityDate)
+    
+    if (resetPeriod === 'weekly') {
+      const start = this.getWeekStart(date)
+      const end = this.getWeekEnd(start)
+      return {
+        start: start.toISOString().split('T')[0],
+        end: end.toISOString().split('T')[0]
+      }
+    }
+    
+    // Add monthly/yearly support in the future if needed
+    return { start: null, end: null }
+  }
 
   async calculateBadgesForActivity(activity: Activity) {
     // Get all active badges
@@ -65,13 +102,24 @@ export class BadgeCalculator {
     const { criteria } = badge
     const userId = activity.user_id
 
-    // Get or create progress record
-    const { data: progress } = await this.supabase
+    // Get current period if this is a periodic badge
+    const period = this.getCurrentPeriod(criteria.reset_period, activity.start_date_local)
+    
+    // Build query for progress record
+    let progressQuery = this.supabase
       .from('badge_progress')
       .select('*')
       .eq('user_id', userId)
       .eq('badge_id', badge.id)
-      .single()
+    
+    // For periodic badges, filter by period
+    if (period.start) {
+      progressQuery = progressQuery.eq('period_start', period.start)
+    } else {
+      progressQuery = progressQuery.is('period_start', null)
+    }
+    
+    const { data: progress } = await progressQuery.single()
 
     const currentProgress: BadgeProgress = progress || {
       user_id: userId,
@@ -79,7 +127,9 @@ export class BadgeCalculator {
       current_value: 0,
       bronze_achieved: false,
       silver_achieved: false,
-      gold_achieved: false
+      gold_achieved: false,
+      period_start: period.start,
+      period_end: period.end
     }
 
     // Calculate based on badge type

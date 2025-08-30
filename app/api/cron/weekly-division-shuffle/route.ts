@@ -184,14 +184,40 @@ export async function GET(request: NextRequest) {
       console.log(`Relegated user ${relegation.user_id} from ${relegation.from_division_name} to ${relegation.to_division_name}`)
     }
     
-    console.log('Weekly division shuffle completed')
+    // Reset weekly badge progress
+    console.log('Resetting weekly badge progress...')
+    
+    // Get all badges with weekly reset period
+    const { data: weeklyBadges } = await supabase
+      .from('badges')
+      .select('id')
+      .eq('active', true)
+      .eq('criteria->reset_period', 'weekly')
+    
+    if (weeklyBadges && weeklyBadges.length > 0) {
+      const badgeIds = weeklyBadges.map(b => b.id)
+      
+      // Archive old weekly progress by updating last_reset_at
+      await supabase
+        .from('badge_progress')
+        .update({ 
+          last_reset_at: new Date().toISOString()
+        })
+        .in('badge_id', badgeIds)
+        .lt('period_end', now.toISOString())
+      
+      console.log(`Reset progress for ${weeklyBadges.length} weekly badges`)
+    }
+    
+    console.log('Weekly division shuffle and badge reset completed')
     
     return NextResponse.json({ 
       success: true, 
       shuffled: new Date().toISOString(),
       promotions: promotions.length,
       relegations: relegations.length,
-      weekProcessed: weekStartStr
+      weekProcessed: weekStartStr,
+      badgesReset: weeklyBadges?.length || 0
     })
   } catch (error) {
     console.error('Error in weekly division shuffle:', error)

@@ -19,7 +19,7 @@ export function createAdminClient() {
     if (payload.role !== 'service_role') {
       throw new Error('The provided key is not a service role key. Please use the service_role key from Supabase dashboard.')
     }
-  } catch (e) {
+  } catch {
     console.warn('Could not verify service role key format')
   }
 
