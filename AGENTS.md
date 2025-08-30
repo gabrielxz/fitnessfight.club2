@@ -17,9 +17,9 @@ A web application that syncs with Strava to track exercise data and create custo
 ```
 ├── app/
 │   ├── admin/
-│   │   ├── page.tsx              # Admin dashboard page (hardcoded for Gabriel Beal)
-│   │   ├── AdminDashboard.tsx    # Admin UI component
-│   │   └── actions.ts            # Server actions for admin operations
+│   │   ├── page.tsx              # Admin dashboard page (fetches from auth.users)
+│   │   ├── AdminDashboard.tsx    # Admin UI component with user management
+│   │   └── actions.ts            # Server actions (deleteUser, assignBadge, changeDivision)
 │   ├── api/
 │   │   ├── cron/
 │   │   │   └── weekly-division-shuffle/  # Weekly division promotions/relegations
@@ -39,7 +39,7 @@ A web application that syncs with Strava to track exercise data and create custo
 │   │   ├── DivisionSelector.tsx    # My Division/Global toggle
 │   │   ├── LoggedInView.tsx        # Authenticated user view
 │   │   ├── AthleteCard.tsx         # Individual athlete display
-│   │   ├── Navigation.tsx          # App navigation with admin link
+│   │   ├── Navigation.tsx          # App navigation with mobile menu
 │   │   ├── strava-connection.tsx   # Strava connection UI
 │   │   ├── sync-activities.tsx     # Manual sync button
 │   │   └── WeekProgress.tsx        # Week progress bar
@@ -54,9 +54,10 @@ A web application that syncs with Strava to track exercise data and create custo
 │   ├── badges/
 │   │   └── BadgeCalculator.ts    # Badge calculation logic
 │   └── supabase/
-│   ├── client.ts                 # Browser client
-│   ├── server.ts                 # Server client
-│   └── middleware.ts             # Session refresh
+│       ├── client.ts              # Browser client
+│       ├── server.ts              # Server client
+│       ├── admin.ts               # Admin client with service role
+│       └── middleware.ts          # Session refresh
 ├── middleware.ts                 # Auth middleware
 ├── scripts/
 │   └── setup-webhook.js          # Strava webhook management
@@ -65,7 +66,8 @@ A web application that syncs with Strava to track exercise data and create custo
 │   ├── 002_create_strava_activities.sql
 │   ├── 003_create_divisions.sql
 │   ├── 004_create_badges.sql
-│   └── 005_admin_policies.sql   # Admin RLS policies
+│   ├── 005_admin_policies.sql   # Admin RLS policies
+│   └── 006_create_user_profiles.sql # User profiles for names/emails
 └── vercel.json                   # Cron job configuration
 ```
 
@@ -82,20 +84,27 @@ A web application that syncs with Strava to track exercise data and create custo
 3. **strava_webhook_events** - Logs all webhook events for debugging
    - Tracks processing status and errors
 
+4. **user_profiles** - Stores user metadata from Google OAuth
+   - Created by migration 006_create_user_profiles.sql
+   - Stores email, full_name, avatar_url
+   - Populated on login via auth callback
+   - Prevents UUID display issues
+
 ### Division System Tables (Release 1)
-4. **divisions** - Division definitions (Noodle, Sweaty, Shreddy, Juicy)
+5. **divisions** - Division definitions (Noodle, Sweaty, Shreddy, Juicy)
    - 4 levels with fun names and emojis
    - Min/max user limits per division
 
-5. **user_divisions** - Current division assignments
+6. **user_divisions** - Current division assignments
    - Tracks which division each user is in
    - Join date for division tenure tracking
+   - New users auto-assigned to Noodle division on first login
 
-6. **division_history** - Promotion/relegation history
+7. **division_history** - Promotion/relegation history
    - Tracks all division changes
    - Records final points and position
 
-7. **user_points** - Weekly points cache
+8. **user_points** - Weekly points cache
    - Points calculation: 1 point per hour, max 10/week
    - Cached to avoid recalculation on each page load
 
@@ -128,11 +137,23 @@ A web application that syncs with Strava to track exercise data and create custo
 - **Auto-assignment**: New users start in Noodle division
 - **Leaderboards**: Division-specific standings with promotion/relegation zones (only rank #1 and last rank show zone indicators)
 
+### Admin Dashboard
+- **Access**: Hardcoded for gabrielbeal@gmail.com
+- **User Management**: View all users from auth.users with profiles
+- **Division Management**: Manually assign/reassign users to divisions
+- **Badge Management**: Award badges to users (Bronze/Silver/Gold tiers)
+- **User Deletion**: Complete removal including auth account (requires service role)
+- **Stats Display**: Total users, Strava connected, not connected counts
+- **Manual Assignment**: "Assign to Noodle" button for users without divisions
+
 ## Environment Variables
 ```bash
 # Supabase
 NEXT_PUBLIC_SUPABASE_URL=https://[project-id].supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=[anon-key]
+
+# IMPORTANT: Required for admin functions (user deletion, fetching all users)
+SUPABASE_SERVICE_ROLE_KEY=[service-role-key]
 
 # Strava OAuth
 STRAVA_CLIENT_ID=[client-id]
@@ -177,10 +198,28 @@ ALTER TABLE strava_activities DISABLE ROW LEVEL SECURITY;
 ### 2. Manual Activities
 **Note**: Manual activities entered on Strava website may not trigger webhooks immediately. Activities recorded through Strava app are more reliable.
 
-### 3. Google OAuth Redirect
+### 3. Google OAuth Configuration
 **Setup Required**:
 - Add redirect URI in Google Cloud Console: `https://[supabase-id].supabase.co/auth/v1/callback`
-- Update Supabase URL Configuration with production domain
+- Update Application Name in Google Cloud Console OAuth Consent Screen
+- Update Authorized Domains to include your production domain
+- Strava Callback Domain should match production domain (e.g., `fitnessfight.club`)
+
+### 4. User Display Issues
+**Issue**: Users not showing with real names or appearing as UUID fragments
+**Solution**: Run migration 006_create_user_profiles.sql to create profiles table
+- Profiles store Google OAuth metadata (name, email, avatar)
+- Admin dashboard fetches from auth.users using service role key
+- All users visible regardless of when they signed up
+
+### 5. Complete User Deletion
+**Requirement**: SUPABASE_SERVICE_ROLE_KEY must be set in environment variables
+**Behavior**: Deletes user from:
+- auth.users (authentication account)
+- strava_activities (all activity data)
+- user_profiles, user_divisions, user_badges, user_points
+- division_history records
+**Note**: User session is invalidated before deletion to prevent ghost sessions
 
 ## Development Workflow
 
