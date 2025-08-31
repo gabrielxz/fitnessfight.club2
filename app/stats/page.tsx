@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import Navigation from '@/app/components/Navigation'
 import BadgeProgressDisplay from './BadgeProgressDisplay'
 
 export default async function StatsPage() {
@@ -11,7 +12,9 @@ export default async function StatsPage() {
   }
 
   return (
-    <div className="min-h-screen p-8 pt-24">
+    <>
+      <Navigation user={user} />
+      <div className="min-h-screen p-8 pt-24">
       <div className="max-w-7xl mx-auto">
         <div className="mb-8">
           <h1 className="text-4xl font-bold text-white mb-2">
@@ -25,5 +28,6 @@ export default async function StatsPage() {
         <BadgeProgressDisplay />
       </div>
     </div>
+    </>
   )
 }
