@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { User } from '@supabase/supabase-js'
 import { useState } from 'react'
@@ -42,7 +43,13 @@ export default function Navigation({ user }: NavigationProps) {
         <div className="flex justify-between h-16">
           <div className="flex items-center gap-8">
             <Link href="/" className="flex items-center gap-2 group">
-              <span className="text-2xl">⚔️</span>
+              <Image
+                src="/favicon-32x32.png"
+                alt="FFC Logo"
+                width={32}
+                height={32}
+                className="group-hover:scale-110 transition-transform"
+              />
               <span className="text-xl font-black gradient-text group-hover:scale-105 transition-transform">
                 FFC
               </span>
