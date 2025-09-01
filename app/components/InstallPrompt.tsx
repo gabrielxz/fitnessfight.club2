@@ -118,9 +118,13 @@ export default function InstallPrompt() {
               </div>
               <div className="flex items-center gap-2 text-gray-300">
                 <span>Tap the share button</span>
-                <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m9.032 4.026a9.001 9.001 0 01-7.432 0m9.032-4.026A9.001 9.001 0 0112 3c-4.474 0-8.268 3.12-9.032 7.326m0 0A9.001 9.001 0 0012 21c4.474 0 8.268-3.12 9.032-7.326" />
-                </svg>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img 
+                  src="/ios-share-icon.png" 
+                  alt="iOS Share" 
+                  className="w-5 h-5 inline-block"
+                  style={{ filter: 'invert(60%) sepia(100%) saturate(500%) hue-rotate(190deg)' }}
+                />
               </div>
             </div>
 
