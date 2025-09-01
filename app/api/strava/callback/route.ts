@@ -81,7 +81,7 @@ export async function GET(request: NextRequest) {
         strava_athlete_id: tokenData.athlete.id,
         strava_firstname: tokenData.athlete.firstname,
         strava_lastname: tokenData.athlete.lastname,
-        strava_profile: tokenData.athlete.profile,
+        strava_profile: tokenData.athlete.profile_medium || tokenData.athlete.profile,
         access_token: tokenData.access_token,
         refresh_token: tokenData.refresh_token,
         expires_at: new Date(tokenData.expires_at * 1000).toISOString(),

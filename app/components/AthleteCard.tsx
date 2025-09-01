@@ -1,4 +1,7 @@
+'use client'
+
 import Image from 'next/image'
+import { useState } from 'react'
 
 interface AthleteCardProps {
   rank: number
@@ -21,6 +24,8 @@ export default function AthleteCard({
   badges = [],
   profilePicture
 }: AthleteCardProps) {
+  const [imageError, setImageError] = useState(false)
+  
   const cardStyles: Record<number, React.CSSProperties> = {
     1: { 
       borderColor: 'rgba(234, 179, 8, 0.3)',
@@ -56,7 +61,7 @@ export default function AthleteCard({
     <div className="glass-card p-6 transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl" style={mergedStyles}>
       <div className="flex justify-between items-start mb-4">
         <div className="flex items-center gap-3">
-          {profilePicture ? (
+          {profilePicture && !imageError ? (
             <div className="relative w-12 h-12">
               <Image
                 src={profilePicture}
@@ -64,6 +69,7 @@ export default function AthleteCard({
                 fill
                 className="rounded-full object-cover"
                 sizes="48px"
+                onError={() => setImageError(true)}
               />
               {rank <= 3 && (
                 <div className="absolute -top-1 -right-1 w-6 h-6 bg-gradient-to-br from-yellow-500 to-orange-500 rounded-full flex items-center justify-center text-xs font-bold text-white">
