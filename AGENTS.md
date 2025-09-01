@@ -352,3 +352,69 @@ Run migrations in Supabase SQL Editor (in order):
 - Advanced statistics and progress tracking
 - Strava webhook subscription management UI
 - Service role key for better webhook security
+
+## Release 4: Habit Tracker (In Development - feature/habit-tracker branch)
+
+### Overview
+A mini habit tracker inspired by HabitShare, allowing users to track daily habits and earn points for consistency.
+
+### Database Schema (Migration 008_create_habits.sql)
+- **habits** - User habit definitions
+  - id, user_id, name (max 100 chars), target_frequency (1-7), position, archived_at
+  - RLS enabled for user data protection
+- **habit_entries** - Daily status tracking
+  - habit_id, date, status (SUCCESS/FAILURE/NEUTRAL), week_start
+  - Unique constraint on (habit_id, date)
+- **habit_weekly_summaries** - Weekly performance cache
+  - habit_id, user_id, week_start, successes, target, percentage, points_earned
+
+### Features
+1. **Habit Management**
+   - Add habits with name and target frequency (1-7 days/week)
+   - Edit habit name and frequency
+   - Delete habits (soft delete with archived_at)
+   - Unlimited habits allowed, but only first 5 count for points
+
+2. **Daily Tracking**
+   - Click day circles to cycle: NEUTRAL → SUCCESS → FAILURE
+   - Visual indicators: Green (SUCCESS), Red (FAILURE), Gray (NEUTRAL)
+   - "TODAY" indicator on current day
+   - Can only modify current and past days
+
+3. **Weekly View**
+   - Shows Mon-Sun with status circles
+   - "This Wk: X/7" progress display
+   - Overall percentage calculation
+   - Navigate through previous weeks
+
+4. **Points System**
+   - 0.5 points per completed habit (meeting weekly target)
+   - Only first 5 habits eligible for points
+   - Points calculated during weekly cron job
+   - Visual indicators: "+0.5 pts" badge for eligible habits
+
+5. **UI Components**
+   - `/habits` page - Main habits interface
+   - Glass-card design matching existing theme
+   - Add/Edit habit dialogs with sliders
+   - Responsive mobile layout
+   - Info message when >5 habits exist
+
+### API Endpoints
+- `GET /api/habits` - Get user's habits with current week
+- `POST /api/habits` - Create new habit
+- `PATCH /api/habits/[id]` - Update habit
+- `DELETE /api/habits/[id]` - Soft delete habit
+- `POST /api/habits/[id]/entries` - Set daily status
+- `GET /api/habits/history` - Get paginated history
+
+### Integration
+- Added "Habits" link to Navigation (logged-in users only)
+- Weekly cron job calculates habit points and adds to user_points
+- Habits ordered by position, then creation date
+
+### Implementation Notes
+- Feature branch: `feature/habit-tracker`
+- Migration must be run before deployment
+- Points are capped at 2.5/week (5 habits × 0.5 points)
+- Soft delete preserves historical data
