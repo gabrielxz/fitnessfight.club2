@@ -4,6 +4,7 @@ import Navigation from '@/app/components/Navigation'
 import LoggedInView from '@/app/components/LoggedInView'
 import DivisionLeaderboard from '@/app/components/DivisionLeaderboard'
 import WeekProgress from '@/app/components/WeekProgress'
+import InstallPrompt from '@/app/components/InstallPrompt'
 
 const divisionEmojis: Record<string, string> = {
   'Noodle': '🍜',
@@ -80,6 +81,7 @@ export default async function Page() {
           )}
         </div>
       </main>
+      <InstallPrompt />
     </div>
   )
 }
