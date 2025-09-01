@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { deleteUser, assignBadge, removeBadge, changeDivision } from './actions'
 
 interface User {
@@ -59,6 +59,14 @@ export default function AdminDashboard({
   const [selectedDivision, setSelectedDivision] = useState<string>('')
   const [deleteConfirm, setDeleteConfirm] = useState<string>('')
   const [loading, setLoading] = useState(false)
+  const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
+
+  useEffect(() => {
+    if (notification) {
+      const timer = setTimeout(() => setNotification(null), 3000)
+      return () => clearTimeout(timer)
+    }
+  }, [notification])
 
   const getUserDivision = (userId: string) => {
     const userDiv = userDivisions.find(ud => ud.user_id === userId)
@@ -83,10 +91,11 @@ export default function AdminDashboard({
     setLoading(true)
     try {
       await deleteUser(userId)
-      window.location.reload()
+      setNotification({ message: 'User deleted successfully', type: 'success' })
+      setTimeout(() => window.location.reload(), 1500)
     } catch (error) {
       console.error('Error deleting user:', error)
-      alert('Failed to delete user')
+      setNotification({ message: 'Failed to delete user', type: 'error' })
     }
     setLoading(false)
     setDeleteConfirm('')
@@ -94,17 +103,23 @@ export default function AdminDashboard({
 
   const handleAssignBadge = async () => {
     if (!selectedUser || !selectedBadge) {
-      alert('Please select a user and badge')
+      setNotification({ message: 'Please select a user and badge', type: 'error' })
       return
     }
 
     setLoading(true)
     try {
       await assignBadge(selectedUser, selectedBadge, selectedTier)
-      window.location.reload()
+      const user = users.find(u => u.user_id === selectedUser)
+      const badge = badges.find(b => b.id === selectedBadge)
+      setNotification({ 
+        message: `${badge?.emoji} ${badge?.name} (${selectedTier}) assigned to ${user?.display_name}`, 
+        type: 'success' 
+      })
+      setTimeout(() => window.location.reload(), 1500)
     } catch (error) {
       console.error('Error assigning badge:', error)
-      alert('Failed to assign badge')
+      setNotification({ message: 'Failed to assign badge', type: 'error' })
     }
     setLoading(false)
   }
@@ -113,33 +128,64 @@ export default function AdminDashboard({
     setLoading(true)
     try {
       await removeBadge(userBadgeId)
-      window.location.reload()
+      setNotification({ message: 'Badge removed successfully', type: 'success' })
+      setTimeout(() => window.location.reload(), 1500)
     } catch (error) {
       console.error('Error removing badge:', error)
-      alert('Failed to remove badge')
+      setNotification({ message: 'Failed to remove badge', type: 'error' })
     }
     setLoading(false)
   }
 
   const handleChangeDivision = async () => {
     if (!selectedUser || !selectedDivision) {
-      alert('Please select a user and division')
+      setNotification({ message: 'Please select a user and division', type: 'error' })
       return
     }
 
     setLoading(true)
     try {
       await changeDivision(selectedUser, selectedDivision)
-      window.location.reload()
+      const user = users.find(u => u.user_id === selectedUser)
+      const division = divisions.find(d => d.id === selectedDivision)
+      setNotification({ 
+        message: `${user?.display_name} moved to ${division?.emoji} ${division?.name}`, 
+        type: 'success' 
+      })
+      setTimeout(() => window.location.reload(), 1500)
     } catch (error) {
       console.error('Error changing division:', error)
-      alert('Failed to change division')
+      setNotification({ message: 'Failed to change division', type: 'error' })
     }
     setLoading(false)
   }
 
   return (
     <div className="relative z-10 pt-24 pb-12 px-4 sm:px-6 lg:px-8">
+      {/* Notification Toast */}
+      {notification && (
+        <div
+          className={`fixed top-20 right-4 z-50 px-6 py-3 rounded-lg shadow-lg transition-all duration-300 ${
+            notification.type === 'success' 
+              ? 'bg-green-600 text-white' 
+              : 'bg-red-600 text-white'
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            {notification.type === 'success' ? (
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+            ) : (
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            )}
+            <span className="font-medium">{notification.message}</span>
+          </div>
+        </div>
+      )}
+      
       <div className="max-w-7xl mx-auto">
         <h1 className="text-4xl font-bold text-white mb-8">Admin Dashboard</h1>
         
@@ -196,16 +242,26 @@ export default function AdminDashboard({
                       {getUserDivision(user.user_id) === 'Not Assigned' && (
                         <button
                           onClick={async () => {
-                            setSelectedUser(user.user_id)
                             // Find Noodle division ID
                             const noodleDiv = divisions.find(d => d.name === 'Noodle')
                             if (noodleDiv) {
-                              setSelectedDivision(noodleDiv.id)
-                              // Auto-assign to Noodle
-                              await handleChangeDivision()
+                              setLoading(true)
+                              try {
+                                await changeDivision(user.user_id, noodleDiv.id)
+                                setNotification({ 
+                                  message: `${user.display_name} assigned to ${noodleDiv.emoji} ${noodleDiv.name}`, 
+                                  type: 'success' 
+                                })
+                                setTimeout(() => window.location.reload(), 1500)
+                              } catch (error) {
+                                console.error('Error assigning to Noodle:', error)
+                                setNotification({ message: 'Failed to assign to Noodle', type: 'error' })
+                              }
+                              setLoading(false)
                             }
                           }}
-                          className="ml-2 text-xs px-2 py-1 bg-orange-600 hover:bg-orange-700 rounded text-white"
+                          disabled={loading}
+                          className="ml-2 text-xs px-2 py-1 bg-orange-600 hover:bg-orange-700 rounded text-white disabled:opacity-50"
                         >
                           Assign to Noodle
                         </button>

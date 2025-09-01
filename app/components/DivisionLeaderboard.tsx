@@ -111,6 +111,7 @@ export default function DivisionLeaderboard({ userId, divisionId }: DivisionLead
             zone={zone}
             isCurrentUser={athlete.user_id === userId}
             badges={athlete.badges || []}
+            profilePicture={athlete.strava_profile}
           />
         )
       })}

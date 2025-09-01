@@ -1,3 +1,5 @@
+import Image from 'next/image'
+
 interface AthleteCardProps {
   rank: number
   name: string
@@ -6,6 +8,7 @@ interface AthleteCardProps {
   zone: 'promotion' | 'safe' | 'relegation' | null
   isCurrentUser?: boolean
   badges?: Array<{ emoji: string; name?: string; tier: 'gold' | 'silver' | 'bronze' | string }>
+  profilePicture?: string | null
 }
 
 export default function AthleteCard({
@@ -15,7 +18,8 @@ export default function AthleteCard({
   hours,
   zone,
   isCurrentUser = false,
-  badges = []
+  badges = [],
+  profilePicture
 }: AthleteCardProps) {
   const cardStyles: Record<number, React.CSSProperties> = {
     1: { 
@@ -52,12 +56,29 @@ export default function AthleteCard({
     <div className="glass-card p-6 transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl" style={mergedStyles}>
       <div className="flex justify-between items-start mb-4">
         <div className="flex items-center gap-3">
-          <div className={`
-            w-12 h-12 rounded-full flex items-center justify-center text-xl font-bold
-            ${rank <= 3 ? 'bg-gradient-to-br from-yellow-500 to-orange-500 text-white' : 'text-gray-300'}
-          `} style={rank > 3 ? { backgroundColor: 'rgba(255, 255, 255, 0.1)' } : {}}>
-            {rankEmojis[rank] || getInitials(name)}
-          </div>
+          {profilePicture ? (
+            <div className="relative w-12 h-12">
+              <Image
+                src={profilePicture}
+                alt={name}
+                fill
+                className="rounded-full object-cover"
+                sizes="48px"
+              />
+              {rank <= 3 && (
+                <div className="absolute -top-1 -right-1 w-6 h-6 bg-gradient-to-br from-yellow-500 to-orange-500 rounded-full flex items-center justify-center text-xs font-bold text-white">
+                  {rank}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className={`
+              w-12 h-12 rounded-full flex items-center justify-center text-xl font-bold
+              ${rank <= 3 ? 'bg-gradient-to-br from-yellow-500 to-orange-500 text-white' : 'text-gray-300'}
+            `} style={rank > 3 ? { backgroundColor: 'rgba(255, 255, 255, 0.1)' } : {}}>
+              {rankEmojis[rank] || getInitials(name)}
+            </div>
+          )}
           <div>
             <div className="flex items-center gap-2">
               <h3 className="font-bold text-lg">
