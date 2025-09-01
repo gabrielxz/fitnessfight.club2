@@ -12,8 +12,9 @@ function getWeekStart(date: Date): Date {
 // POST /api/habits/[id]/entries - Set habit status for a date
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
+  const params = await context.params
   try {
     const supabase = await createClient()
     

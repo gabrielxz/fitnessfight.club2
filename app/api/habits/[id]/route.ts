@@ -4,8 +4,9 @@ import { createClient } from '@/lib/supabase/server'
 // PATCH /api/habits/[id] - Update habit name/frequency
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
+  const params = await context.params
   try {
     const supabase = await createClient()
     
@@ -18,7 +19,7 @@ export async function PATCH(
     const { name, target_frequency } = body
 
     // Build update object
-    const updateData: any = {}
+    const updateData: Record<string, string | number> = {}
     
     if (name !== undefined) {
       if (name.length > 100) {
@@ -66,8 +67,9 @@ export async function PATCH(
 // DELETE /api/habits/[id] - Soft delete habit
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
+  const params = await context.params
   try {
     const supabase = await createClient()
     

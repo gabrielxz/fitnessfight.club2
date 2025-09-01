@@ -164,7 +164,7 @@ export default function HabitList() {
             if (habit.id === habitId) {
               // Update entries
               const existingEntryIndex = habit.entries.findIndex(e => e.date === date)
-              let newEntries = [...habit.entries]
+              const newEntries = [...habit.entries]
               
               if (newStatus === 'NEUTRAL') {
                 // Remove entry if neutral

@@ -75,7 +75,19 @@ export async function GET(request: NextRequest) {
     }
 
     // Organize data by week
-    const weeklyData: any[] = []
+    interface WeeklyHabitData {
+      weekStart: string
+      weekEnd: string
+      habits: Array<typeof habits[0] & {
+        entries: typeof entries
+        summary: {
+          successes: number
+          target: number
+          percentage: number
+        }
+      }>
+    }
+    const weeklyData: WeeklyHabitData[] = []
     for (let i = 0; i < weeksToFetch; i++) {
       const weekStart = new Date(currentWeekStart)
       weekStart.setDate(weekStart.getDate() - (7 * i))
