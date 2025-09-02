@@ -41,11 +41,49 @@ export default function HabitList() {
   const [habits, setHabits] = useState<Habit[]>([])
   const [weeks, setWeeks] = useState<WeekData[]>([])
   const [currentDate, setCurrentDate] = useState<string>('')
+  const [userTimezone, setUserTimezone] = useState<string>('')
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [showAddDialog, setShowAddDialog] = useState(false)
   const [currentWeekIndex, setCurrentWeekIndex] = useState(0)
   const [totalWeeksLoaded, setTotalWeeksLoaded] = useState(1)
+
+  // Get user's local date and timezone
+  useEffect(() => {
+    // Set current date in local timezone
+    const localDate = new Date().toLocaleDateString('en-CA') // YYYY-MM-DD format
+    setCurrentDate(localDate)
+    
+    // Detect user's timezone
+    const detectedTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone
+    setUserTimezone(detectedTimezone)
+  }, [])
+
+  // Calculate when week ends in user's timezone
+  const getWeekEndInUserTimezone = () => {
+    if (!userTimezone) return null
+    
+    // Week ends at 23:59 UTC on Sunday
+    const now = new Date()
+    const currentDay = now.getUTCDay()
+    const daysUntilSunday = currentDay === 0 ? 0 : 7 - currentDay
+    
+    // Create date for next Sunday 23:59 UTC
+    const weekEndUTC = new Date(now)
+    weekEndUTC.setUTCDate(weekEndUTC.getUTCDate() + daysUntilSunday)
+    weekEndUTC.setUTCHours(23, 59, 59, 0)
+    
+    // Convert to user's timezone
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: userTimezone,
+      weekday: 'short',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    })
+    
+    return formatter.format(weekEndUTC)
+  }
 
   // Fetch habits and current week data
   const fetchHabits = useCallback(async (weeksToFetch = 1) => {
@@ -56,8 +94,16 @@ export default function HabitList() {
       const data = await response.json()
       setHabits(data.habits || [])
       setWeeks(data.weeks || [])
-      setCurrentDate(data.currentDate)
       setTotalWeeksLoaded(weeksToFetch)
+      
+      // Fetch user's timezone preference if available
+      const profileResponse = await fetch('/api/user/profile')
+      if (profileResponse.ok) {
+        const profileData = await profileResponse.json()
+        if (profileData.timezone) {
+          setUserTimezone(profileData.timezone)
+        }
+      }
     } catch (error) {
       console.error('Error fetching habits:', error)
     } finally {
@@ -258,6 +304,18 @@ export default function HabitList() {
           >
             Next Week →
           </button>
+        </div>
+      )}
+
+      {/* Week end time notice */}
+      {userTimezone && (
+        <div className="mb-4 p-3 bg-amber-500/10 rounded-lg border border-amber-500/30">
+          <p className="text-sm text-amber-400">
+            ⏰ Week ends {getWeekEndInUserTimezone()} in your timezone ({userTimezone})
+          </p>
+          <p className="text-xs text-amber-400/70 mt-1">
+            Complete Sunday habits before this time to ensure they count for the current week.
+          </p>
         </div>
       )}
 

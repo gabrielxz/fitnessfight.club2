@@ -4,6 +4,7 @@ import AnimatedBackground from '@/app/components/AnimatedBackground'
 import Navigation from '@/app/components/Navigation'
 import StravaConnection from '@/app/components/strava-connection'
 import SyncActivities from '@/app/components/sync-activities'
+import TimezoneSettings from '@/app/components/TimezoneSettings'
 
 export default async function ProfilePage() {
   const supabase = await createClient()
@@ -47,6 +48,7 @@ export default async function ProfilePage() {
               stravaProfile={stravaConnection?.strava_profile}
             />
             <SyncActivities />
+            <TimezoneSettings />
           </div>
         </div>
       </main>

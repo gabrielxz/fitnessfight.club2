@@ -130,8 +130,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ 
       habits,
-      weeks: weeklyData,
-      currentDate: now.toISOString().split('T')[0]
+      weeks: weeklyData
     })
   } catch (error) {
     console.error('Error in GET /api/habits:', error)
