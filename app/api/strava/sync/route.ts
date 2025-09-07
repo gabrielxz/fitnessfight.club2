@@ -131,9 +131,34 @@ export async function POST() {
       }
     }
     
-    // Recalculate points for all affected weeks
+    // Recalculate points for all affected weeks ONLY ONCE per week
+    // This prevents double-counting when multiple activities are synced
+    let totalPointsDifference = 0
     for (const weekStartStr of affectedWeeks) {
-      await recalculateWeeklyPoints(user.id, new Date(weekStartStr), supabase)
+      const pointsDiff = await recalculateWeeklyPoints(user.id, new Date(weekStartStr), supabase, true)
+      totalPointsDifference += pointsDiff || 0
+    }
+    
+    // Now update cumulative points ONCE with the total difference
+    if (totalPointsDifference !== 0) {
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('cumulative_points')
+        .eq('id', user.id)
+        .single()
+      
+      const currentCumulative = profile?.cumulative_points || 0
+      const newCumulative = Math.max(0, currentCumulative + totalPointsDifference)
+      
+      await supabase
+        .from('user_profiles')
+        .upsert({
+          id: user.id,
+          cumulative_points: newCumulative,
+          updated_at: new Date().toISOString()
+        })
+      
+      console.log(`Updated cumulative points for user ${user.id}: ${currentCumulative.toFixed(2)} -> ${newCumulative.toFixed(2)} (${totalPointsDifference > 0 ? '+' : ''}${totalPointsDifference.toFixed(2)})`)
     }
     
     // Ensure user has a division assignment (if they don't have one yet)
@@ -219,7 +244,7 @@ function getWeekEnd(weekStart: Date): Date {
 }
 
 // Recalculate all points for a user for a given week
-async function recalculateWeeklyPoints(userId: string, weekStart: Date, supabase: SupabaseClient) {
+async function recalculateWeeklyPoints(userId: string, weekStart: Date, supabase: SupabaseClient, skipCumulativeUpdate: boolean = false) {
   try {
     const weekEnd = getWeekEnd(weekStart)
     
@@ -280,8 +305,8 @@ async function recalculateWeeklyPoints(userId: string, weekStart: Date, supabase
       
     }
     
-    // Update cumulative points in user_profiles
-    if (pointsDifference !== 0) {
+    // Update cumulative points in user_profiles (skip during batch sync to prevent double-counting)
+    if (!skipCumulativeUpdate && pointsDifference !== 0) {
       // Get current cumulative points
       const { data: profile } = await supabase
         .from('user_profiles')
@@ -305,7 +330,11 @@ async function recalculateWeeklyPoints(userId: string, weekStart: Date, supabase
     }
     
     console.log(`Weekly points for user ${userId}: ${weeklyExercisePoints.toFixed(2)} points (${totalHours.toFixed(2)} hours) from ${activities.length} activities`)
+    
+    // Return the points difference for batch processing
+    return pointsDifference
   } catch (error) {
     console.error('Error in recalculateWeeklyPoints:', error)
+    return 0
   }
 }
