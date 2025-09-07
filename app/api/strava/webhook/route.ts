@@ -257,7 +257,10 @@ async function deleteActivity(activityId: number, supabase: SupabaseClient) {
 function getWeekStart(date: Date): Date {
   const d = new Date(date)
   const day = d.getUTCDay()
-  const diff = d.getUTCDate() - day
+  // If Sunday (0), treat as end of week (day 7)
+  const adjustedDay = day === 0 ? 7 : day
+  // Calculate days back to Monday (1)
+  const diff = d.getUTCDate() - (adjustedDay - 1)
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), diff, 0, 0, 0, 0))
 }
 

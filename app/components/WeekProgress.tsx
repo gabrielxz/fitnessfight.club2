@@ -9,17 +9,24 @@ export default function WeekProgress() {
   useEffect(() => {
     const calculateProgress = () => {
       const now = new Date()
-      const sunday = new Date()
-      sunday.setUTCDate(sunday.getUTCDate() - sunday.getUTCDay() + 7)
+      
+      // Calculate end of week (Sunday 23:59:59 UTC)
+      const currentDay = now.getUTCDay()
+      const daysUntilSunday = currentDay === 0 ? 0 : 7 - currentDay
+      const sunday = new Date(now)
+      sunday.setUTCDate(sunday.getUTCDate() + daysUntilSunday)
       sunday.setUTCHours(23, 59, 59, 999)
       
       const msRemaining = sunday.getTime() - now.getTime()
       const days = Math.ceil(msRemaining / (1000 * 60 * 60 * 24))
-      setDaysRemaining(days)
+      setDaysRemaining(Math.min(days, 7)) // Never show more than 7 days
       
-      // Calculate week progress (0-100%)
-      const weekStart = new Date()
-      weekStart.setUTCDate(weekStart.getUTCDate() - weekStart.getUTCDay())
+      // Calculate week progress (0-100%) - Monday is start of week
+      const weekStart = new Date(now)
+      const day = weekStart.getUTCDay()
+      const adjustedDay = day === 0 ? 7 : day // Sunday is 7, not 0
+      const diff = weekStart.getUTCDate() - (adjustedDay - 1) // Days back to Monday
+      weekStart.setUTCDate(diff)
       weekStart.setUTCHours(0, 0, 0, 0)
       
       const weekDuration = 7 * 24 * 60 * 60 * 1000
