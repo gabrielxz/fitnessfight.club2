@@ -305,9 +305,7 @@ async function recalculateWeeklyPoints(userId: string, weekStart: Date, supabase
     }
     
     console.log(`Weekly points for user ${userId}: ${weeklyExercisePoints.toFixed(2)} points (${totalHours.toFixed(2)} hours) from ${activities.length} activities`)
-    }
   } catch (error) {
-    console.error('Error calculating user points:', error)
-    // Don't throw to prevent sync failure
+    console.error('Error in recalculateWeeklyPoints:', error)
   }
 }

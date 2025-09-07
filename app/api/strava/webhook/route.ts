@@ -357,7 +357,6 @@ async function recalculateWeeklyPoints(userId: string, weekStart: Date, supabase
     }
     
     console.log(`Weekly points for user ${userId}: ${weeklyExercisePoints.toFixed(2)} points (${totalHours.toFixed(2)} hours) from ${activities.length} activities`)
-    }
     
     // Ensure user has a division assignment
     const { data: userDivision } = await supabase
