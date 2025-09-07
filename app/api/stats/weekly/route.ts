@@ -11,10 +11,13 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Get current week start (Sunday in UTC)
+    // Get current week start (Monday in UTC)
     const now = new Date()
     const day = now.getUTCDay()
-    const diff = now.getUTCDate() - day
+    // If Sunday (0), treat as end of week (day 7)
+    const adjustedDay = day === 0 ? 7 : day
+    // Calculate days back to Monday (1)
+    const diff = now.getUTCDate() - (adjustedDay - 1)
     const currentWeekStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), diff, 0, 0, 0, 0))
 
     // Get last week start

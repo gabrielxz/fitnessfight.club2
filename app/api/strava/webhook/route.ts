@@ -214,8 +214,9 @@ async function fetchAndStoreActivity(
 
     console.log(`Activity ${activityId} stored successfully in database`)
     
-    // Calculate points for this activity
-    await calculateUserPoints(connection.user_id, activity, supabase)
+    // Recalculate points for the week this activity belongs to
+    const weekStart = getWeekStart(new Date(activity.start_date))
+    await recalculateWeeklyPoints(connection.user_id, weekStart, supabase)
 
     // Calculate badges for this activity
     const badgeCalculator = new BadgeCalculator(supabase)
@@ -267,59 +268,64 @@ function getWeekEnd(weekStart: Date): Date {
   return end
 }
 
-// Calculate and update user points
-interface Activity {
-  start_date: string
-  moving_time: number
-}
-
-async function calculateUserPoints(userId: string, activity: Activity, supabase: SupabaseClient) {
+// Recalculate all points for a user for a given week
+async function recalculateWeeklyPoints(userId: string, weekStart: Date, supabase: SupabaseClient) {
   try {
-    const weekStart = getWeekStart(new Date(activity.start_date))
     const weekEnd = getWeekEnd(weekStart)
     
-    // Get or create user_points record for this week
+    // Get all activities for this user in this week
+    const { data: activities, error } = await supabase
+      .from('strava_activities')
+      .select('moving_time, start_date')
+      .eq('user_id', userId)
+      .gte('start_date', weekStart.toISOString())
+      .lte('start_date', weekEnd.toISOString())
+      .is('deleted_at', null)
+    
+    if (error) {
+      console.error('Error fetching activities for points calculation:', error)
+      return
+    }
+    
+    // Calculate total hours and points
+    const totalHours = activities.reduce((sum, activity) => sum + (activity.moving_time / 3600), 0)
+    const totalPoints = Math.min(totalHours, 10) // Cap at 10 points
+    
+    // Update or insert user_points record
     const { data: existingPoints } = await supabase
       .from('user_points')
-      .select('*')
+      .select('id')
       .eq('user_id', userId)
       .eq('week_start', weekStart.toISOString().split('T')[0])
       .single()
     
-    const activityHours = activity.moving_time / 3600
-    
     if (existingPoints) {
-      const newTotalHours = existingPoints.total_hours + activityHours
-      const newPoints = Math.min(newTotalHours, 10) // Cap at 10 points
-      
       await supabase
         .from('user_points')
         .update({
-          total_hours: newTotalHours,
-          total_points: newPoints,
-          activities_count: existingPoints.activities_count + 1,
-          last_activity_at: activity.start_date,
+          total_hours: totalHours,
+          total_points: totalPoints,
+          activities_count: activities.length,
+          last_activity_at: activities.length > 0 ? activities[activities.length - 1].start_date : null,
           updated_at: new Date().toISOString()
         })
         .eq('id', existingPoints.id)
       
-      console.log(`Updated points for user ${userId}: ${newPoints.toFixed(2)} points (${newTotalHours.toFixed(2)} hours)`)
-    } else {
-      const points = Math.min(activityHours, 10)
-      
+      console.log(`Updated weekly points for user ${userId}: ${totalPoints.toFixed(2)} points (${totalHours.toFixed(2)} hours) from ${activities.length} activities`)
+    } else if (activities.length > 0) {
       await supabase
         .from('user_points')
         .insert({
           user_id: userId,
           week_start: weekStart.toISOString().split('T')[0],
           week_end: weekEnd.toISOString().split('T')[0],
-          total_hours: activityHours,
-          total_points: points,
-          activities_count: 1,
-          last_activity_at: activity.start_date
+          total_hours: totalHours,
+          total_points: totalPoints,
+          activities_count: activities.length,
+          last_activity_at: activities[activities.length - 1].start_date
         })
       
-      console.log(`Created points for user ${userId}: ${points.toFixed(2)} points (${activityHours.toFixed(2)} hours)`)
+      console.log(`Created weekly points for user ${userId}: ${totalPoints.toFixed(2)} points (${totalHours.toFixed(2)} hours) from ${activities.length} activities`)
     }
     
     // Ensure user has a division assignment

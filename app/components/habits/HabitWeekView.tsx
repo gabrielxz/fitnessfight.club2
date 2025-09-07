@@ -20,15 +20,15 @@ export default function HabitWeekView({
 }: HabitWeekViewProps) {
   const days = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su']
   
-  // Calculate dates for the week (starting Sunday)
+  // Calculate dates for the week (Monday to Sunday)
   const getWeekDates = () => {
     const dates = []
     const start = new Date(weekStart)
     
-    // Adjust to show Monday first
-    for (let i = 1; i <= 7; i++) {
+    // Week already starts on Monday, so just iterate through the 7 days
+    for (let i = 0; i < 7; i++) {
       const date = new Date(start)
-      date.setDate(start.getDate() + (i % 7))
+      date.setDate(start.getDate() + i)
       dates.push(date.toISOString().split('T')[0])
     }
     

@@ -114,7 +114,7 @@ export default function TimezoneSettings() {
     if (!selectedTimezone) return null
     
     try {
-      // Week ends at 23:59 UTC on Sunday
+      // Week ends at 23:59 UTC on Sunday (weeks run Monday-Sunday)
       const now = new Date()
       const currentDay = now.getUTCDay()
       const daysUntilSunday = currentDay === 0 ? 0 : 7 - currentDay
