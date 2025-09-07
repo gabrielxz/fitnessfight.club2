@@ -121,7 +121,6 @@ async function recalculateWeeklyPoints() {
         .update({
           total_hours: totalHours,
           total_points: finalPoints,
-          habit_points: habitPoints,
           updated_at: new Date().toISOString()
         })
         .eq('id', existing.id)
@@ -131,14 +130,17 @@ async function recalculateWeeklyPoints() {
       }
     } else {
       // Create new record
+      const weekEnd = new Date(currentWeekStart)
+      weekEnd.setUTCDate(weekEnd.getUTCDate() + 6)
+      
       const { error: insertError } = await supabase
         .from('user_points')
         .insert({
           user_id: userId,
           week_start: currentWeekStartStr,
+          week_end: formatDate(weekEnd),
           total_hours: totalHours,
-          total_points: finalPoints,
-          habit_points: habitPoints
+          total_points: finalPoints
         })
       
       if (insertError) {
