@@ -162,6 +162,48 @@ export async function POST(
           percentage
         })
     }
+    
+    // Update cumulative points when habit is marked complete
+    // Check if this habit completion brings the total to the target
+    const previousSuccessCount = existingSummary?.successes || 0
+    const habitJustCompleted = previousSuccessCount < habit.target_frequency && successCount >= habit.target_frequency
+    const habitWasCompleteButNowNot = previousSuccessCount >= habit.target_frequency && successCount < habit.target_frequency
+    
+    // Only first 5 habits earn points (0.5 each)
+    const { data: userHabits } = await supabase
+      .from('habits')
+      .select('id, position')
+      .eq('user_id', user.id)
+      .is('archived_at', null)
+      .order('position', { ascending: true })
+      .order('created_at', { ascending: true })
+      .limit(5)
+    
+    const isEligibleForPoints = userHabits?.some(h => h.id === params.id) || false
+    
+    if (isEligibleForPoints && (habitJustCompleted || habitWasCompleteButNowNot)) {
+      // Get current cumulative points
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('cumulative_points')
+        .eq('id', user.id)
+        .single()
+      
+      const currentCumulative = profile?.cumulative_points || 0
+      const pointChange = habitJustCompleted ? 0.5 : -0.5
+      const newCumulative = Math.max(0, currentCumulative + pointChange)
+      
+      // Update cumulative points
+      await supabase
+        .from('user_profiles')
+        .upsert({
+          id: user.id,
+          cumulative_points: newCumulative,
+          updated_at: new Date().toISOString()
+        })
+      
+      console.log(`Habit ${habitJustCompleted ? 'completed' : 'uncompleted'} - Updated cumulative points for user ${user.id}: ${currentCumulative.toFixed(2)} -> ${newCumulative.toFixed(2)} (${pointChange > 0 ? '+' : ''}${pointChange})`)
+    }
 
     return NextResponse.json({ 
       entry,

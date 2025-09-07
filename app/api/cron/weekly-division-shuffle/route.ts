@@ -212,97 +212,11 @@ export async function GET(request: NextRequest) {
       console.log(`Reset progress for ${weeklyBadges.length} weekly badges`)
     }
     
-    // Calculate habit points for the week
-    console.log('Calculating habit points...')
+    // Note: Habit points are now added immediately when habits are completed
+    // No need to calculate them at week end anymore
+    console.log('Habit points are calculated in real-time now')
     
-    // Get all users' habits for this week
-    const { data: allHabits } = await supabase
-      .from('habits')
-      .select('id, user_id, position')
-      .is('archived_at', null)
-      .order('position', { ascending: true })
-      .order('created_at', { ascending: true })
-    
-    if (allHabits && allHabits.length > 0) {
-      // Group habits by user and keep only first 5
-      const userHabitsMap = new Map<string, string[]>()
-      
-      for (const habit of allHabits) {
-        const userHabits = userHabitsMap.get(habit.user_id) || []
-        if (userHabits.length < 5) {
-          userHabits.push(habit.id)
-        }
-        userHabitsMap.set(habit.user_id, userHabits)
-      }
-      
-      // Get summaries for the eligible habits
-      const eligibleHabitIds = Array.from(userHabitsMap.values()).flat()
-      
-      const { data: habitsWithSummaries } = await supabase
-        .from('habit_weekly_summaries')
-        .select('*')
-        .eq('week_start', weekStartStr)
-        .in('habit_id', eligibleHabitIds)
-      
-      if (habitsWithSummaries && habitsWithSummaries.length > 0) {
-        // Group by user and calculate points
-        const userHabitPoints = new Map<string, number>()
-        
-        for (const summary of habitsWithSummaries) {
-          // Award 0.5 points per habit that met its weekly target
-          if (summary.successes >= summary.target) {
-            const currentPoints = userHabitPoints.get(summary.user_id) || 0
-            userHabitPoints.set(summary.user_id, currentPoints + 0.5)
-            
-            // Update the summary with points earned
-            await supabase
-              .from('habit_weekly_summaries')
-              .update({ points_earned: 0.5 })
-              .eq('id', summary.id)
-          }
-        }
-      
-      // Add habit points to user_points
-      for (const [userId, habitPoints] of userHabitPoints) {
-        // Get existing points for this week
-        const { data: existingPoints } = await supabase
-          .from('user_points')
-          .select('*')
-          .eq('user_id', userId)
-          .eq('week_start', weekStartStr)
-          .single()
-        
-        if (existingPoints) {
-          // Update existing points (add habit points)
-          await supabase
-            .from('user_points')
-            .update({ 
-              total_points: existingPoints.total_points + habitPoints,
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', existingPoints.id)
-        } else {
-          // Create new points record (shouldn't happen usually)
-          await supabase
-            .from('user_points')
-            .insert({
-              user_id: userId,
-              week_start: weekStartStr,
-              week_end: weekEndStr,
-              total_points: habitPoints,
-              total_hours: 0,
-              activity_count: 0
-            })
-        }
-        
-        console.log(`Added ${habitPoints} habit points for user ${userId}`)
-      }
-        
-        console.log(`Calculated habit points for ${userHabitPoints.size} users`)
-      }
-    }
-    
-    console.log('Weekly division shuffle, badge reset, and habit points calculation completed')
+    console.log('Weekly division shuffle and badge reset completed')
     
     return NextResponse.json({ 
       success: true, 

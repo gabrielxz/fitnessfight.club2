@@ -382,6 +382,9 @@ export class BadgeCalculator {
   }
 
   private async awardBadge(badge: Badge, userId: string, tier: string, value: number) {
+    // Badge tier point values
+    const tierPoints: { [key: string]: number } = { bronze: 3, silver: 6, gold: 10 }
+    
     // Check if already awarded
     const { data: existing } = await this.supabase
       .from('user_badges')
@@ -390,29 +393,67 @@ export class BadgeCalculator {
       .eq('badge_id', badge.id)
       .single()
 
+    let pointsToAward = 0
+
     if (existing) {
       // Update to higher tier if achieved
       const tierOrder: { [key: string]: number } = { bronze: 1, silver: 2, gold: 3 }
       if (tierOrder[tier] > tierOrder[existing.tier]) {
+        // Calculate point difference for tier upgrade
+        const previousPoints = existing.points_awarded || tierPoints[existing.tier] || 0
+        pointsToAward = tierPoints[tier] - previousPoints
+        
         await this.supabase
           .from('user_badges')
           .update({
             tier,
             progress_value: value,
+            points_awarded: tierPoints[tier],
             updated_at: new Date().toISOString()
           })
           .eq('id', existing.id)
+          
+        console.log(`Badge upgraded: ${badge.name} from ${existing.tier} to ${tier} for user ${userId} (+${pointsToAward} points)`)
       }
     } else {
       // Award new badge
+      pointsToAward = tierPoints[tier]
+      
       await this.supabase
         .from('user_badges')
         .insert({
           user_id: userId,
           badge_id: badge.id,
           tier,
-          progress_value: value
+          progress_value: value,
+          points_awarded: tierPoints[tier]
         })
+        
+      console.log(`Badge awarded: ${badge.name} ${tier} for user ${userId} (+${pointsToAward} points)`)
+    }
+    
+    // Update cumulative points if badge was awarded or upgraded
+    if (pointsToAward > 0) {
+      // Get current cumulative points
+      const { data: profile } = await this.supabase
+        .from('user_profiles')
+        .select('cumulative_points')
+        .eq('id', userId)
+        .single()
+      
+      const currentCumulative = profile?.cumulative_points || 0
+      const newCumulative = currentCumulative + pointsToAward
+      
+      // Update cumulative points
+      await this.supabase
+        .from('user_profiles')
+        .upsert({
+          id: userId,
+          cumulative_points: newCumulative,
+          updated_at: new Date().toISOString()
+        })
+      
+      console.log(`Updated cumulative points for user ${userId}: ${currentCumulative.toFixed(2)} -> ${newCumulative.toFixed(2)} (+${pointsToAward})`)
     }
   }
 }

@@ -290,31 +290,33 @@ async function recalculateWeeklyPoints(userId: string, weekStart: Date, supabase
       return
     }
     
-    // Calculate total hours and points
+    // Calculate total hours and points for this week
     const totalHours = activities.reduce((sum, activity) => sum + (activity.moving_time / 3600), 0)
-    const totalPoints = Math.min(totalHours, 10) // Cap at 10 points
+    const weeklyExercisePoints = Math.min(totalHours, 10) // Cap at 10 points per week
     
-    // Update or insert user_points record
-    const { data: existingPoints } = await supabase
+    // Get existing points for this week to calculate the difference
+    const { data: existingWeekPoints } = await supabase
       .from('user_points')
-      .select('id')
+      .select('id, total_points')
       .eq('user_id', userId)
       .eq('week_start', weekStart.toISOString().split('T')[0])
       .single()
     
-    if (existingPoints) {
+    const previousWeekPoints = existingWeekPoints?.total_points || 0
+    const pointsDifference = weeklyExercisePoints - previousWeekPoints
+    
+    // Update or insert user_points record for weekly tracking
+    if (existingWeekPoints) {
       await supabase
         .from('user_points')
         .update({
           total_hours: totalHours,
-          total_points: totalPoints,
+          total_points: weeklyExercisePoints,
           activities_count: activities.length,
           last_activity_at: activities.length > 0 ? activities[activities.length - 1].start_date : null,
           updated_at: new Date().toISOString()
         })
-        .eq('id', existingPoints.id)
-      
-      console.log(`Updated weekly points for user ${userId}: ${totalPoints.toFixed(2)} points (${totalHours.toFixed(2)} hours) from ${activities.length} activities`)
+        .eq('id', existingWeekPoints.id)
     } else if (activities.length > 0) {
       await supabase
         .from('user_points')
@@ -323,12 +325,38 @@ async function recalculateWeeklyPoints(userId: string, weekStart: Date, supabase
           week_start: weekStart.toISOString().split('T')[0],
           week_end: weekEnd.toISOString().split('T')[0],
           total_hours: totalHours,
-          total_points: totalPoints,
+          total_points: weeklyExercisePoints,
           activities_count: activities.length,
           last_activity_at: activities[activities.length - 1].start_date
         })
       
-      console.log(`Created weekly points for user ${userId}: ${totalPoints.toFixed(2)} points (${totalHours.toFixed(2)} hours) from ${activities.length} activities`)
+    }
+    
+    // Update cumulative points in user_profiles
+    if (pointsDifference !== 0) {
+      // Get current cumulative points
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('cumulative_points')
+        .eq('id', userId)
+        .single()
+      
+      const currentCumulative = profile?.cumulative_points || 0
+      const newCumulative = Math.max(0, currentCumulative + pointsDifference)
+      
+      // Update cumulative points
+      await supabase
+        .from('user_profiles')
+        .upsert({
+          id: userId,
+          cumulative_points: newCumulative,
+          updated_at: new Date().toISOString()
+        })
+      
+      console.log(`Updated cumulative points for user ${userId}: ${currentCumulative.toFixed(2)} -> ${newCumulative.toFixed(2)} (${pointsDifference > 0 ? '+' : ''}${pointsDifference.toFixed(2)})`)
+    }
+    
+    console.log(`Weekly points for user ${userId}: ${weeklyExercisePoints.toFixed(2)} points (${totalHours.toFixed(2)} hours) from ${activities.length} activities`)
     }
     
     // Ensure user has a division assignment

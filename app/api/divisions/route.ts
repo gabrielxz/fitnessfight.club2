@@ -75,23 +75,26 @@ export async function GET(request: NextRequest) {
     // Get user IDs for batch queries
     const userIds = divisionUsers?.map(u => u.user_id) || []
     
-    // Get points for all users in the division
-    const { data: userPoints } = await supabase
-      .from('user_points')
-      .select('user_id, total_points, total_hours')
-      .in('user_id', userIds)
-      .eq('week_start', weekStartStr)
-
-    // Get user profiles for names
+    // Get cumulative points and profile info from user_profiles
     const { data: userProfiles } = await supabase
       .from('user_profiles')
-      .select('id, full_name, email')
+      .select('id, cumulative_points, full_name, email')
       .in('id', userIds)
+    
+    // Get weekly hours for display
+    const { data: userWeeklyData } = await supabase
+      .from('user_points')
+      .select('user_id, total_hours')
+      .in('user_id', userIds)
+      .eq('week_start', weekStartStr)
     
     const profileMap = new Map(
       userProfiles?.map(p => [
         p.id,
-        p.full_name || p.email?.split('@')[0] || null
+        {
+          name: p.full_name || p.email?.split('@')[0] || null,
+          cumulative_points: p.cumulative_points || 0
+        }
       ]) || []
     )
 
@@ -113,7 +116,7 @@ export async function GET(request: NextRequest) {
 
     // Combine all data
     const leaderboard = divisionUsers?.map(divUser => {
-      const points = userPoints?.find(p => p.user_id === divUser.user_id)
+      const weeklyData = userWeeklyData?.find(p => p.user_id === divUser.user_id)
       const connection = stravaConnections?.find(c => c.user_id === divUser.user_id)
       const badges = userBadges?.filter(b => b.user_id === divUser.user_id)
         .map(b => ({
@@ -122,17 +125,17 @@ export async function GET(request: NextRequest) {
           tier: b.tier,
         })) || []
       
+      const profile = profileMap.get(divUser.user_id)
       const stravaName = connection
         ? `${connection.strava_firstname || ''} ${connection.strava_lastname || ''}`.trim()
         : null
-      const profileName = profileMap.get(divUser.user_id)
       
       return {
         user_id: divUser.user_id,
-        name: stravaName || profileName || `User ${divUser.user_id.substring(0, 8)}`,
+        name: stravaName || profile?.name || `User ${divUser.user_id.substring(0, 8)}`,
         strava_profile: connection?.strava_profile,
-        total_points: points?.total_points || 0,
-        total_hours: points?.total_hours || 0,
+        total_points: profile?.cumulative_points || 0,  // Use cumulative points
+        total_hours: weeklyData?.total_hours || 0,      // Weekly hours for display
         badges,
         has_strava: !!connection,
       }

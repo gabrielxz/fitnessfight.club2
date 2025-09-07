@@ -58,29 +58,35 @@ export async function GET() {
       0
     ) / 1000 // Convert to km
 
-    // Get points data for current week
+    // Get cumulative points from user profile
+    const { data: profile } = await supabase
+      .from('user_profiles')
+      .select('cumulative_points')
+      .eq('id', user.id)
+      .single()
+    
+    // Get points data for current week hours tracking
     const currentWeekStartStr = currentWeekStart.toISOString().split('T')[0]
     const lastWeekStartStr = lastWeekStart.toISOString().split('T')[0]
     
-    const { data: currentWeekPoints } = await supabase
+    const { data: currentWeekData } = await supabase
       .from('user_points')
-      .select('total_points, total_hours')
+      .select('total_hours')
       .eq('user_id', user.id)
       .eq('week_start', currentWeekStartStr)
       .single()
     
-    const { data: lastWeekPoints } = await supabase
+    const { data: lastWeekData } = await supabase
       .from('user_points')
-      .select('total_points')
+      .select('total_hours')
       .eq('user_id', user.id)
       .eq('week_start', lastWeekStartStr)
       .single()
 
     return NextResponse.json({
-      currentWeekHours: currentWeekPoints?.total_hours || currentWeekHours,
-      lastWeekHours,
-      currentWeekPoints: currentWeekPoints?.total_points || Math.min(currentWeekHours, 10),
-      lastWeekPoints: lastWeekPoints?.total_points || Math.min(lastWeekHours, 10),
+      currentWeekHours: currentWeekData?.total_hours || currentWeekHours,
+      lastWeekHours: lastWeekData?.total_hours || lastWeekHours,
+      cumulativePoints: profile?.cumulative_points || 0,  // Total lifetime points
       activityCount: currentWeekActivities?.length || 0,
       totalDistance
     })
