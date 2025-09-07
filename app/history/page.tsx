@@ -82,7 +82,7 @@ export default async function HistoryPage() {
                   Congratulations from <span className="font-semibold text-orange-400">Hidetoshi Imura</span>
                 </p>
                 <p className="text-sm text-gray-400 italic">
-                  "The Surgeon" from The Office
+                  &ldquo;The Surgeon&rdquo; from The Office
                 </p>
               </div>
               
