@@ -164,10 +164,23 @@ export async function POST(
     }
     
     // Update cumulative points when habit is marked complete
-    // Check if this habit completion brings the total to the target
-    const previousSuccessCount = existingSummary?.successes || 0
-    const habitJustCompleted = previousSuccessCount < habit.target_frequency && successCount >= habit.target_frequency
-    const habitWasCompleteButNowNot = previousSuccessCount >= habit.target_frequency && successCount < habit.target_frequency
+    // We need to check the previous state of THIS specific entry, not the summary
+    const wasSuccess = existing?.status === 'SUCCESS'
+    const isNowSuccess = status === 'SUCCESS'
+    
+    // Calculate old and new success counts
+    const oldSuccessCount = weekEntries?.filter(e => {
+      // Count all successes except the one we're changing
+      if (e.id === existing?.id) return wasSuccess
+      return e.status === 'SUCCESS'
+    }).length || 0
+    
+    const newSuccessCount = successCount // This is already calculated above
+    
+    const habitWasComplete = oldSuccessCount >= habit.target_frequency
+    const habitIsNowComplete = newSuccessCount >= habit.target_frequency
+    const habitJustCompleted = !habitWasComplete && habitIsNowComplete
+    const habitWasCompleteButNowNot = habitWasComplete && !habitIsNowComplete
     
     // Only first 5 habits earn points (0.5 each)
     const { data: userHabits } = await supabase

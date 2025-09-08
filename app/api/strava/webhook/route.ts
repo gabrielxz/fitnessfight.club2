@@ -272,6 +272,8 @@ function getWeekEnd(weekStart: Date): Date {
 }
 
 // Recalculate all points for a user for a given week
+// Note: Webhook calls this once per activity, so we always update cumulative points
+// Unlike sync which processes multiple activities at once
 async function recalculateWeeklyPoints(userId: string, weekStart: Date, supabase: SupabaseClient) {
   try {
     const weekEnd = getWeekEnd(weekStart)
@@ -333,6 +335,7 @@ async function recalculateWeeklyPoints(userId: string, weekStart: Date, supabase
     }
     
     // Update cumulative points in user_profiles
+    // Webhook processes one activity at a time, so we update cumulative here
     if (pointsDifference !== 0) {
       // Get current cumulative points
       const { data: profile } = await supabase
