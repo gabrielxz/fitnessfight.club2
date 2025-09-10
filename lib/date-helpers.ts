@@ -1,6 +1,6 @@
 
 import { startOfWeek, endOfWeek } from 'date-fns'
-import { utcToZonedTime, zonedTimeToUtc } from 'date-fns-tz'
+import { toZonedTime, fromZonedTime } from 'date-fns-tz'
 
 /**
  * Gets the start and end of a week (Monday-Sunday) for a given date and timezone.
@@ -16,7 +16,7 @@ export function getWeekBoundaries(
   timezone: string
 ): { weekStart: Date; weekEnd: Date } {
   // 1. Convert the incoming UTC date to the user's local timezone.
-  const zonedDate = utcToZonedTime(date, timezone)
+  const zonedDate = toZonedTime(date, timezone)
 
   // 2. Calculate the start of the week (Monday) in the user's timezone.
   const weekStartLocal = startOfWeek(zonedDate, { weekStartsOn: 1 /* Monday */ })
@@ -25,8 +25,8 @@ export function getWeekBoundaries(
   const weekEndLocal = endOfWeek(zonedDate, { weekStartsOn: 1 /* Monday */ })
 
   // 4. Convert the local start and end boundaries back to UTC for storage.
-  const weekStart = zonedTimeToUtc(weekStartLocal, timezone)
-  const weekEnd = zonedTimeToUtc(weekEndLocal, timezone)
+  const weekStart = fromZonedTime(weekStartLocal, timezone)
+  const weekEnd = fromZonedTime(weekEndLocal, timezone)
 
   return { weekStart, weekEnd }
 }
@@ -44,7 +44,7 @@ export function getPreviousWeekBoundaries(
   timezone: string
 ): { weekStart: Date; weekEnd: Date } {
   // 1. Convert the incoming UTC date to the user's local timezone.
-  const zonedDate = utcToZonedTime(date, timezone)
+  const zonedDate = toZonedTime(date, timezone)
 
   // 2. Go back 7 days to ensure we are in the previous week.
   zonedDate.setDate(zonedDate.getDate() - 7)
