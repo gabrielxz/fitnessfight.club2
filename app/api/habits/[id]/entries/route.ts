@@ -1,233 +1,175 @@
+
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { getSession } from '@/lib/supabase/middleware'
+import { getWeekBoundaries } from '@/lib/date-helpers'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
-// Helper to get week start (Monday)
-function getWeekStart(date: Date): Date {
-  const d = new Date(date)
-  const day = d.getUTCDay()
-  // If Sunday (0), treat as end of week (day 7)
-  const adjustedDay = day === 0 ? 7 : day
-  // Calculate days back to Monday (1)
-  const diff = d.getUTCDate() - (adjustedDay - 1)
-  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), diff, 0, 0, 0, 0))
+// This function is now in the Strava webhook file, but should be centralized.
+// For now, we are assuming it's available here.
+// In a future refactor, this could be moved to a shared /lib file.
+async function recalculateAllWeeklyPoints(
+  userId: string,
+  dateInWeek: Date,
+  timezone: string,
+  supabase: SupabaseClient
+) {
+  try {
+    const { weekStart, weekEnd } = getWeekBoundaries(dateInWeek, timezone)
+    
+    // 1. Calculate Exercise Points
+    const { data: activities, error: activitiesError } = await supabase
+      .from('strava_activities')
+      .select('moving_time')
+      .eq('user_id', userId)
+      .gte('start_date', weekStart.toISOString())
+      .lte('start_date', weekEnd.toISOString())
+      .is('deleted_at', null)
+    
+    if (activitiesError) throw activitiesError
+    
+    const totalHours = activities.reduce((sum, a) => sum + (a.moving_time / 3600), 0)
+    const exercisePoints = Math.min(totalHours, 10)
+
+    // 2. Calculate Habit Points
+    const weekStartStr = weekStart.toISOString().split('T')[0]
+    const { data: summaries, error: habitsError } = await supabase
+      .from('habit_weekly_summaries')
+      .select('successes, target')
+      .eq('user_id', userId)
+      .eq('week_start', weekStartStr)
+
+    if (habitsError) throw habitsError
+
+    const completedHabits = summaries.filter(h => h.successes >= h.target).length
+    const habitPoints = Math.min(completedHabits * 0.5, 2.5)
+
+    // 3. Upsert the unified user_points record
+    const weekEndStr = weekEnd.toISOString().split('T')[0]
+
+    const { error: upsertError } = await supabase
+      .from('user_points')
+      .upsert({
+        user_id: userId,
+        week_start: weekStartStr,
+        week_end: weekEndStr,
+        exercise_points: exercisePoints,
+        habit_points: habitPoints,
+        badge_points: 0, // Placeholder for now
+        total_hours: totalHours,
+        activities_count: activities?.length || 0,
+        updated_at: new Date().toISOString()
+      }, {
+        onConflict: 'user_id, week_start'
+      })
+
+    if (upsertError) throw upsertError
+
+    console.log(`Recalculated points for user ${userId} for week starting ${weekStartStr}: Exercise=${exercisePoints.toFixed(2)}, Habit=${habitPoints.toFixed(2)}`)
+
+  } catch (error) {
+    console.error(`Error calculating all weekly points for user ${userId}:`, error)
+  }
 }
 
-// POST /api/habits/[id]/entries - Set habit status for a date
+
+// POST handler to add or update a habit entry for a specific date
 export async function POST(
   request: NextRequest,
-  context: { params: Promise<{ id: string }> }
+  { params }: { params: { id: string } }
 ) {
-  const params = await context.params
-  try {
-    const supabase = await createClient()
-    
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+  const { response, session } = await getSession(request)
+  const user = session?.user
 
-    const body = await request.json()
-    const { date, status } = body
-
-    // Validate input
-    if (!date || !status) {
-      return NextResponse.json({ error: 'Date and status are required' }, { status: 400 })
-    }
-
-    if (!['SUCCESS', 'FAILURE', 'NEUTRAL'].includes(status)) {
-      return NextResponse.json({ error: 'Invalid status' }, { status: 400 })
-    }
-
-    // Verify habit belongs to user
-    const { data: habit, error: habitError } = await supabase
-      .from('habits')
-      .select('*')
-      .eq('id', params.id)
-      .eq('user_id', user.id)
-      .single()
-
-    if (habitError || !habit) {
-      return NextResponse.json({ error: 'Habit not found' }, { status: 404 })
-    }
-
-    // Calculate week start for this date
-    const entryDate = new Date(date)
-    const weekStart = getWeekStart(entryDate)
-
-    // Check if entry exists
-    const { data: existing, error: checkError } = await supabase
-      .from('habit_entries')
-      .select('*')
-      .eq('habit_id', params.id)
-      .eq('date', date)
-      .maybeSingle()
-
-    if (checkError) {
-      console.error('Error checking existing entry:', checkError)
-      return NextResponse.json({ error: 'Failed to check entry' }, { status: 500 })
-    }
-
-    let entry
-
-    if (existing) {
-      if (status === 'NEUTRAL') {
-        // Delete the entry if setting back to neutral
-        const { error: deleteError } = await supabase
-          .from('habit_entries')
-          .delete()
-          .eq('id', existing.id)
-
-        if (deleteError) {
-          console.error('Error deleting entry:', deleteError)
-          return NextResponse.json({ error: 'Failed to update entry' }, { status: 500 })
-        }
-
-        entry = null
-      } else {
-        // Update existing entry
-        const { data: updated, error: updateError } = await supabase
-          .from('habit_entries')
-          .update({ status })
-          .eq('id', existing.id)
-          .select()
-          .single()
-
-        if (updateError) {
-          console.error('Error updating entry:', updateError)
-          return NextResponse.json({ error: 'Failed to update entry' }, { status: 500 })
-        }
-
-        entry = updated
-      }
-    } else if (status !== 'NEUTRAL') {
-      // Create new entry (only if not neutral)
-      const { data: created, error: createError } = await supabase
-        .from('habit_entries')
-        .insert({
-          habit_id: params.id,
-          date,
-          status,
-          week_start: weekStart.toISOString().split('T')[0]
-        })
-        .select()
-        .single()
-
-      if (createError) {
-        console.error('Error creating entry:', createError)
-        return NextResponse.json({ error: 'Failed to create entry' }, { status: 500 })
-      }
-
-      entry = created
-    }
-
-    // Update weekly summary
-    const { data: weekEntries } = await supabase
-      .from('habit_entries')
-      .select('*')
-      .eq('habit_id', params.id)
-      .eq('week_start', weekStart.toISOString().split('T')[0])
-
-    const successCount = weekEntries?.filter(e => e.status === 'SUCCESS').length || 0
-    const percentage = habit.target_frequency > 0 
-      ? Math.round((successCount / habit.target_frequency) * 100 * 100) / 100
-      : 0
-
-    // Check if summary exists
-    const { data: existingSummary } = await supabase
-      .from('habit_weekly_summaries')
-      .select('*')
-      .eq('habit_id', params.id)
-      .eq('week_start', weekStart.toISOString().split('T')[0])
-      .maybeSingle()
-
-    if (existingSummary) {
-      // Update existing summary
-      await supabase
-        .from('habit_weekly_summaries')
-        .update({
-          successes: successCount,
-          percentage
-        })
-        .eq('id', existingSummary.id)
-    } else {
-      // Create new summary
-      await supabase
-        .from('habit_weekly_summaries')
-        .insert({
-          habit_id: params.id,
-          user_id: user.id,
-          week_start: weekStart.toISOString().split('T')[0],
-          successes: successCount,
-          target: habit.target_frequency,
-          percentage
-        })
-    }
-    
-    // Update cumulative points when habit is marked complete
-    // We need to check the previous state of THIS specific entry, not the summary
-    const wasSuccess = existing?.status === 'SUCCESS'
-    const isNowSuccess = status === 'SUCCESS'
-    
-    // Calculate old and new success counts
-    const oldSuccessCount = weekEntries?.filter(e => {
-      // Count all successes except the one we're changing
-      if (e.id === existing?.id) return wasSuccess
-      return e.status === 'SUCCESS'
-    }).length || 0
-    
-    const newSuccessCount = successCount // This is already calculated above
-    
-    const habitWasComplete = oldSuccessCount >= habit.target_frequency
-    const habitIsNowComplete = newSuccessCount >= habit.target_frequency
-    const habitJustCompleted = !habitWasComplete && habitIsNowComplete
-    const habitWasCompleteButNowNot = habitWasComplete && !habitIsNowComplete
-    
-    // Only first 5 habits earn points (0.5 each)
-    const { data: userHabits } = await supabase
-      .from('habits')
-      .select('id, position')
-      .eq('user_id', user.id)
-      .is('archived_at', null)
-      .order('position', { ascending: true })
-      .order('created_at', { ascending: true })
-      .limit(5)
-    
-    const isEligibleForPoints = userHabits?.some(h => h.id === params.id) || false
-    
-    if (isEligibleForPoints && (habitJustCompleted || habitWasCompleteButNowNot)) {
-      // Get current cumulative points
-      const { data: profile } = await supabase
-        .from('user_profiles')
-        .select('cumulative_points')
-        .eq('id', user.id)
-        .single()
-      
-      const currentCumulative = profile?.cumulative_points || 0
-      const pointChange = habitJustCompleted ? 0.5 : -0.5
-      const newCumulative = Math.max(0, currentCumulative + pointChange)
-      
-      // Update cumulative points
-      await supabase
-        .from('user_profiles')
-        .upsert({
-          id: user.id,
-          cumulative_points: newCumulative,
-          updated_at: new Date().toISOString()
-        })
-      
-      console.log(`Habit ${habitJustCompleted ? 'completed' : 'uncompleted'} - Updated cumulative points for user ${user.id}: ${currentCumulative.toFixed(2)} -> ${newCumulative.toFixed(2)} (${pointChange > 0 ? '+' : ''}${pointChange})`)
-    }
-
-    return NextResponse.json({ 
-      entry,
-      summary: {
-        successes: successCount,
-        target: habit.target_frequency,
-        percentage
-      }
-    })
-  } catch (error) {
-    console.error('Error in POST /api/habits/[id]/entries:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+
+  const { date, completed } = await request.json()
+  const habitId = params.id
+
+  if (!date || completed === undefined) {
+    return NextResponse.json({ error: 'Missing date or completed status' }, { status: 400 })
+  }
+
+  const supabase = createClient()
+
+  // Upsert the habit entry
+  const { data: entry, error } = await supabase
+    .from('habit_entries')
+    .upsert(
+      {
+        habit_id: habitId,
+        user_id: user.id,
+        entry_date: date,
+        completed: completed
+      },
+      {
+        onConflict: 'habit_id, entry_date'
+      }
+    )
+    .select()
+    .single()
+
+  if (error) {
+    console.error('Error upserting habit entry:', error)
+    return NextResponse.json({ error: 'Failed to update habit' }, { status: 500 })
+  }
+
+  // After updating the entry, recalculate weekly summary and then all points
+  const userTimezone = user.user_metadata.timezone || 'UTC'
+  await recalculateHabitSummary(user.id, habitId, new Date(date), userTimezone, supabase)
+  await recalculateAllWeeklyPoints(user.id, new Date(date), userTimezone, supabase)
+
+  return NextResponse.json(entry, { headers: response.headers })
+}
+
+// Recalculate weekly summary for a single habit
+async function recalculateHabitSummary(
+  userId: string,
+  habitId: string,
+  entryDate: Date,
+  timezone: string,
+  supabase: SupabaseClient
+) {
+  const { weekStart, weekEnd } = getWeekBoundaries(entryDate, timezone)
+  const weekStartStr = weekStart.toISOString().split('T')[0]
+  const weekEndStr = weekEnd.toISOString().split('T')[0]
+
+  const { data: habit } = await supabase
+    .from('habits')
+    .select('target')
+    .eq('id', habitId)
+    .single()
+
+  if (!habit) return
+
+  const { count: successes, error: countError } = await supabase
+    .from('habit_entries')
+    .select('*', { count: 'exact', head: true })
+    .eq('habit_id', habitId)
+    .eq('user_id', userId)
+    .eq('completed', true)
+    .gte('entry_date', weekStartStr)
+    .lte('entry_date', weekEndStr)
+
+  if (countError) {
+    console.error('Error counting habit successes:', countError)
+    return
+  }
+
+  await supabase
+    .from('habit_weekly_summaries')
+    .upsert(
+      {
+        user_id: userId,
+        habit_id: habitId,
+        week_start: weekStartStr,
+        successes: successes || 0,
+        target: habit.target
+      },
+      {
+        onConflict: 'user_id, habit_id, week_start'
+      }
+    )
 }
