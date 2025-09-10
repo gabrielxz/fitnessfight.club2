@@ -1,0 +1,72 @@
+
+import { SupabaseClient } from '@supabase/supabase-js'
+import { getWeekBoundaries } from '@/lib/date-helpers'
+
+// Recalculates all points for a user for a given week based on a date within that week.
+export async function recalculateAllWeeklyPoints(
+  userId: string,
+  dateInWeek: Date,
+  timezone: string,
+  supabase: SupabaseClient
+) {
+  try {
+    const { weekStart, weekEnd } = getWeekBoundaries(dateInWeek, timezone)
+    
+    // 1. Calculate Exercise Points
+    const { data: activities, error: activitiesError } = await supabase
+      .from('strava_activities')
+      .select('moving_time')
+      .eq('user_id', userId)
+      .gte('start_date', weekStart.toISOString())
+      .lte('start_date', weekEnd.toISOString())
+      .is('deleted_at', null)
+    
+    if (activitiesError) throw activitiesError
+    
+    const totalHours = activities.reduce((sum, a) => sum + (a.moving_time / 3600), 0)
+    const exercisePoints = Math.min(totalHours, 10)
+
+    // 2. Calculate Habit Points
+    const weekStartStr = weekStart.toISOString().split('T')[0]
+    const { data: summaries, error: habitsError } = await supabase
+      .from('habit_weekly_summaries')
+      .select('successes, target')
+      .eq('user_id', userId)
+      .eq('week_start', weekStartStr)
+
+    if (habitsError) throw habitsError
+
+    const completedHabits = summaries.filter(h => h.successes >= h.target).length
+    const habitPoints = Math.min(completedHabits * 0.5, 2.5)
+
+    // 3. Calculate Badge Points for the week
+    // This will be implemented later. For now, it's 0.
+    const badgePoints = 0;
+
+    // 4. Upsert the unified user_points record
+    const weekEndStr = weekEnd.toISOString().split('T')[0]
+
+    const { error: upsertError } = await supabase
+      .from('user_points')
+      .upsert({
+        user_id: userId,
+        week_start: weekStartStr,
+        week_end: weekEndStr,
+        exercise_points: exercisePoints,
+        habit_points: habitPoints,
+        badge_points: badgePoints,
+        total_hours: totalHours,
+        activities_count: activities.length,
+        updated_at: new Date().toISOString()
+      }, {
+        onConflict: 'user_id, week_start'
+      })
+
+    if (upsertError) throw upsertError
+
+    console.log(`Recalculated points for user ${userId} for week starting ${weekStartStr}: Exercise=${exercisePoints.toFixed(2)}, Habit=${habitPoints.toFixed(2)}`)
+
+  } catch (error) {
+    console.error(`Error calculating all weekly points for user ${userId}:`, error)
+  }
+}

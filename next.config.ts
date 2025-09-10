@@ -165,6 +165,7 @@ const withPWA = require('next-pwa')({
 })
 
 const nextConfig: NextConfig = {
+  transpilePackages: ['date-fns-tz'],
   images: {
     remotePatterns: [
       {

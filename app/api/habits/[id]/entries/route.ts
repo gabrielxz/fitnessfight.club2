@@ -1,7 +1,6 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { getSession } from '@/lib/supabase/middleware'
 import { getWeekBoundaries } from '@/lib/date-helpers'
 import type { SupabaseClient } from '@supabase/supabase-js'
 

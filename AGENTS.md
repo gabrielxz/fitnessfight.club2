@@ -353,7 +353,103 @@ Run migrations in Supabase SQL Editor (in order):
 - Strava webhook subscription management UI
 - Service role key for better webhook security
 
-## Release 4: Habit Tracker (In Development - feature/habit-tracker branch)
+
+### Release 4: Habit Tracker (In Development - feature/habit-tracker branch)
+
+### Overview
+A mini habit tracker inspired by HabitShare, allowing users to track daily habits and earn points for consistency.
+
+### Database Schema (Migration 008_create_habits.sql)
+- **habits** - User habit definitions
+  - id, user_id, name (max 100 chars), target_frequency (1-7), position, archived_at
+  - RLS enabled for user data protection
+- **habit_entries** - Daily status tracking
+  - habit_id, date, status (SUCCESS/FAILURE/NEUTRAL), week_start
+  - Unique constraint on (habit_id, date)
+- **habit_weekly_summaries** - Weekly performance cache
+  - habit_id, user_id, week_start, successes, target, percentage, points_earned
+
+### Features
+1. **Habit Management**
+   - Add habits with name and target frequency (1-7 days/week)
+   - Edit habit name and frequency
+   - Delete habits (soft delete with archived_at)
+   - Unlimited habits allowed, but only first 5 count for points
+
+2. **Daily Tracking**
+   - Click day circles to cycle: NEUTRAL → SUCCESS → FAILURE
+   - Visual indicators: Green (SUCCESS), Red (FAILURE), Gray (NEUTRAL)
+   - "TODAY" indicator on current day
+   - Can only modify current and past days
+
+3. **Weekly View**
+   - Shows Mon-Sun with status circles
+   - "This Wk: X/7" progress display
+   - Overall percentage calculation
+   - Navigate through previous weeks
+
+4. **Points System**
+   - 0.5 points per completed habit (meeting weekly target)
+   - Only first 5 habits eligible for points
+   - Points calculated during weekly cron job
+   - Visual indicators: "+0.5 pts" badge for eligible habits
+
+5. **UI Components**
+   - `/habits` page - Main habits interface
+   - Glass-card design matching existing theme
+   - Add/Edit habit dialogs with sliders
+   - Responsive mobile layout
+   - Info message when >5 habits exist
+
+### API Endpoints
+- `GET /api/habits` - Get user's habits with current week
+- `POST /api/habits` - Create new habit
+- `PATCH /api/habits/[id]` - Update habit
+- `DELETE /api/habits/[id]` - Soft delete habit
+- `POST /api/habits/[id]/entries` - Set daily status
+- `GET /api/habits/history` - Get paginated history
+
+### Integration
+- Added "Habits" link to Navigation (logged-in users only)
+- Weekly cron job calculates habit points and adds to user_points
+- Habits ordered by position, then creation date
+
+### Implementation Notes
+- Feature branch: `feature/habit-tracker`
+- Migration must be run before deployment
+- Points are capped at 2.5/week (5 habits × 0.5 points)
+- Soft delete preserves historical data
+
+---
+
+## Agent Updates
+
+### Gemini (2025-09-10): Points Calculation & Timezone Refactor
+
+**Objective**: Resolve point inflation issues and ensure weekly calculations are fair and accurate for all users regardless of their timezone.
+
+**Architectural Changes**:
+
+1.  **Timezone-Aware Date Logic**:
+    -   Created `lib/date-helpers.ts` to centralize all date-related calculations.
+    -   All weekly boundaries (Monday-Sunday) are now calculated based on the user's specific IANA timezone, fetched from their profile. This ensures an activity on a user's local Sunday evening correctly counts for that week.
+
+2.  **Unified Point Calculation**:
+    -   Created `lib/points-helpers.ts` containing a single `recalculateAllWeeklyPoints` function. This function is now the single source of truth for calculating a user's weekly score.
+    -   Refactored the Strava webhook (`/api/strava/webhook`) and the Habit API (`/api/habits/[id]/entries`) to call this centralized function, eliminating duplicate and inconsistent logic.
+    -   Fixed a critical bug where deleting a Strava activity would not trigger a recalculation of that week's points.
+
+3.  **Database Schema Refactor**:
+    -   **Migration `012_refactor_user_points.sql`**: Overhauled the `user_points` table to be the definitive record for weekly scores. It now contains distinct `exercise_points`, `habit_points`, and `badge_points` columns. The `total_points` column is now a generated column that automatically sums the other three, ensuring data integrity.
+    -   **Migration `013_add_increment_badge_points_fn.sql`**: Added a PostgreSQL function (`increment_badge_points`) to allow for safe, atomic updates to the new `badge_points` column, preventing race conditions.
+    -   **Migration `014_add_user_id_to_habit_entries.sql`**: Added a missing `user_id` column to the `habit_entries` table to improve data integrity and simplify RLS policies.
+
+4.  **Badge Point Integration**:
+    -   Modified the `BadgeCalculator` to award points directly to the correct weekly record in the `user_points` table via the new database function, rather than incorrectly adding them only to the `cumulative_points` on a user's profile.
+
+**Known Issue (Build Failure)**:
+-   Despite the architectural improvements, these changes have introduced a persistent build error in the Vercel environment. The errors relate to module resolution for the `date-fns-tz` package and a type-checking failure in the Next.js Habits API route. These issues could not be resolved even after extensive troubleshooting of the code, configuration (`tsconfig.json`, `next.config.ts`), and dependencies.
+
 
 ### Overview
 A mini habit tracker inspired by HabitShare, allowing users to track daily habits and earn points for consistency.
