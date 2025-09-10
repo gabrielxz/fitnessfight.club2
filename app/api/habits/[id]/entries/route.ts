@@ -4,6 +4,15 @@ import { getWeekBoundaries } from '@/lib/date-helpers'
 import { recalculateAllWeeklyPoints } from '@/lib/points-helpers'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
+// Helper to get week start (Monday) from a date
+function getWeekStart(date: Date): Date {
+  const d = new Date(date)
+  const day = d.getUTCDay()
+  const adjustedDay = day === 0 ? 7 : day
+  const diff = d.getUTCDate() - (adjustedDay - 1)
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), diff, 0, 0, 0, 0))
+}
+
 // Recalculate weekly summary for a single habit
 async function recalculateHabitSummary(
   userId: string,
@@ -18,7 +27,7 @@ async function recalculateHabitSummary(
 
   const { data: habit } = await supabase
     .from('habits')
-    .select('target')
+    .select('target_frequency')
     .eq('id', habitId)
     .single()
 
@@ -28,10 +37,9 @@ async function recalculateHabitSummary(
     .from('habit_entries')
     .select('*', { count: 'exact', head: true })
     .eq('habit_id', habitId)
-    .eq('user_id', userId)
-    .eq('completed', true)
-    .gte('entry_date', weekStartStr)
-    .lte('entry_date', weekEndStr)
+    .eq('status', 'SUCCESS')
+    .gte('date', weekStartStr)
+    .lte('date', weekEndStr)
 
   if (countError) {
     console.error('Error counting habit successes:', countError)
@@ -46,10 +54,11 @@ async function recalculateHabitSummary(
         habit_id: habitId,
         week_start: weekStartStr,
         successes: successes || 0,
-        target: habit.target
+        target: habit.target_frequency,
+        percentage: habit.target_frequency > 0 ? ((successes || 0) / habit.target_frequency) * 100 : 0
       },
       {
-        onConflict: 'user_id, habit_id, week_start'
+        onConflict: 'habit_id, week_start'
       }
     )
 }
@@ -66,39 +75,76 @@ export async function POST(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const { date, completed } = await request.json()
+  const { date, status } = await request.json()
   const { id: habitId } = await params
 
-  if (!date || completed === undefined) {
-    return NextResponse.json({ error: 'Missing date or completed status' }, { status: 400 })
+  if (!date || !status) {
+    return NextResponse.json({ error: 'Missing date or status' }, { status: 400 })
   }
 
-  // Upsert the habit entry
-  const { data: entry, error } = await supabase
-    .from('habit_entries')
-    .upsert(
-      {
-        habit_id: habitId,
-        user_id: user.id,
-        entry_date: date,
-        completed: completed
-      },
-      {
-        onConflict: 'habit_id, entry_date'
-      }
-    )
-    .select()
-    .single()
+  // Validate status
+  if (!['SUCCESS', 'FAILURE', 'NEUTRAL'].includes(status)) {
+    return NextResponse.json({ error: 'Invalid status value' }, { status: 400 })
+  }
+
+  // Calculate week_start for this date
+  const weekStart = getWeekStart(new Date(date))
+  const weekStartStr = weekStart.toISOString().split('T')[0]
+
+  let entry = null
+  let error = null
+
+  if (status === 'NEUTRAL') {
+    // Delete the entry if it exists (neutral = no entry)
+    const { error: deleteError } = await supabase
+      .from('habit_entries')
+      .delete()
+      .eq('habit_id', habitId)
+      .eq('date', date)
+    
+    error = deleteError
+  } else {
+    // Upsert the habit entry
+    const { data, error: upsertError } = await supabase
+      .from('habit_entries')
+      .upsert(
+        {
+          habit_id: habitId,
+          date: date,
+          status: status,
+          week_start: weekStartStr
+        },
+        {
+          onConflict: 'habit_id, date'
+        }
+      )
+      .select()
+      .single()
+    
+    entry = data
+    error = upsertError
+  }
 
   if (error) {
-    console.error('Error upserting habit entry:', error)
+    console.error('Error updating habit entry:', error)
     return NextResponse.json({ error: 'Failed to update habit' }, { status: 500 })
   }
 
   // After updating the entry, recalculate weekly summary and then all points
-  const userTimezone = user.user_metadata.timezone || 'UTC'
+  const userTimezone = user.user_metadata?.timezone || 'UTC'
   await recalculateHabitSummary(user.id, habitId, new Date(date), userTimezone, supabase)
   await recalculateAllWeeklyPoints(user.id, new Date(date), userTimezone, supabase)
 
-  return NextResponse.json(entry)
+  // Fetch updated summary for response
+  const { data: summary } = await supabase
+    .from('habit_weekly_summaries')
+    .select('successes, target, percentage')
+    .eq('habit_id', habitId)
+    .eq('week_start', weekStartStr)
+    .single()
+
+  return NextResponse.json({ 
+    entry,
+    summary: summary || { successes: 0, target: 0, percentage: 0 }
+  })
 }
