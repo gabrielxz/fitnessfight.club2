@@ -75,16 +75,16 @@ export async function GET(request: NextRequest) {
     // Get user IDs for batch queries
     const userIds = divisionUsers?.map(u => u.user_id) || []
     
-    // Get cumulative points and profile info from user_profiles
+    // Get profile info from user_profiles
     const { data: userProfiles } = await supabase
       .from('user_profiles')
-      .select('id, cumulative_points, full_name, email')
+      .select('id, full_name, email')
       .in('id', userIds)
     
-    // Get weekly hours for display
+    // Get weekly points and hours from user_points
     const { data: userWeeklyData } = await supabase
       .from('user_points')
-      .select('user_id, total_hours')
+      .select('user_id, total_points, total_hours')
       .in('user_id', userIds)
       .eq('week_start', weekStartStr)
     
@@ -92,8 +92,7 @@ export async function GET(request: NextRequest) {
       userProfiles?.map(p => [
         p.id,
         {
-          name: p.full_name || p.email?.split('@')[0] || null,
-          cumulative_points: p.cumulative_points || 0
+          name: p.full_name || p.email?.split('@')[0] || null
         }
       ]) || []
     )
@@ -134,7 +133,7 @@ export async function GET(request: NextRequest) {
         user_id: divUser.user_id,
         name: stravaName || profile?.name || `User ${divUser.user_id.substring(0, 8)}`,
         strava_profile: connection?.strava_profile,
-        total_points: profile?.cumulative_points || 0,  // Use cumulative points
+        total_points: weeklyData?.total_points || 0,    // Use weekly points from user_points
         total_hours: weeklyData?.total_hours || 0,      // Weekly hours for display
         badges,
         has_strava: !!connection,
