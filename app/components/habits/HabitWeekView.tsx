@@ -40,27 +40,18 @@ export default function HabitWeekView({
   // Get status for a specific date
   const getStatusForDate = (date: string) => {
     const entry = entries.find(e => e.date === date)
-    return entry?.status || 'NEUTRAL'
+    // Only SUCCESS or NEUTRAL (no entry) - never FAILURE
+    return entry?.status === 'SUCCESS' ? 'SUCCESS' : 'NEUTRAL'
   }
   
-  // Cycle through statuses
-  const cycleStatus = (currentStatus: string) => {
-    const cycle = ['NEUTRAL', 'SUCCESS', 'FAILURE']
-    const currentIndex = cycle.indexOf(currentStatus)
-    return cycle[(currentIndex + 1) % cycle.length] as 'SUCCESS' | 'FAILURE' | 'NEUTRAL'
+  // Toggle between SUCCESS and NEUTRAL only
+  const toggleStatus = (currentStatus: string) => {
+    return currentStatus === 'SUCCESS' ? 'NEUTRAL' : 'SUCCESS'
   }
   
   // Get color for status
   const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'SUCCESS':
-        return 'bg-green-500'
-      case 'FAILURE':
-        return 'bg-red-500'
-      case 'NEUTRAL':
-      default:
-        return 'bg-gray-600'
-    }
+    return status === 'SUCCESS' ? 'bg-green-500' : 'bg-gray-600'
   }
   
   return (
@@ -76,7 +67,7 @@ export default function HabitWeekView({
             <button
               onClick={() => {
                 if (isPast) {
-                  const newStatus = cycleStatus(status)
+                  const newStatus = toggleStatus(status) as 'SUCCESS' | 'NEUTRAL'
                   onStatusChange(habitId, date, newStatus)
                 }
               }}
@@ -87,7 +78,7 @@ export default function HabitWeekView({
                 ${isPast ? 'hover:scale-110 cursor-pointer' : 'opacity-50 cursor-not-allowed'}
                 ${isToday ? 'ring-2 ring-yellow-500 ring-offset-2 ring-offset-slate-900' : ''}
               `}
-              title={isPast ? 'Click to change status' : 'Future date'}
+              title={isPast ? `Click to ${status === 'SUCCESS' ? 'unmark' : 'mark'} as complete` : 'Future date'}
             />
             {isToday && (
               <div className="text-[10px] text-yellow-500 mt-1 uppercase tracking-wider">Today</div>
