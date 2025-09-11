@@ -28,16 +28,33 @@ export async function recalculateAllWeeklyPoints(
 
     // 2. Calculate Habit Points
     const weekStartStr = weekStart.toISOString().split('T')[0]
+    
+    // First get the user's habits ordered by position to know which 5 are eligible
+    const { data: habits, error: habitsListError } = await supabase
+      .from('habits')
+      .select('id')
+      .eq('user_id', userId)
+      .is('archived_at', null)
+      .order('position')
+      .order('created_at')
+      .limit(5)
+    
+    if (habitsListError) throw habitsListError
+    
+    const eligibleHabitIds = habits?.map(h => h.id) || []
+    
+    // Now get summaries for eligible habits
     const { data: summaries, error: habitsError } = await supabase
       .from('habit_weekly_summaries')
-      .select('successes, target')
+      .select('successes, target, points_earned, habit_id')
       .eq('user_id', userId)
       .eq('week_start', weekStartStr)
+      .in('habit_id', eligibleHabitIds)
 
     if (habitsError) throw habitsError
 
-    const completedHabits = summaries.filter(h => h.successes >= h.target).length
-    const habitPoints = Math.min(completedHabits * 0.5, 2.5)
+    // Sum up the points from eligible habits
+    const habitPoints = summaries?.reduce((sum, s) => sum + (s.points_earned || 0), 0) || 0
 
     // 3. Calculate Badge Points
     const { data: badges, error: badgesError } = await supabase
