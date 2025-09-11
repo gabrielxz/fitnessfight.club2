@@ -164,9 +164,12 @@ export async function POST(
   const updatedSummary = await recalculateHabitSummary(user.id, habitId, new Date(date), userTimezone, supabase)
   
   // Then recalculate all weekly points (including the updated habit points)
-  await recalculateAllWeeklyPoints(user.id, new Date(date), userTimezone, supabase)
-
-  console.log(`[POINTS] Recalculated points for user ${user.id}, summary points: ${updatedSummary?.points_earned || 0}`)
+  try {
+    const updatedPoints = await recalculateAllWeeklyPoints(user.id, new Date(date), userTimezone, supabase)
+    console.log(`[POINTS] Recalculated for user ${user.id}: Exercise=${updatedPoints?.exercisePoints}, Habit=${updatedPoints?.habitPoints}, Badge=${updatedPoints?.badgePoints}, Total=${updatedPoints?.totalPoints}`)
+  } catch (pointsError) {
+    console.error('[POINTS ERROR] Failed to recalculate points:', pointsError)
+  }
 
   return NextResponse.json({ 
     entry,

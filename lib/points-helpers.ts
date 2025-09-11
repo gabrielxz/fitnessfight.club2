@@ -92,11 +92,23 @@ export async function recalculateAllWeeklyPoints(
         onConflict: 'user_id, week_start'
       })
 
-    if (upsertError) throw upsertError
+    if (upsertError) {
+      console.error('Error upserting user_points:', upsertError)
+      throw upsertError
+    }
 
     console.log(`Recalculated points for user ${userId} for week starting ${weekStartStr}: Exercise=${exercisePoints.toFixed(2)}, Habit=${habitPoints.toFixed(2)}, Badge=${badgePoints}`)
+    
+    // Return the calculated points for verification
+    return {
+      exercisePoints,
+      habitPoints,
+      badgePoints,
+      totalPoints: exercisePoints + habitPoints + badgePoints
+    }
 
   } catch (error) {
     console.error(`Error calculating all weekly points for user ${userId}:`, error)
+    throw error // Re-throw to let caller handle it
   }
 }
