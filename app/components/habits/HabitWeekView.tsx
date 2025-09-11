@@ -40,18 +40,41 @@ export default function HabitWeekView({
   // Get status for a specific date
   const getStatusForDate = (date: string) => {
     const entry = entries.find(e => e.date === date)
-    // Only SUCCESS or NEUTRAL (no entry) - never FAILURE
-    return entry?.status === 'SUCCESS' ? 'SUCCESS' : 'NEUTRAL'
+    return entry?.status || 'NEUTRAL'
   }
   
-  // Toggle between SUCCESS and NEUTRAL only
-  const toggleStatus = (currentStatus: string) => {
-    return currentStatus === 'SUCCESS' ? 'NEUTRAL' : 'SUCCESS'
+  // Cycle through statuses: NEUTRAL -> SUCCESS -> FAILURE -> NEUTRAL
+  const cycleStatus = (currentStatus: string) => {
+    const cycle = ['NEUTRAL', 'SUCCESS', 'FAILURE']
+    const currentIndex = cycle.indexOf(currentStatus)
+    return cycle[(currentIndex + 1) % cycle.length] as 'SUCCESS' | 'FAILURE' | 'NEUTRAL'
   }
   
   // Get color for status
   const getStatusColor = (status: string) => {
-    return status === 'SUCCESS' ? 'bg-green-500' : 'bg-gray-600'
+    switch (status) {
+      case 'SUCCESS':
+        return 'bg-green-500'
+      case 'FAILURE':
+        return 'bg-red-500'
+      case 'NEUTRAL':
+      default:
+        return 'bg-gray-600'
+    }
+  }
+  
+  // Get tooltip for status
+  const getStatusTooltip = (status: string, isPast: boolean) => {
+    if (!isPast) return 'Future date'
+    switch (status) {
+      case 'SUCCESS':
+        return 'Completed (click to mark as failed)'
+      case 'FAILURE':
+        return 'Failed (click to clear)'
+      case 'NEUTRAL':
+      default:
+        return 'Not tracked (click to mark complete)'
+    }
   }
   
   return (
@@ -67,7 +90,7 @@ export default function HabitWeekView({
             <button
               onClick={() => {
                 if (isPast) {
-                  const newStatus = toggleStatus(status) as 'SUCCESS' | 'NEUTRAL'
+                  const newStatus = cycleStatus(status)
                   onStatusChange(habitId, date, newStatus)
                 }
               }}
@@ -78,7 +101,7 @@ export default function HabitWeekView({
                 ${isPast ? 'hover:scale-110 cursor-pointer' : 'opacity-50 cursor-not-allowed'}
                 ${isToday ? 'ring-2 ring-yellow-500 ring-offset-2 ring-offset-slate-900' : ''}
               `}
-              title={isPast ? `Click to ${status === 'SUCCESS' ? 'unmark' : 'mark'} as complete` : 'Future date'}
+              title={getStatusTooltip(status, isPast)}
             />
             {isToday && (
               <div className="text-[10px] text-yellow-500 mt-1 uppercase tracking-wider">Today</div>

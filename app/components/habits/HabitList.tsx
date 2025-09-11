@@ -192,6 +192,7 @@ export default function HabitList() {
 
   // Handle status change
   const handleStatusChange = async (habitId: string, date: string, newStatus: 'SUCCESS' | 'FAILURE' | 'NEUTRAL') => {
+    console.log(`[CLIENT] Updating habit ${habitId} on ${date} to ${newStatus}`)
     try {
       const response = await fetch(`/api/habits/${habitId}/entries`, {
         method: 'POST',
@@ -199,9 +200,13 @@ export default function HabitList() {
         body: JSON.stringify({ date, status: newStatus })
       })
       
-      if (!response.ok) throw new Error('Failed to update status')
+      if (!response.ok) {
+        console.error(`[CLIENT] API error: ${response.status} ${response.statusText}`)
+        throw new Error('Failed to update status')
+      }
       
       const data = await response.json()
+      console.log(`[CLIENT] API response:`, data)
       
       // Update local state optimistically
       setWeeks(prevWeeks => {
@@ -238,8 +243,15 @@ export default function HabitList() {
           return { ...week, habits: updatedHabits }
         })
       })
+      
+      // Force a refresh after a short delay to ensure database is updated
+      setTimeout(() => {
+        fetchHabits(totalWeeksLoaded)
+      }, 500)
     } catch (error) {
       console.error('Error updating status:', error)
+      // Refresh on error to ensure UI is in sync
+      fetchHabits(totalWeeksLoaded)
     }
   }
 

@@ -13,26 +13,15 @@ async function fixHabitSystem() {
   console.log('FIXING HABIT SYSTEM')
   console.log('=' .repeat(60))
   
-  // Step 1: Remove ALL FAILURE entries - they shouldn't exist
-  console.log('\n1. Removing all FAILURE entries (these should not exist)...')
+  // Step 1: FAILURE entries are now valid - they're visual markers but count as 0 for points
+  console.log('\n1. Checking FAILURE entries (valid for tracking, count as 0 for points)...')
   const { data: failures, error: fetchError } = await supabase
     .from('habit_entries')
     .select('id, habit_id, date, status')
     .eq('status', 'FAILURE')
   
   if (failures && failures.length > 0) {
-    console.log(`   Found ${failures.length} FAILURE entries to remove`)
-    
-    const { error: deleteError } = await supabase
-      .from('habit_entries')
-      .delete()
-      .eq('status', 'FAILURE')
-    
-    if (!deleteError) {
-      console.log('   ✓ Removed all FAILURE entries')
-    } else {
-      console.error('   Error removing failures:', deleteError)
-    }
+    console.log(`   Found ${failures.length} FAILURE entries (these are valid, count as 0 for points)`)
   } else {
     console.log('   No FAILURE entries found')
   }
@@ -198,7 +187,7 @@ async function fixHabitSystem() {
   console.log('\nNOTE: The UI should now work correctly:')
   console.log('- Gray (NEUTRAL) = no entry')
   console.log('- Green (SUCCESS) = completed')
-  console.log('- Red should not be used (we delete FAILURE entries)')
+  console.log('- Red (FAILURE) = explicitly failed (counts as 0 for points)')
   console.log('=' .repeat(60))
 }
 

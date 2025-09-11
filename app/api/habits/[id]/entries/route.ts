@@ -50,7 +50,7 @@ async function recalculateHabitSummary(
     return
   }
 
-  console.log(`Habit ${habitId}: ${successes}/${habit.target_frequency} successes for week ${weekStartStr}`)
+  console.log(`[SUMMARY] Habit ${habitId}: ${successes}/${habit.target_frequency} successes for week ${weekStartStr}`)
 
   // Calculate if this habit is completed
   const isCompleted = (successes || 0) >= habit.target_frequency
@@ -101,7 +101,7 @@ export async function POST(
   const { date, status } = await request.json()
   const { id: habitId } = await params
 
-  console.log(`Updating habit ${habitId} for date ${date} to status ${status}`)
+  console.log(`[HABIT UPDATE] User: ${user.id}, Habit: ${habitId}, Date: ${date}, Status: ${status}`)
 
   if (!date || !status) {
     return NextResponse.json({ error: 'Missing date or status' }, { status: 400 })
@@ -128,7 +128,7 @@ export async function POST(
       .eq('date', date)
     
     error = deleteError
-    console.log(`Deleted entry for habit ${habitId} on ${date}`)
+    console.log(`[DELETED] Entry for habit ${habitId} on ${date} (NEUTRAL status)`)
   } else {
     // Upsert the habit entry
     const { data, error: upsertError } = await supabase
@@ -149,7 +149,7 @@ export async function POST(
     
     entry = data
     error = upsertError
-    console.log(`Upserted entry for habit ${habitId} on ${date} with status ${status}`)
+    console.log(`[UPSERTED] Entry for habit ${habitId} on ${date} with status ${status}, entry: ${entry ? 'created' : 'failed'}`)
   }
 
   if (error) {
@@ -166,7 +166,7 @@ export async function POST(
   // Then recalculate all weekly points (including the updated habit points)
   await recalculateAllWeeklyPoints(user.id, new Date(date), userTimezone, supabase)
 
-  console.log(`Recalculated points for user ${user.id}`)
+  console.log(`[POINTS] Recalculated points for user ${user.id}, summary points: ${updatedSummary?.points_earned || 0}`)
 
   return NextResponse.json({ 
     entry,
