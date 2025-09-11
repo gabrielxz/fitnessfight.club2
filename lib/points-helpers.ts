@@ -39,9 +39,22 @@ export async function recalculateAllWeeklyPoints(
     const completedHabits = summaries.filter(h => h.successes >= h.target).length
     const habitPoints = Math.min(completedHabits * 0.5, 2.5)
 
-    // 3. Calculate Badge Points for the week
-    // This will be implemented later. For now, it's 0.
-    const badgePoints = 0;
+    // 3. Calculate Badge Points
+    const { data: badges, error: badgesError } = await supabase
+      .from('user_badges')
+      .select('tier')
+      .eq('user_id', userId)
+    
+    if (badgesError) throw badgesError
+    
+    let badgePoints = 0
+    if (badges) {
+      badges.forEach(badge => {
+        if (badge.tier === 'gold') badgePoints += 10
+        else if (badge.tier === 'silver') badgePoints += 6
+        else if (badge.tier === 'bronze') badgePoints += 3
+      })
+    }
 
     // 4. Upsert the unified user_points record
     const weekEndStr = weekEnd.toISOString().split('T')[0]
@@ -64,7 +77,7 @@ export async function recalculateAllWeeklyPoints(
 
     if (upsertError) throw upsertError
 
-    console.log(`Recalculated points for user ${userId} for week starting ${weekStartStr}: Exercise=${exercisePoints.toFixed(2)}, Habit=${habitPoints.toFixed(2)}`)
+    console.log(`Recalculated points for user ${userId} for week starting ${weekStartStr}: Exercise=${exercisePoints.toFixed(2)}, Habit=${habitPoints.toFixed(2)}, Badge=${badgePoints}`)
 
   } catch (error) {
     console.error(`Error calculating all weekly points for user ${userId}:`, error)
