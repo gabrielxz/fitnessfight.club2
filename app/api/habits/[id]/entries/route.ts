@@ -57,7 +57,7 @@ async function recalculateHabitSummary(
   const percentage = habit.target_frequency > 0 ? ((successes || 0) / habit.target_frequency) * 100 : 0
 
   // Upsert the summary with points_earned field
-  const { error: upsertError } = await supabase
+  const { data: summaryData, error: upsertError } = await supabase
     .from('habit_weekly_summaries')
     .upsert(
       {
@@ -67,16 +67,36 @@ async function recalculateHabitSummary(
         successes: successes || 0,
         target: habit.target_frequency,
         percentage: percentage,
-        points_earned: isCompleted ? 0.5 : 0 // This was missing!
+        points_earned: isCompleted ? 0.5 : 0
       },
       {
         onConflict: 'habit_id, week_start'
       }
     )
+    .select()
+    .single()
 
   if (upsertError) {
-    console.error('Error upserting habit summary:', upsertError)
+    console.error('[CRITICAL] Error upserting habit summary:', upsertError)
+    console.error('Summary data attempted:', {
+      user_id: userId,
+      habit_id: habitId,
+      week_start: weekStartStr,
+      successes: successes || 0,
+      target: habit.target_frequency,
+      points_earned: isCompleted ? 0.5 : 0
+    })
+    
+    // Check if it's an RLS error
+    if (upsertError.code === '42501') {
+      console.error('[RLS ERROR] Row Level Security blocked the summary update')
+      throw new Error('RLS Policy Error: Cannot update habit summary. Please contact support.')
+    }
+    
+    throw upsertError
   }
+  
+  console.log('[SUMMARY UPDATED]', summaryData)
 
   return { 
     successes: successes || 0, 
@@ -116,45 +136,64 @@ export async function POST(
   const weekStart = getWeekStart(new Date(date))
   const weekStartStr = weekStart.toISOString().split('T')[0]
 
+  // Use RPC to update entry and summary in a transaction
   let entry = null
-  let error = null
-
-  if (status === 'NEUTRAL') {
-    // Delete the entry if it exists (neutral = no entry)
-    const { error: deleteError } = await supabase
-      .from('habit_entries')
-      .delete()
-      .eq('habit_id', habitId)
-      .eq('date', date)
+  let updateResult = null
+  
+  try {
+    if (status === 'NEUTRAL') {
+      // Delete the entry if it exists (neutral = no entry)
+      const { error: deleteError } = await supabase
+        .from('habit_entries')
+        .delete()
+        .eq('habit_id', habitId)
+        .eq('date', date)
+      
+      if (deleteError) {
+        console.error('[DELETE ERROR]', deleteError)
+        throw deleteError
+      }
+      console.log(`[DELETED] Entry for habit ${habitId} on ${date} (NEUTRAL status)`)
+    } else {
+      // Upsert the habit entry
+      const { data, error: upsertError } = await supabase
+        .from('habit_entries')
+        .upsert(
+          {
+            habit_id: habitId,
+            date: date,
+            status: status,
+            week_start: weekStartStr
+          },
+          {
+            onConflict: 'habit_id, date'
+          }
+        )
+        .select()
+        .single()
+      
+      if (upsertError) {
+        console.error('[UPSERT ERROR]', upsertError)
+        throw upsertError
+      }
+      
+      entry = data
+      console.log(`[UPSERTED] Entry for habit ${habitId} on ${date} with status ${status}`)
+    }
+  } catch (error: any) {
+    console.error('[TRANSACTION ERROR] Failed to update habit entry:', error)
     
-    error = deleteError
-    console.log(`[DELETED] Entry for habit ${habitId} on ${date} (NEUTRAL status)`)
-  } else {
-    // Upsert the habit entry
-    const { data, error: upsertError } = await supabase
-      .from('habit_entries')
-      .upsert(
-        {
-          habit_id: habitId,
-          date: date,
-          status: status,
-          week_start: weekStartStr
-        },
-        {
-          onConflict: 'habit_id, date'
-        }
-      )
-      .select()
-      .single()
+    // Check for RLS errors
+    if (error.code === '42501') {
+      return NextResponse.json({ 
+        error: 'Permission denied. Please refresh the page and try again.' 
+      }, { status: 403 })
+    }
     
-    entry = data
-    error = upsertError
-    console.log(`[UPSERTED] Entry for habit ${habitId} on ${date} with status ${status}, entry: ${entry ? 'created' : 'failed'}`)
-  }
-
-  if (error) {
-    console.error('Error updating habit entry:', error)
-    return NextResponse.json({ error: 'Failed to update habit' }, { status: 500 })
+    return NextResponse.json({ 
+      error: 'Failed to update habit',
+      details: error.message 
+    }, { status: 500 })
   }
 
   // After updating the entry, recalculate weekly summary and then all points
