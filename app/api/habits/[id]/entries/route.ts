@@ -31,8 +31,12 @@ async function recalculateHabitSummary(
     .eq('id', habitId)
     .single()
 
-  if (!habit) return
+  if (!habit) {
+    console.error('Habit not found:', habitId)
+    return
+  }
 
+  // Count all SUCCESS entries for this week
   const { count: successes, error: countError } = await supabase
     .from('habit_entries')
     .select('*', { count: 'exact', head: true })
@@ -46,7 +50,14 @@ async function recalculateHabitSummary(
     return
   }
 
-  await supabase
+  console.log(`Habit ${habitId}: ${successes}/${habit.target_frequency} successes for week ${weekStartStr}`)
+
+  // Calculate if this habit is completed
+  const isCompleted = (successes || 0) >= habit.target_frequency
+  const percentage = habit.target_frequency > 0 ? ((successes || 0) / habit.target_frequency) * 100 : 0
+
+  // Upsert the summary with points_earned field
+  const { error: upsertError } = await supabase
     .from('habit_weekly_summaries')
     .upsert(
       {
@@ -55,12 +66,24 @@ async function recalculateHabitSummary(
         week_start: weekStartStr,
         successes: successes || 0,
         target: habit.target_frequency,
-        percentage: habit.target_frequency > 0 ? ((successes || 0) / habit.target_frequency) * 100 : 0
+        percentage: percentage,
+        points_earned: isCompleted ? 0.5 : 0 // This was missing!
       },
       {
         onConflict: 'habit_id, week_start'
       }
     )
+
+  if (upsertError) {
+    console.error('Error upserting habit summary:', upsertError)
+  }
+
+  return { 
+    successes: successes || 0, 
+    target: habit.target_frequency, 
+    percentage,
+    points_earned: isCompleted ? 0.5 : 0
+  }
 }
 
 // POST handler to add or update a habit entry for a specific date
@@ -77,6 +100,8 @@ export async function POST(
 
   const { date, status } = await request.json()
   const { id: habitId } = await params
+
+  console.log(`Updating habit ${habitId} for date ${date} to status ${status}`)
 
   if (!date || !status) {
     return NextResponse.json({ error: 'Missing date or status' }, { status: 400 })
@@ -103,6 +128,7 @@ export async function POST(
       .eq('date', date)
     
     error = deleteError
+    console.log(`Deleted entry for habit ${habitId} on ${date}`)
   } else {
     // Upsert the habit entry
     const { data, error: upsertError } = await supabase
@@ -123,6 +149,7 @@ export async function POST(
     
     entry = data
     error = upsertError
+    console.log(`Upserted entry for habit ${habitId} on ${date} with status ${status}`)
   }
 
   if (error) {
@@ -132,19 +159,17 @@ export async function POST(
 
   // After updating the entry, recalculate weekly summary and then all points
   const userTimezone = user.user_metadata?.timezone || 'UTC'
-  await recalculateHabitSummary(user.id, habitId, new Date(date), userTimezone, supabase)
+  
+  // First recalculate the habit summary
+  const updatedSummary = await recalculateHabitSummary(user.id, habitId, new Date(date), userTimezone, supabase)
+  
+  // Then recalculate all weekly points (including the updated habit points)
   await recalculateAllWeeklyPoints(user.id, new Date(date), userTimezone, supabase)
 
-  // Fetch updated summary for response
-  const { data: summary } = await supabase
-    .from('habit_weekly_summaries')
-    .select('successes, target, percentage')
-    .eq('habit_id', habitId)
-    .eq('week_start', weekStartStr)
-    .single()
+  console.log(`Recalculated points for user ${user.id}`)
 
   return NextResponse.json({ 
     entry,
-    summary: summary || { successes: 0, target: 0, percentage: 0 }
+    summary: updatedSummary || { successes: 0, target: 0, percentage: 0, points_earned: 0 }
   })
 }
