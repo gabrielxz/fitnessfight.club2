@@ -440,7 +440,16 @@ A mini habit tracker inspired by HabitShare, allowing users to track daily habit
     -   Fixed a critical bug where deleting a Strava activity would not trigger a recalculation of that week's points.
 
 3.  **Database Schema Refactor**:
-    -   **Migration `012_refactor_user_points.sql`**: Overhauled the `user_points` table to be the definitive record for weekly scores. It now contains distinct `exercise_points`, `habit_points`, and `badge_points` columns. The `total_points` column is now a generated column that automatically sums the other three, ensuring data integrity.
+    -   **Migration `012_refactor_user_points.sql`**: Overhauled the `user_points` table to be the definitive record for weekly scores. It now contains distinct `exercise_points`, `habit_points`, and `badge_points` columns. The `total_points` column is now a **GENERATED column** that automatically sums the other three, ensuring data integrity.
+        
+        **IMPORTANT - total_points Implementation**:
+        - `total_points` is a PostgreSQL GENERATED ALWAYS AS column
+        - It automatically calculates as: `exercise_points + habit_points + badge_points`
+        - **DO NOT** attempt to update `total_points` directly - this will cause an error
+        - Only update the individual point columns (`exercise_points`, `habit_points`, `badge_points`)
+        - The database will automatically recalculate `total_points` when any component changes
+        - Any attempt to set `total_points` directly will result in error: "column 'total_points' can only be updated to DEFAULT"
+        
     -   **Migration `013_add_increment_badge_points_fn.sql`**: Added a PostgreSQL function (`increment_badge_points`) to allow for safe, atomic updates to the new `badge_points` column, preventing race conditions.
     -   **Migration `014_add_user_id_to_habit_entries.sql`**: Added a missing `user_id` column to the `habit_entries` table to improve data integrity and simplify RLS policies.
 
