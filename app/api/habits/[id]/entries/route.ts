@@ -138,7 +138,6 @@ export async function POST(
 
   // Use RPC to update entry and summary in a transaction
   let entry = null
-  let updateResult = null
   
   try {
     if (status === 'NEUTRAL') {
@@ -180,11 +179,12 @@ export async function POST(
       entry = data
       console.log(`[UPSERTED] Entry for habit ${habitId} on ${date} with status ${status}`)
     }
-  } catch (error: any) {
+  } catch (error) {
     console.error('[TRANSACTION ERROR] Failed to update habit entry:', error)
     
     // Check for RLS errors
-    if (error.code === '42501') {
+    const errorObj = error as { code?: string; message?: string }
+    if (errorObj.code === '42501') {
       return NextResponse.json({ 
         error: 'Permission denied. Please refresh the page and try again.' 
       }, { status: 403 })
@@ -192,7 +192,7 @@ export async function POST(
     
     return NextResponse.json({ 
       error: 'Failed to update habit',
-      details: error.message 
+      details: errorObj.message || 'Unknown error'
     }, { status: 500 })
   }
 

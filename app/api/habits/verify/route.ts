@@ -1,8 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
 // GET /api/habits/verify - Verify and fix habit data consistency
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const supabase = await createClient()
     
@@ -11,8 +11,19 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const issues: any[] = []
-    const fixes: any[] = []
+    const issues: Array<{
+      habit: string
+      issue: string
+      expected: { successes: number; points: number } | null
+      actual: { successes: number; points: number } | null
+    }> = []
+    
+    const fixes: Array<{
+      habit: string
+      action: string
+      status: string
+      error?: string
+    }> = []
     
     // Get current week boundaries (Monday to Sunday)
     const now = new Date()
