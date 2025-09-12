@@ -211,7 +211,9 @@ async function fetchAndStoreActivity(
         kudos_count: activity.kudos_count,
         comment_count: activity.comment_count,
         athlete_count: activity.athlete_count,
-        photo_count: activity.photo_count,
+        // Use total_photo_count which includes all photos (Instagram, etc)
+        // photo_count only counts Strava-uploaded photos
+        photo_count: activity.total_photo_count || activity.photo_count || 0,
         map_summary_polyline: activity.map?.summary_polyline,
         trainer: activity.trainer,
         commute: activity.commute,

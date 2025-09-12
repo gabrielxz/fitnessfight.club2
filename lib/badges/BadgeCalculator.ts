@@ -77,12 +77,24 @@ export class BadgeCalculator {
   }
 
   async calculateBadgesForActivity(activity: Activity) {
-    const { data: badges } = await this.supabase
+    console.log(`[BadgeCalculator] Starting badge calculation for activity ${activity.strava_activity_id}`)
+    
+    const { data: badges, error: badgesError } = await this.supabase
       .from('badges')
       .select('*')
       .eq('active', true)
 
-    if (!badges) return
+    if (badgesError) {
+      console.error('[BadgeCalculator] Error fetching badges:', badgesError)
+      return
+    }
+
+    if (!badges) {
+      console.log('[BadgeCalculator] No active badges found')
+      return
+    }
+
+    console.log(`[BadgeCalculator] Found ${badges.length} active badges to evaluate`)
 
     const { data: profile } = await this.supabase
       .from('user_profiles')
@@ -93,8 +105,15 @@ export class BadgeCalculator {
     const timezone = profile?.timezone || 'UTC'
 
     for (const badge of badges) {
-      await this.evaluateBadge(badge, activity, timezone)
+      console.log(`[BadgeCalculator] Evaluating badge: ${badge.name} (${badge.code})`)
+      try {
+        await this.evaluateBadge(badge, activity, timezone)
+      } catch (error) {
+        console.error(`[BadgeCalculator] Error evaluating badge ${badge.code}:`, error)
+      }
     }
+    
+    console.log(`[BadgeCalculator] Completed badge calculation for activity ${activity.strava_activity_id}`)
   }
 
   private async evaluateBadge(badge: Badge, activity: Activity, timezone: string) {
@@ -198,6 +217,7 @@ export class BadgeCalculator {
 
   private async handleCumulativeBadge(badge: Badge, activity: Activity, progress: BadgeProgress, timezone: string) {
     const { criteria } = badge
+    console.log(`[BadgeCalculator] Handling cumulative badge: ${badge.code}`)
     
     // For cumulative badges (no reset period), we need to recalculate from all activities
     // to avoid double-counting when activities are reprocessed
@@ -214,12 +234,19 @@ export class BadgeCalculator {
       query = query.eq('type', criteria.activity_type)
     }
     
-    const { data: allActivities } = await query
+    const { data: allActivities, error: queryError } = await query
     
-    if (!allActivities) {
-      console.error('Failed to fetch activities for cumulative badge calculation')
+    if (queryError) {
+      console.error(`[BadgeCalculator] Error fetching activities for ${badge.code}:`, queryError)
       return
     }
+    
+    if (!allActivities) {
+      console.error(`[BadgeCalculator] No activities returned for cumulative badge ${badge.code}`)
+      return
+    }
+    
+    console.log(`[BadgeCalculator] Found ${allActivities.length} activities for ${badge.code}`)
     
     // Calculate total value from all activities
     let totalValue = 0
@@ -378,15 +405,18 @@ export class BadgeCalculator {
 
   private async handleWeeklyCumulativeBadge(badge: Badge, activity: Activity, progress: BadgeProgress, timezone: string) {
     const { criteria } = badge
+    console.log(`[BadgeCalculator] Handling weekly cumulative badge: ${badge.code}`)
     
     // For weekly cumulative badges, we need to recalculate from all activities in the week
     // This ensures we get the correct total, not just increment from the last value
     const period = await this.getCurrentPeriod('weekly', activity.start_date_local, timezone)
     
     if (!period.start || !period.end) {
-      console.error('Failed to get week boundaries for weekly cumulative badge')
+      console.error(`[BadgeCalculator] Failed to get week boundaries for ${badge.code}`)
       return
     }
+    
+    console.log(`[BadgeCalculator] Week period for ${badge.code}: ${period.start} to ${period.end}`)
     
     // Get all activities for this week
     let query = this.supabase
@@ -403,12 +433,19 @@ export class BadgeCalculator {
       query = query.or(`type.eq.${criteria.activity_type},sport_type.eq.${criteria.activity_type}`)
     }
     
-    const { data: weekActivities } = await query
+    const { data: weekActivities, error: queryError } = await query
     
-    if (!weekActivities) {
-      console.error('Failed to fetch week activities for badge calculation')
+    if (queryError) {
+      console.error(`[BadgeCalculator] Error fetching week activities for ${badge.code}:`, queryError)
       return
     }
+    
+    if (!weekActivities) {
+      console.error(`[BadgeCalculator] No activities returned for weekly badge ${badge.code}`)
+      return
+    }
+    
+    console.log(`[BadgeCalculator] Found ${weekActivities.length} activities for ${badge.code} this week`)
     
     // Calculate total value for the week
     let totalValue = 0
