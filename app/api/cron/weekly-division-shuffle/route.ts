@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 // Helper functions for week calculations
 function getWeekStart(date: Date): Date {
@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
     }
     
     console.log('Starting weekly division shuffle...')
-    const supabase = await createClient()
+    const supabase = createAdminClient()
     
     // Calculate last week's dates
     const now = new Date()

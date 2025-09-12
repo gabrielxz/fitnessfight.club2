@@ -127,9 +127,11 @@ export async function assignBadge(userId: string, badgeId: string, tier: 'bronze
     throw new Error('Unauthorized')
   }
 
+  const adminClient = createAdminClient()
+
   try {
     // Check if user already has this badge
-    const { data: existing, error: checkError } = await supabase
+    const { data: existing, error: checkError } = await adminClient
       .from('user_badges')
       .select('*')
       .eq('user_id', userId)
@@ -143,7 +145,7 @@ export async function assignBadge(userId: string, badgeId: string, tier: 'bronze
 
     if (existing) {
       // Update tier if it exists
-      const { error } = await supabase
+      const { error } = await adminClient
         .from('user_badges')
         .update({ tier, updated_at: new Date().toISOString() })
         .eq('id', existing.id)
@@ -154,7 +156,7 @@ export async function assignBadge(userId: string, badgeId: string, tier: 'bronze
       }
     } else {
       // Insert new badge
-      const { error } = await supabase
+      const { error } = await adminClient
         .from('user_badges')
         .insert({
           user_id: userId,
@@ -170,7 +172,7 @@ export async function assignBadge(userId: string, badgeId: string, tier: 'bronze
     }
     
     // Recalculate badge points for the user
-    const { data: allBadges } = await supabase
+    const { data: allBadges } = await adminClient
       .from('user_badges')
       .select('tier')
       .eq('user_id', userId)
@@ -197,7 +199,7 @@ export async function assignBadge(userId: string, badgeId: string, tier: 'bronze
     const weekStartStr = weekStart.toISOString().split('T')[0]
     
     // Update user_points with new badge total
-    const { error: pointsError } = await supabase
+    const { error: pointsError } = await adminClient
       .from('user_points')
       .update({
         badge_points: totalBadgePoints,
@@ -227,9 +229,11 @@ export async function removeBadge(userBadgeId: string) {
                  user.user_metadata?.name !== 'Gabriel Beal')) {
     throw new Error('Unauthorized')
   }
+
+  const adminClient = createAdminClient()
   
   // Get the badge info before deleting to know which user to update
-  const { data: badge } = await supabase
+  const { data: badge } = await adminClient
     .from('user_badges')
     .select('user_id, tier')
     .eq('id', userBadgeId)
@@ -239,7 +243,7 @@ export async function removeBadge(userBadgeId: string) {
     throw new Error('Badge not found')
   }
 
-  const { error } = await supabase
+  const { error } = await adminClient
     .from('user_badges')
     .delete()
     .eq('id', userBadgeId)
@@ -247,7 +251,7 @@ export async function removeBadge(userBadgeId: string) {
   if (error) throw error
   
   // Recalculate badge points for the affected user
-  const { data: remainingBadges } = await supabase
+  const { data: remainingBadges } = await adminClient
     .from('user_badges')
     .select('tier')
     .eq('user_id', badge.user_id)
@@ -274,7 +278,7 @@ export async function removeBadge(userBadgeId: string) {
   const weekStartStr = weekStart.toISOString().split('T')[0]
   
   // Update user_points with new badge total
-  const { error: pointsError } = await supabase
+  const { error: pointsError } = await adminClient
     .from('user_points')
     .update({
       badge_points: newBadgePoints,
@@ -301,9 +305,11 @@ export async function changeDivision(userId: string, divisionId: string) {
     throw new Error('Unauthorized')
   }
 
+  const adminClient = createAdminClient()
+
   try {
     // Check if user has a division assignment
-    const { data: existing, error: checkError } = await supabase
+    const { data: existing, error: checkError } = await adminClient
       .from('user_divisions')
       .select('*')
       .eq('user_id', userId)
@@ -316,13 +322,13 @@ export async function changeDivision(userId: string, divisionId: string) {
 
     if (existing) {
       // Record history of the change
-      const { data: oldDivision } = await supabase
+      const { data: oldDivision } = await adminClient
         .from('divisions')
         .select('*')
         .eq('id', existing.division_id)
         .single()
 
-      const { data: newDivision } = await supabase
+      const { data: newDivision } = await adminClient
         .from('divisions')
         .select('*')
         .eq('id', divisionId)
@@ -336,7 +342,7 @@ export async function changeDivision(userId: string, divisionId: string) {
         const weekEnd = new Date(weekStart)
         weekEnd.setDate(weekStart.getDate() + 6) // End of current week
         
-        const { error: historyError } = await supabase
+        const { error: historyError } = await adminClient
           .from('division_history')
           .insert({
             user_id: userId,
@@ -356,7 +362,7 @@ export async function changeDivision(userId: string, divisionId: string) {
       }
 
       // Update the division
-      const { error } = await supabase
+      const { error } = await adminClient
         .from('user_divisions')
         .update({ 
           division_id: divisionId,
@@ -370,7 +376,7 @@ export async function changeDivision(userId: string, divisionId: string) {
       }
     } else {
       // Insert new division assignment
-      const { error } = await supabase
+      const { error } = await adminClient
         .from('user_divisions')
         .insert({
           user_id: userId,

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { BadgeCalculator } from '@/lib/badges/BadgeCalculator'
 import { recalculateAllWeeklyPoints } from '@/lib/points-helpers'
@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
       updates       // For update events, contains what changed
     } = body
 
-    const supabase = await createClient()
+    const supabase = createAdminClient()
 
     // Log the webhook event
     await supabase
