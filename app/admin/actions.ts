@@ -168,6 +168,47 @@ export async function assignBadge(userId: string, badgeId: string, tier: 'bronze
         throw error
       }
     }
+    
+    // Recalculate badge points for the user
+    const { data: allBadges } = await supabase
+      .from('user_badges')
+      .select('tier')
+      .eq('user_id', userId)
+    
+    let totalBadgePoints = 0
+    if (allBadges) {
+      allBadges.forEach(b => {
+        if (b.tier === 'gold') totalBadgePoints += 10
+        else if (b.tier === 'silver') totalBadgePoints += 6
+        else if (b.tier === 'bronze') totalBadgePoints += 3
+      })
+    }
+    
+    // Get current week for updating points
+    const now = new Date()
+    const currentDay = now.getUTCDay()
+    const daysToMonday = currentDay === 0 ? 6 : currentDay - 1
+    const weekStart = new Date(Date.UTC(
+      now.getUTCFullYear(),
+      now.getUTCMonth(),
+      now.getUTCDate() - daysToMonday,
+      0, 0, 0, 0
+    ))
+    const weekStartStr = weekStart.toISOString().split('T')[0]
+    
+    // Update user_points with new badge total
+    const { error: pointsError } = await supabase
+      .from('user_points')
+      .update({
+        badge_points: totalBadgePoints,
+        updated_at: new Date().toISOString()
+      })
+      .eq('user_id', userId)
+      .eq('week_start', weekStartStr)
+    
+    if (pointsError) {
+      console.error('Failed to update badge points after assignment:', pointsError)
+    }
 
     revalidatePath('/admin')
   } catch (error) {
@@ -186,6 +227,17 @@ export async function removeBadge(userBadgeId: string) {
                  user.user_metadata?.name !== 'Gabriel Beal')) {
     throw new Error('Unauthorized')
   }
+  
+  // Get the badge info before deleting to know which user to update
+  const { data: badge } = await supabase
+    .from('user_badges')
+    .select('user_id, tier')
+    .eq('id', userBadgeId)
+    .single()
+  
+  if (!badge) {
+    throw new Error('Badge not found')
+  }
 
   const { error } = await supabase
     .from('user_badges')
@@ -193,6 +245,47 @@ export async function removeBadge(userBadgeId: string) {
     .eq('id', userBadgeId)
 
   if (error) throw error
+  
+  // Recalculate badge points for the affected user
+  const { data: remainingBadges } = await supabase
+    .from('user_badges')
+    .select('tier')
+    .eq('user_id', badge.user_id)
+  
+  let newBadgePoints = 0
+  if (remainingBadges) {
+    remainingBadges.forEach(b => {
+      if (b.tier === 'gold') newBadgePoints += 10
+      else if (b.tier === 'silver') newBadgePoints += 6
+      else if (b.tier === 'bronze') newBadgePoints += 3
+    })
+  }
+  
+  // Get current week for updating points
+  const now = new Date()
+  const currentDay = now.getUTCDay()
+  const daysToMonday = currentDay === 0 ? 6 : currentDay - 1
+  const weekStart = new Date(Date.UTC(
+    now.getUTCFullYear(),
+    now.getUTCMonth(),
+    now.getUTCDate() - daysToMonday,
+    0, 0, 0, 0
+  ))
+  const weekStartStr = weekStart.toISOString().split('T')[0]
+  
+  // Update user_points with new badge total
+  const { error: pointsError } = await supabase
+    .from('user_points')
+    .update({
+      badge_points: newBadgePoints,
+      updated_at: new Date().toISOString()
+    })
+    .eq('user_id', badge.user_id)
+    .eq('week_start', weekStartStr)
+  
+  if (pointsError) {
+    console.error('Failed to update badge points after deletion:', pointsError)
+  }
 
   revalidatePath('/admin')
 }
