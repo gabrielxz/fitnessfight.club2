@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { recalculateAllWeeklyPoints } from '@/lib/points-helpers'
 
 // PATCH /api/habits/[id] - Update habit name/frequency
 export async function PATCH(
@@ -55,6 +56,72 @@ export async function PATCH(
 
     if (!habit) {
       return NextResponse.json({ error: 'Habit not found' }, { status: 404 })
+    }
+    
+    // If target_frequency was changed, recalculate summary and points
+    if (target_frequency !== undefined) {
+      console.log(`[HABIT UPDATE] Target frequency changed for habit ${params.id} to ${target_frequency}`)
+      
+      // Get current week boundaries
+      const now = new Date()
+      const currentDay = now.getUTCDay()
+      const daysToMonday = currentDay === 0 ? 6 : currentDay - 1
+      const weekStart = new Date(Date.UTC(
+        now.getUTCFullYear(),
+        now.getUTCMonth(),
+        now.getUTCDate() - daysToMonday,
+        0, 0, 0, 0
+      ))
+      const weekEnd = new Date(weekStart)
+      weekEnd.setUTCDate(weekEnd.getUTCDate() + 6)
+      
+      const weekStartStr = weekStart.toISOString().split('T')[0]
+      const weekEndStr = weekEnd.toISOString().split('T')[0]
+      
+      // Count SUCCESS entries for this week
+      const { count: successes } = await supabase
+        .from('habit_entries')
+        .select('*', { count: 'exact', head: true })
+        .eq('habit_id', params.id)
+        .eq('status', 'SUCCESS')
+        .gte('date', weekStartStr)
+        .lte('date', weekEndStr)
+      
+      const actualSuccesses = successes || 0
+      const isCompleted = actualSuccesses >= target_frequency
+      const percentage = target_frequency > 0 ? (actualSuccesses / target_frequency) * 100 : 0
+      const pointsEarned = isCompleted ? 0.5 : 0
+      
+      console.log(`[HABIT UPDATE] Recalculating: ${actualSuccesses}/${target_frequency} = ${pointsEarned} pts`)
+      
+      // Update the weekly summary
+      const { error: summaryError } = await supabase
+        .from('habit_weekly_summaries')
+        .upsert({
+          habit_id: params.id,
+          user_id: user.id,
+          week_start: weekStartStr,
+          successes: actualSuccesses,
+          target: target_frequency,
+          percentage: percentage,
+          points_earned: pointsEarned,
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'habit_id, week_start'
+        })
+      
+      if (summaryError) {
+        console.error('[HABIT UPDATE] Error updating summary:', summaryError)
+      }
+      
+      // Recalculate total weekly points
+      try {
+        const userTimezone = user.user_metadata?.timezone || 'UTC'
+        await recalculateAllWeeklyPoints(user.id, now, userTimezone, supabase)
+        console.log('[HABIT UPDATE] Points recalculated after target change')
+      } catch (pointsError) {
+        console.error('[HABIT UPDATE] Failed to recalculate points:', pointsError)
+      }
     }
 
     return NextResponse.json({ habit })
