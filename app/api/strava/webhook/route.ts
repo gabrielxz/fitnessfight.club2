@@ -54,19 +54,29 @@ export async function POST(request: NextRequest) {
 
     // Handle different event types
     if (object_type === 'activity') {
-      // Get the user's connection and profile to find their timezone
+      // FIXED: Get connection first, then fetch timezone separately
       const { data: connection, error: connError } = await supabase
         .from('strava_connections')
-        .select('*, user_profiles(timezone)')
+        .select('*')
         .eq('strava_athlete_id', owner_id)
         .single()
 
       if (connError || !connection) {
-        console.log(`No connection or profile found for athlete ${owner_id}`)
+        console.log(`No connection found for athlete ${owner_id}`)
         return NextResponse.json({ status: 'ok' })
       }
       
-      const userTimezone = connection.user_profiles?.timezone || 'UTC'
+      // Fetch timezone separately to avoid join issues
+      let userTimezone = 'UTC'
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('timezone')
+        .eq('id', connection.user_id)
+        .single()
+      
+      if (profile?.timezone) {
+        userTimezone = profile.timezone
+      }
 
       // Check if token needs refresh
       const now = Math.floor(Date.now() / 1000)
