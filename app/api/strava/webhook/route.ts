@@ -69,7 +69,12 @@ export async function POST(request: NextRequest) {
       const userTimezone = connection.user_profiles?.timezone || 'UTC'
 
       // Check if token needs refresh
-      if (new Date(connection.expires_at) < new Date()) {
+      const now = Math.floor(Date.now() / 1000)
+      const expiresAt = typeof connection.expires_at === 'string' 
+        ? Math.floor(new Date(connection.expires_at).getTime() / 1000)
+        : connection.expires_at
+      
+      if (expiresAt <= now) {
         const refreshed = await refreshStravaToken(connection.refresh_token)
         if (refreshed) {
           await supabase
@@ -77,7 +82,7 @@ export async function POST(request: NextRequest) {
             .update({
               access_token: refreshed.access_token,
               refresh_token: refreshed.refresh_token,
-              expires_at: new Date(refreshed.expires_at * 1000).toISOString()
+              expires_at: refreshed.expires_at
             })
             .eq('user_id', connection.user_id)
           
@@ -214,6 +219,7 @@ async function fetchAndStoreActivity(
         device_watts: activity.device_watts,
         has_heartrate: activity.has_heartrate,
         calories: activity.calories,
+        suffer_score: activity.suffer_score,
         deleted_at: null
       }, {
         onConflict: 'strava_activity_id'

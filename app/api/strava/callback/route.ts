@@ -84,7 +84,7 @@ export async function GET(request: NextRequest) {
         strava_profile: tokenData.athlete.profile_medium || tokenData.athlete.profile,
         access_token: tokenData.access_token,
         refresh_token: tokenData.refresh_token,
-        expires_at: new Date(tokenData.expires_at * 1000).toISOString(),
+        expires_at: tokenData.expires_at,
         scope: 'read,activity:read_all,profile:read_all',
       }, {
         onConflict: 'user_id',

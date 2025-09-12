@@ -109,11 +109,21 @@ export async function GET() {
     let unit = ''
     if (criteria.metric === 'distance_km') {
       unit = 'km'
+    } else if (criteria.metric === 'distance_miles') {
+      unit = 'miles'
     } else if (criteria.metric === 'elevation_gain') {
       unit = 'm'
+    } else if (criteria.metric === 'suffer_score') {
+      unit = 'RE'  // Relative Effort
+    } else if (criteria.metric === 'moving_time_hours') {
+      unit = 'hours'
+    } else if (criteria.metric === 'moving_time_minutes') {
+      unit = 'minutes'
     } else if (criteria.type === 'count') {
       unit = criteria.condition?.includes('hour') ? 'activities' : 'activities'
     } else if (criteria.type === 'weekly_streak') {
+      unit = 'weeks'
+    } else if (criteria.type === 'weekly_count') {
       unit = 'weeks'
     } else if (criteria.type === 'unique_sports') {
       unit = 'sports'

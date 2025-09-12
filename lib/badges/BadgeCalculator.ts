@@ -13,6 +13,8 @@ interface Activity {
   average_speed: number
   type: string
   sport_type: string
+  suffer_score?: number
+  photo_count?: number
 }
 
 interface BadgeCriteria {
@@ -24,6 +26,7 @@ interface BadgeCriteria {
   metric?: string;
   activity_type?: string;
   reset_period?: 'weekly' | 'monthly' | 'yearly';
+  sports_list?: string[];
 }
 
 interface Badge {
@@ -32,6 +35,8 @@ interface Badge {
   name: string
   emoji: string
   criteria: BadgeCriteria
+  start_date?: string | null
+  end_date?: string | null
 }
 
 interface BadgeProgress {
@@ -92,6 +97,24 @@ export class BadgeCalculator {
   private async evaluateBadge(badge: Badge, activity: Activity, timezone: string) {
     const { criteria } = badge
     const userId = activity.user_id
+    
+    // Check if activity date is within badge's active date range
+    const activityDate = new Date(activity.start_date_local)
+    
+    if (badge.start_date) {
+      const startDate = new Date(badge.start_date)
+      if (activityDate < startDate) {
+        return // Activity is before badge start date
+      }
+    }
+    
+    if (badge.end_date) {
+      const endDate = new Date(badge.end_date)
+      endDate.setHours(23, 59, 59, 999) // Include the entire end date
+      if (activityDate > endDate) {
+        return // Activity is after badge end date
+      }
+    }
 
     const period = await this.getCurrentPeriod(criteria.reset_period, activity.start_date_local, timezone)
     
@@ -135,6 +158,12 @@ export class BadgeCalculator {
         break
       case 'unique_sports':
         await this.handleVarietyBadge(badge, activity, currentProgress, timezone)
+        break
+      case 'weekly_cumulative':
+        await this.handleWeeklyCumulativeBadge(badge, activity, currentProgress, timezone)
+        break
+      case 'weekly_count':
+        await this.handleWeeklyCountBadge(badge, activity, currentProgress, timezone)
         break
     }
   }
@@ -194,7 +223,12 @@ export class BadgeCalculator {
     const { criteria } = badge
     let value = 0
 
-    if (criteria.activity_type && activity.type !== criteria.activity_type) return
+    // Check activity type - support both type and sport_type fields
+    if (criteria.activity_type) {
+      if (activity.type !== criteria.activity_type && activity.sport_type !== criteria.activity_type) {
+        return
+      }
+    }
 
     switch (criteria.metric) {
       case 'calories_per_hour':
@@ -203,6 +237,9 @@ export class BadgeCalculator {
         break
       case 'average_speed_kmh':
         value = (activity.average_speed || 0) * 3.6
+        break
+      case 'moving_time_minutes':
+        value = (activity.moving_time || 0) / 60
         break
     }
 
@@ -262,25 +299,118 @@ export class BadgeCalculator {
   }
 
   private async handleVarietyBadge(badge: Badge, activity: Activity, progress: BadgeProgress, timezone: string) {
-    const { data: uniqueSports } = await this.supabase
-      .from('strava_activities')
-      .select('sport_type')
-      .eq('user_id', activity.user_id)
-      .is('deleted_at', null)
+    const { criteria } = badge
+    
+    // Check if this badge is looking for specific sports (Net Gain badge)
+    if (criteria.sports_list && criteria.sports_list.length > 0) {
+      const { data: activities } = await this.supabase
+        .from('strava_activities')
+        .select('sport_type')
+        .eq('user_id', activity.user_id)
+        .in('sport_type', criteria.sports_list)
+        .is('deleted_at', null)
+      
+      if (!activities) return
+      
+      const uniqueSports = new Set(activities.map(a => a.sport_type))
+      const count = uniqueSports.size
+      progress.current_value = count
+      
+      const tierAchieved = this.checkTierProgress(count, badge.criteria, progress)
+      
+      if (tierAchieved) {
+        await this.awardBadge(badge, activity, tierAchieved, count, timezone)
+      }
+      
+      await this.supabase.from('badge_progress').upsert({ ...progress, metadata: { sports: Array.from(uniqueSports) } })
+    } else {
+      // Original variety pack logic
+      const { data: uniqueSports } = await this.supabase
+        .from('strava_activities')
+        .select('sport_type')
+        .eq('user_id', activity.user_id)
+        .is('deleted_at', null)
 
-    if (!uniqueSports) return
+      if (!uniqueSports) return
 
-    const uniqueTypes = new Set(uniqueSports.map(s => s.sport_type))
-    const count = uniqueTypes.size
-    progress.current_value = count
+      const uniqueTypes = new Set(uniqueSports.map(s => s.sport_type))
+      const count = uniqueTypes.size
+      progress.current_value = count
 
-    const tierAchieved = this.checkTierProgress(count, badge.criteria, progress)
+      const tierAchieved = this.checkTierProgress(count, badge.criteria, progress)
 
-    if (tierAchieved) {
-      await this.awardBadge(badge, activity, tierAchieved, count, timezone)
+      if (tierAchieved) {
+        await this.awardBadge(badge, activity, tierAchieved, count, timezone)
+      }
+
+      await this.supabase.from('badge_progress').upsert({ ...progress, metadata: { sports: Array.from(uniqueTypes) } })
+    }
+  }
+
+  private async handleWeeklyCumulativeBadge(badge: Badge, activity: Activity, progress: BadgeProgress, timezone: string) {
+    const { criteria } = badge
+    let increment = 0
+
+    // Check if activity type matches (for sport-specific badges)
+    if (criteria.activity_type) {
+      // Check both type and sport_type fields
+      if (activity.type !== criteria.activity_type && activity.sport_type !== criteria.activity_type) {
+        return
+      }
     }
 
-    await this.supabase.from('badge_progress').upsert({ ...progress, metadata: { sports: Array.from(uniqueTypes) } })
+    switch (criteria.metric) {
+      case 'suffer_score':
+        increment = activity.suffer_score || 0
+        break
+      case 'distance_miles':
+        increment = (activity.distance || 0) / 1609.34 // Convert meters to miles
+        break
+      case 'moving_time_hours':
+        increment = (activity.moving_time || 0) / 3600 // Convert seconds to hours
+        break
+      case 'moving_time_minutes':
+        increment = (activity.moving_time || 0) / 60 // Convert seconds to minutes
+        break
+    }
+
+    progress.current_value += increment
+
+    const tierAchieved = this.checkTierProgress(progress.current_value, criteria, progress)
+
+    if (tierAchieved) {
+      await this.awardBadge(badge, activity, tierAchieved, progress.current_value, timezone)
+    }
+
+    await this.supabase.from('badge_progress').upsert({ ...progress })
+  }
+
+  private async handleWeeklyCountBadge(badge: Badge, activity: Activity, progress: BadgeProgress, timezone: string) {
+    const { criteria } = badge
+    
+    // For Belfie badge - count weeks with photos
+    if (criteria.condition === 'photo_count > 0') {
+      if ((activity.photo_count || 0) > 0) {
+        // Check if this week has already been counted
+        const weekKey = progress.period_start || 'no_period'
+        const metadata = progress.metadata as any || {}
+        const countedWeeks = metadata.counted_weeks || []
+        
+        if (!countedWeeks.includes(weekKey)) {
+          countedWeeks.push(weekKey)
+          progress.current_value = countedWeeks.length
+          progress.metadata = { ...metadata, counted_weeks: countedWeeks }
+          
+          const tierAchieved = this.checkTierProgress(progress.current_value, criteria, progress)
+          
+          if (tierAchieved) {
+            await this.awardBadge(badge, activity, tierAchieved, progress.current_value, timezone)
+          }
+          
+          await this.supabase.from('badge_progress').upsert({ ...progress })
+        }
+      }
+    }
   }
 
   private checkTierProgress(value: number, criteria: BadgeCriteria, progress: BadgeProgress): string | null {
@@ -291,7 +421,7 @@ export class BadgeCalculator {
   }
 
   private async awardBadge(badge: Badge, activity: Activity, tier: string, value: number, timezone: string) {
-    const tierPoints: { [key: string]: number } = { bronze: 3, silver: 6, gold: 10 }
+    const tierPoints: { [key: string]: number } = { bronze: 3, silver: 6, gold: 15 }
     const { data: existing } = await this.supabase
       .from('user_badges')
       .select('*')

@@ -178,7 +178,7 @@ export async function assignBadge(userId: string, badgeId: string, tier: 'bronze
     let totalBadgePoints = 0
     if (allBadges) {
       allBadges.forEach(b => {
-        if (b.tier === 'gold') totalBadgePoints += 10
+        if (b.tier === 'gold') totalBadgePoints += 15
         else if (b.tier === 'silver') totalBadgePoints += 6
         else if (b.tier === 'bronze') totalBadgePoints += 3
       })
@@ -255,7 +255,7 @@ export async function removeBadge(userBadgeId: string) {
   let newBadgePoints = 0
   if (remainingBadges) {
     remainingBadges.forEach(b => {
-      if (b.tier === 'gold') newBadgePoints += 10
+      if (b.tier === 'gold') newBadgePoints += 15
       else if (b.tier === 'silver') newBadgePoints += 6
       else if (b.tier === 'bronze') newBadgePoints += 3
     })

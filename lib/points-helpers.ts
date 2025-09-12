@@ -67,7 +67,7 @@ export async function recalculateAllWeeklyPoints(
     let badgePoints = 0
     if (badges) {
       badges.forEach(badge => {
-        if (badge.tier === 'gold') badgePoints += 10
+        if (badge.tier === 'gold') badgePoints += 15
         else if (badge.tier === 'silver') badgePoints += 6
         else if (badge.tier === 'bronze') badgePoints += 3
       })

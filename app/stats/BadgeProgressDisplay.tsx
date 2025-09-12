@@ -11,6 +11,7 @@ interface BadgeCriteria {
   metric?: string
   activity_type?: string
   reset_period?: string
+  sports_list?: string[]
 }
 
 interface Badge {
@@ -231,7 +232,7 @@ function BadgeProgressItem({ progress }: { progress: BadgeProgress }) {
 }
 
 function getCriteriaDescription(criteria: BadgeCriteria): string {
-  const { type, condition, bronze, silver, gold, metric, activity_type, reset_period } = criteria
+  const { type, condition, bronze, silver, gold, metric, activity_type, reset_period, sports_list } = criteria
   
   let base = ''
   
@@ -247,10 +248,24 @@ function getCriteriaDescription(criteria: BadgeCriteria): string {
     base = 'Burn calories per hour in a single activity'
   } else if (type === 'single_activity' && metric === 'average_speed_kmh') {
     base = 'Average speed in a single ride'
+  } else if (type === 'single_activity' && metric === 'moving_time_minutes') {
+    base = activity_type ? `${activity_type} for minutes in a single session` : 'Activity duration in minutes'
   } else if (type === 'weekly_streak') {
     base = 'Consecutive weeks with activities'
+  } else if (type === 'weekly_cumulative' && metric === 'suffer_score') {
+    base = 'Relative Effort points in a week'
+  } else if (type === 'weekly_cumulative' && metric === 'distance_miles') {
+    base = activity_type ? `${activity_type} miles in a week` : 'Miles in a week'
+  } else if (type === 'weekly_cumulative' && metric === 'moving_time_hours') {
+    base = activity_type ? `${activity_type} hours in a week` : 'Activity hours in a week'
+  } else if (type === 'weekly_count' && condition === 'photo_count > 0') {
+    base = 'Weeks with photo attachments'
   } else if (type === 'unique_sports') {
-    base = 'Try different sport types'
+    if (sports_list && sports_list.length > 0) {
+      base = `Play distinct racquet sports (${sports_list.join(', ')})`
+    } else {
+      base = 'Try different sport types'
+    }
   }
   
   const targets = `Bronze: ${bronze}, Silver: ${silver}, Gold: ${gold}`

@@ -256,9 +256,32 @@ For local development and testing:
 
 ### Database Migrations
 Run migrations in Supabase SQL Editor (in order):
-1. `001_create_strava_connections.sql`
-2. `002_create_strava_activities.sql`
-3. `003_create_divisions.sql` (Release 1)
+1. `001_create_strava_connections.sql` - Strava OAuth connections
+2. `002_create_strava_activities.sql` - Activity storage
+3. `003_create_divisions.sql` - Division system (Release 1)
+4. `004_create_badges.sql` - Badge system (Release 3)
+5. `005_admin_policies.sql` - Admin RLS policies
+6. `006_create_user_profiles.sql` - User profile metadata
+7. `007_add_weekly_badge_support.sql` - Periodic badge support
+8. `008_create_habits.sql` - Habit tracker (Release 4)
+9. `009_update_cumulative_points.sql` - Cumulative points tracking
+10. `010_add_timezone_to_user_profiles.sql` - Timezone support
+11. `011_add_cumulative_points.sql` - Enhanced cumulative points
+12. `012_refactor_user_points.sql` - Split points into exercise/habit/badge
+13. `013_add_increment_badge_points_fn.sql` - Badge points function
+14. `014_add_user_id_to_habit_entries.sql` - Habit entries fix
+15. `016_fix_habit_summaries_rls.sql` - Habit summaries RLS fix
+16. `017_reset_badges_add_dates.sql` - Badge date fields
+17. `018_add_suffer_score.sql` - Relative Effort tracking
+
+## Utility Scripts
+
+Located in `/scripts/`:
+- `setup-webhook.js` - Strava webhook management
+- `delete-badges-and-add-dates.js` - Clear all badges and add date field support
+- `insert-new-badges.js` - Insert new badge definitions
+- `verify-badges.js` - Check badges in database
+- Various migration and fix scripts for points/habits
 
 ## Security Considerations
 
@@ -326,15 +349,44 @@ Run migrations in Supabase SQL Editor (in order):
   - Responsive design for all screen sizes
 
 ### Release 3 Details (Completed + Enhanced)
-- **10 Badge Types**: Early Bird, Night Owl, Power Hour, Consistency King, Globe Trotter, Mountain Climber, Speed Demon, Runner, Cyclist, Variety Pack
-- **3 Tiers**: Bronze, Silver, Gold for each badge
-- **Automatic Calculation**: BadgeCalculator runs on every webhook activity and manual sync
-- **Database Tables**: badges, user_badges, badge_progress (with periodic support)
-- **Display**: Badges shown on athlete cards in leaderboards + detailed progress on Stats page
-- **Stats Page**: New page showing visual progress bars for all badges
-- **Periodic Badge Support**: Infrastructure for weekly/monthly/yearly badges that reset but preserve achievements
-- **Weekly Reset**: Cron job resets weekly badge progress every Sunday
-- **Note**: Badge removal on activity deletion not yet implemented (badges remain once earned)
+
+#### Original 10 Badge Types (Removed)
+- Early Bird, Night Owl, Power Hour, Consistency King, Globe Trotter, Mountain Climber, Speed Demon, Runner, Cyclist, Variety Pack
+
+#### New Badge System (December 2024)
+- **Badge Point Values Updated**:
+  - Gold: 15 points (was 10)
+  - Silver: 6 points (was 5)
+  - Bronze: 3 points (was 2)
+
+- **7 New Badge Types Implemented**:
+  1. **🥵 Tryhard** - Score Relative Effort points in one week (600/350/150)
+  2. **🏔 Everester** - Cumulative elevation gain in meters (4424/2212/600)
+  3. **🐂 Iron Calves** - Bike miles in a week (90/50/10)
+  4. **🧘 Zen Master** - Yoga hours in a week (10/4/1)
+  5. **📸 Belfie** - Weeks with photo attachments (12/6/1)
+  6. **⚽ Pitch Perfect** - Soccer minutes in single session (100/60/30)
+  7. **🎾 Net Gain** - Distinct racquet sports played (4/2/1)
+
+- **Database Changes**:
+  - Added `start_date` and `end_date` columns to badges table for time-limited badges
+  - Added `suffer_score` column to strava_activities (migration 018)
+  - All existing badges deleted for clean slate
+
+- **BadgeCalculator Enhancements**:
+  - Added `weekly_cumulative` type for week-based accumulation
+  - Added `weekly_count` type for counting qualifying weeks
+  - Enhanced `unique_sports` to handle specific sport lists
+  - Added date range checking for time-limited badges
+  - Support for Relative Effort (suffer_score) tracking
+
+- **Technical Implementation**:
+  - Automatic Calculation: BadgeCalculator runs on every webhook activity and manual sync
+  - Database Tables: badges, user_badges, badge_progress (with periodic support)
+  - Display: Badges shown on athlete cards in leaderboards + detailed progress on Stats page
+  - Stats Page: Visual progress bars with proper unit formatting for all badge types
+  - Periodic Badge Support: Weekly badges reset but preserve achievements
+  - Note: Badge removal on activity deletion not yet implemented (badges remain once earned)
 
 ### Admin Dashboard Details (Completed)
 - **Access Control**: Hardcoded for Gabriel Beal (gabrielbeal@gmail.com)
