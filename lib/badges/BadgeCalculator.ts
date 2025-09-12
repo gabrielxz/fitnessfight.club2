@@ -198,20 +198,46 @@ export class BadgeCalculator {
 
   private async handleCumulativeBadge(badge: Badge, activity: Activity, progress: BadgeProgress, timezone: string) {
     const { criteria } = badge
-    let increment = 0
-
-    if (criteria.activity_type && activity.type !== criteria.activity_type) return
-
-    switch (criteria.metric) {
-      case 'distance_km':
-        increment = (activity.distance || 0) / 1000
-        break
-      case 'elevation_gain':
-        increment = activity.total_elevation_gain || 0
-        break
+    
+    // For cumulative badges (no reset period), we need to recalculate from all activities
+    // to avoid double-counting when activities are reprocessed
+    
+    // Get all activities for this user
+    let query = this.supabase
+      .from('strava_activities')
+      .select('*')
+      .eq('user_id', activity.user_id)
+      .is('deleted_at', null)
+    
+    // Filter by activity type if specified
+    if (criteria.activity_type) {
+      query = query.eq('type', criteria.activity_type)
     }
-
-    progress.current_value += increment
+    
+    const { data: allActivities } = await query
+    
+    if (!allActivities) {
+      console.error('Failed to fetch activities for cumulative badge calculation')
+      return
+    }
+    
+    // Calculate total value from all activities
+    let totalValue = 0
+    for (const act of allActivities) {
+      switch (criteria.metric) {
+        case 'distance_km':
+          totalValue += (act.distance || 0) / 1000
+          break
+        case 'elevation_gain':
+          totalValue += act.total_elevation_gain || 0
+          break
+      }
+    }
+    
+    // Update progress with the recalculated total
+    progress.current_value = totalValue
+    progress.last_activity_id = activity.strava_activity_id
+    progress.last_updated = new Date().toISOString()
 
     const tierAchieved = this.checkTierProgress(progress.current_value, criteria, progress)
 
