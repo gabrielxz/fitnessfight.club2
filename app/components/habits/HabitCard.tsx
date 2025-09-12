@@ -43,15 +43,6 @@ export default function HabitCard({
   const [showEditDialog, setShowEditDialog] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
-  // Calculate streak (simplified for now)
-  const calculateStreak = () => {
-    // This would need more data from previous weeks
-    return '+0'
-  }
-
-  // Calculate overall percentage (would need historical data)
-  const overallPercentage = Math.round(summary.percentage)
-
   const handleEdit = (name: string, targetFrequency: number) => {
     onEdit(habit.id, name, targetFrequency)
     setShowEditDialog(false)
@@ -82,7 +73,7 @@ export default function HabitCard({
               )}
             </div>
             <div className="text-sm text-gray-400">
-              Streak: {calculateStreak()} | Overall: {overallPercentage}% | This Wk: {summary.successes}/{summary.target}
+              This week: {summary.successes}/{summary.target}
             </div>
           </div>
           <div className="flex gap-2">
