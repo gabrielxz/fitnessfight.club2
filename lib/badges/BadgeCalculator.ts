@@ -48,7 +48,10 @@ interface BadgeProgress {
   gold_achieved: boolean;
   last_activity_id?: number;
   last_updated?: string;
-  metadata?: { sports: string[] };
+  metadata?: { 
+    sports?: string[];
+    counted_weeks?: string[];
+  };
   period_start?: string;
   period_end?: string;
   last_reset_at?: string;
@@ -393,7 +396,7 @@ export class BadgeCalculator {
       if ((activity.photo_count || 0) > 0) {
         // Check if this week has already been counted
         const weekKey = progress.period_start || 'no_period'
-        const metadata = progress.metadata as any || {}
+        const metadata = progress.metadata || {}
         const countedWeeks = metadata.counted_weeks || []
         
         if (!countedWeeks.includes(weekKey)) {
