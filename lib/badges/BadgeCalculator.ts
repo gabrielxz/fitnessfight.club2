@@ -352,33 +352,64 @@ export class BadgeCalculator {
 
   private async handleWeeklyCumulativeBadge(badge: Badge, activity: Activity, progress: BadgeProgress, timezone: string) {
     const { criteria } = badge
-    let increment = 0
-
-    // Check if activity type matches (for sport-specific badges)
+    
+    // For weekly cumulative badges, we need to recalculate from all activities in the week
+    // This ensures we get the correct total, not just increment from the last value
+    const period = await this.getCurrentPeriod('weekly', activity.start_date_local, timezone)
+    
+    if (!period.start || !period.end) {
+      console.error('Failed to get week boundaries for weekly cumulative badge')
+      return
+    }
+    
+    // Get all activities for this week
+    let query = this.supabase
+      .from('strava_activities')
+      .select('*')
+      .eq('user_id', activity.user_id)
+      .gte('start_date_local', period.start)
+      .lte('start_date_local', period.end + 'T23:59:59')
+      .is('deleted_at', null)
+    
+    // Filter by activity type if specified
     if (criteria.activity_type) {
-      // Check both type and sport_type fields
-      if (activity.type !== criteria.activity_type && activity.sport_type !== criteria.activity_type) {
-        return
+      // Use OR condition to check both type and sport_type
+      query = query.or(`type.eq.${criteria.activity_type},sport_type.eq.${criteria.activity_type}`)
+    }
+    
+    const { data: weekActivities } = await query
+    
+    if (!weekActivities) {
+      console.error('Failed to fetch week activities for badge calculation')
+      return
+    }
+    
+    // Calculate total value for the week
+    let totalValue = 0
+    for (const act of weekActivities) {
+      let actValue = 0
+      
+      switch (criteria.metric) {
+        case 'suffer_score':
+          actValue = act.suffer_score || 0
+          break
+        case 'distance_miles':
+          actValue = (act.distance || 0) / 1609.34 // Convert meters to miles
+          break
+        case 'moving_time_hours':
+          actValue = (act.moving_time || 0) / 3600 // Convert seconds to hours
+          break
+        case 'moving_time_minutes':
+          actValue = (act.moving_time || 0) / 60 // Convert seconds to minutes
+          break
       }
+      
+      totalValue += actValue
     }
-
-    switch (criteria.metric) {
-      case 'suffer_score':
-        increment = activity.suffer_score || 0
-        break
-      case 'distance_miles':
-        increment = (activity.distance || 0) / 1609.34 // Convert meters to miles
-        break
-      case 'moving_time_hours':
-        increment = (activity.moving_time || 0) / 3600 // Convert seconds to hours
-        break
-      case 'moving_time_minutes':
-        increment = (activity.moving_time || 0) / 60 // Convert seconds to minutes
-        break
-    }
-
-    progress.current_value += increment
-
+    
+    // Update progress with the recalculated total
+    progress.current_value = totalValue
+    
     const tierAchieved = this.checkTierProgress(progress.current_value, criteria, progress)
 
     if (tierAchieved) {
