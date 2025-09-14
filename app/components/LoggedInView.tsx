@@ -14,7 +14,7 @@ interface Division {
 
 interface LoggedInViewProps {
   userId: string
-  userDivision: Division
+  userDivision: Division | null
   allDivisions: Division[]
 }
 
@@ -26,19 +26,24 @@ const divisionEmojis: Record<string, string> = {
 }
 
 export default function LoggedInView({ userId, userDivision, allDivisions }: LoggedInViewProps) {
-  const [activeView, setActiveView] = useState<'division' | 'global'>('division')
+  const [activeView, setActiveView] = useState<'division' | 'global'>(userDivision ? 'division' : 'global')
   
   return (
     <>
-      {/* Division Selector */}
-      <DivisionSelector 
-        currentDivision={userDivision}
-        onViewChange={setActiveView}
-        activeView={activeView}
-      />
+      {userDivision ? (
+        <DivisionSelector 
+          currentDivision={userDivision}
+          onViewChange={setActiveView}
+          activeView={activeView}
+        />
+      ) : (
+        <div className="glass-card p-4 text-center mb-8">
+          <p className="text-gray-300">You are not currently in a division. Explore the global leaderboards below.</p>
+        </div>
+      )}
       
       {/* Show content based on toggle */}
-      {activeView === 'division' ? (
+      {activeView === 'division' && userDivision ? (
         <>
           {/* Single division leaderboard */}
           <DivisionLeaderboard userId={userId} />

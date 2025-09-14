@@ -28,7 +28,7 @@ export default async function Page() {
     userDivision = data
   }
   
-  const division = userDivision?.divisions || { name: 'Noodle', level: 1, emoji: '🍜' }
+  const division = userDivision?.divisions || null
 
   // Fetch all divisions (Juicy first)
   const { data: divisions } = await supabase
