@@ -208,7 +208,7 @@ export class BadgeCalculator {
       const tierAchieved = this.checkTierProgress(progress.current_value, criteria, progress)
 
       if (tierAchieved) {
-        await this.awardBadge(badge, activity, tierAchieved, progress.current_value, timezone)
+        await this.awardBadge(badge, activity, tierAchieved, progress.current_value)
       }
 
       await this.supabase.from('badge_progress').upsert({ ...progress })
@@ -269,7 +269,7 @@ export class BadgeCalculator {
     const tierAchieved = this.checkTierProgress(progress.current_value, criteria, progress)
 
     if (tierAchieved) {
-      await this.awardBadge(badge, activity, tierAchieved, progress.current_value, timezone)
+      await this.awardBadge(badge, activity, tierAchieved, progress.current_value)
     }
 
     await this.supabase.from('badge_progress').upsert({ ...progress })
@@ -305,7 +305,7 @@ export class BadgeCalculator {
     else if (!progress.bronze_achieved && value >= criteria.bronze) tierAchieved = 'bronze'
 
     if (tierAchieved) {
-      await this.awardBadge(badge, activity, tierAchieved, value, timezone)
+      await this.awardBadge(badge, activity, tierAchieved, value)
 
       if (tierAchieved === 'bronze') progress.bronze_achieved = true;
       if (tierAchieved === 'silver') progress.silver_achieved = true;
@@ -348,7 +348,7 @@ export class BadgeCalculator {
     const tierAchieved = this.checkTierProgress(streak, badge.criteria, progress)
 
     if (tierAchieved) {
-      await this.awardBadge(badge, activity, tierAchieved, streak, timezone)
+      await this.awardBadge(badge, activity, tierAchieved, streak)
     }
 
     await this.supabase.from('badge_progress').upsert({ ...progress })
@@ -375,7 +375,7 @@ export class BadgeCalculator {
       const tierAchieved = this.checkTierProgress(count, badge.criteria, progress)
       
       if (tierAchieved) {
-        await this.awardBadge(badge, activity, tierAchieved, count, timezone)
+        await this.awardBadge(badge, activity, tierAchieved, count)
       }
       
       await this.supabase.from('badge_progress').upsert({ ...progress, metadata: { sports: Array.from(uniqueSports) } })
@@ -396,7 +396,7 @@ export class BadgeCalculator {
       const tierAchieved = this.checkTierProgress(count, badge.criteria, progress)
 
       if (tierAchieved) {
-        await this.awardBadge(badge, activity, tierAchieved, count, timezone)
+        await this.awardBadge(badge, activity, tierAchieved, count)
       }
 
       await this.supabase.from('badge_progress').upsert({ ...progress, metadata: { sports: Array.from(uniqueTypes) } })
@@ -476,7 +476,7 @@ export class BadgeCalculator {
     const tierAchieved = this.checkTierProgress(progress.current_value, criteria, progress)
 
     if (tierAchieved) {
-      await this.awardBadge(badge, activity, tierAchieved, progress.current_value, timezone)
+      await this.awardBadge(badge, activity, tierAchieved, progress.current_value)
     }
 
     await this.supabase.from('badge_progress').upsert({ ...progress })
@@ -501,7 +501,7 @@ export class BadgeCalculator {
           const tierAchieved = this.checkTierProgress(progress.current_value, criteria, progress)
           
           if (tierAchieved) {
-            await this.awardBadge(badge, activity, tierAchieved, progress.current_value, timezone)
+            await this.awardBadge(badge, activity, tierAchieved, progress.current_value)
           }
           
           await this.supabase.from('badge_progress').upsert({ ...progress })
@@ -517,7 +517,7 @@ export class BadgeCalculator {
     return null
   }
 
-  private async awardBadge(badge: Badge, activity: Activity, tier: string, value: number, timezone: string) {
+  private async awardBadge(badge: Badge, activity: Activity, tier: string, value: number) {
     const tierPoints: { [key: string]: number } = { bronze: 3, silver: 6, gold: 15 }
     const { data: existing } = await this.supabase
       .from('user_badges')

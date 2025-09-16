@@ -4,14 +4,6 @@ import { getWeekBoundaries } from '@/lib/date-helpers'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createAdminClient } from '@/lib/supabase/admin'
 
-/**
- * Processes a habit entry update to determine if points should be awarded.
- * @param supabase The Supabase client.
- * @param userId The user's ID.
- * @param habitId The habit being updated.
- * @param date The date of the entry.
- * @param timezone The user's timezone.
- */
 async function processHabitCompletion(
   supabase: SupabaseClient,
   userId: string,
@@ -19,7 +11,6 @@ async function processHabitCompletion(
   date: string,
   timezone: string
 ) {
-  // 1. Get the habit's details (target and position)
   const { data: habit, error: habitError } = await supabase
     .from('habits')
     .select('target_frequency, position')
@@ -31,7 +22,6 @@ async function processHabitCompletion(
     return
   }
 
-  // 2. Only the top 5 habits (position 0-4) are eligible for points
   if (habit.position >= 5) {
     console.log(`[Habit Points] Habit ${habitId} is not eligible for points (position ${habit.position})`)
     return
@@ -42,7 +32,6 @@ async function processHabitCompletion(
   const weekStartStr = weekStart.toISOString().split('T')[0]
   const weekEndStr = weekEnd.toISOString().split('T')[0]
 
-  // 3. Get all SUCCESS entries for this habit this week
   const { data: successEntries, error: entriesError } = await supabase
     .from('habit_entries')
     .select('date', { count: 'exact' })
@@ -60,17 +49,12 @@ async function processHabitCompletion(
   const totalSuccesses = successEntries.length
   const target = habit.target_frequency
 
-  // 4. Check if the habit's weekly target has been met
   if (totalSuccesses < target) {
-    // Not yet completed, do nothing.
     return
   }
 
-  // 5. State-change detection: Did this entry just complete the habit?
-  // We check if the habit was incomplete *before* this entry.
   const previousSuccessCount = successEntries.filter(e => new Date(e.date).getTime() !== entryDate.getTime()).length
 
-  // This condition is met only on the day the target is reached.
   if (previousSuccessCount < target) {
     console.log(`[Habit Points] Habit ${habitId} completed for week ${weekStartStr}. Awarding points.`)
     
@@ -87,21 +71,19 @@ async function processHabitCompletion(
   }
 }
 
-
-// POST handler to add or update a habit entry for a specific date
 export async function POST(
-  request: Request,
-  context: { params: { id: string } }
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const supabase = await createClient() // Use the user's client for auth and RLS
-  
+  const supabase = await createClient()
+
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   const { date, status } = await request.json()
-  const habitId = context.params.id
+  const { id: habitId } = await params
 
   if (!date || !status || !['SUCCESS', 'FAILURE', 'NEUTRAL'].includes(status)) {
     return NextResponse.json({ error: 'Missing or invalid date or status' }, { status: 400 })
@@ -114,7 +96,7 @@ export async function POST(
       await supabase.from('habit_entries').upsert(
         {
           habit_id: habitId,
-          user_id: user.id, // Ensure user_id is set for RLS
+          user_id: user.id,
           date: date,
           status: status,
           week_start: getWeekBoundaries(new Date(date), user.user_metadata?.timezone || 'UTC').weekStart.toISOString().split('T')[0]
@@ -128,7 +110,6 @@ export async function POST(
     return NextResponse.json({ error: 'Failed to update habit entry', details: errorObj.message }, { status: 500 })
   }
 
-  // After updating the entry, process completion for points
   const adminSupabase = createAdminClient()
   await processHabitCompletion(
     adminSupabase,

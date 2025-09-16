@@ -76,7 +76,7 @@ export async function assignBadge(userId: string, badgeId: string, tier: 'bronze
 
   if (existing) {
     // Badge exists, could be an upgrade/downgrade
-    const previousPoints = existing.points_awarded || TIER_POINTS[existing.tier] || 0;
+    const previousPoints = existing.points_awarded || TIER_POINTS[existing.tier as keyof typeof TIER_POINTS] || 0;
     pointsToAward = newPointsValue - previousPoints;
 
     const { error } = await adminClient
@@ -131,7 +131,7 @@ export async function removeBadge(userBadgeId: string) {
   
   if (!badge) throw new Error('Badge not found')
 
-  const pointsToRemove = badge.points_awarded || TIER_POINTS[badge.tier] || 0;
+  const pointsToRemove = badge.points_awarded || TIER_POINTS[badge.tier as keyof typeof TIER_POINTS] || 0;
 
   const { error } = await adminClient.from('user_badges').delete().eq('id', userBadgeId)
   if (error) throw error
