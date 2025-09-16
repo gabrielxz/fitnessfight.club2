@@ -38,9 +38,19 @@ export async function GET(request: NextRequest) {
       console.error('Error fetching divisions:', divError)
       throw divError
     }
+
+    interface DivisionChange {
+      user_id: string;
+      from_division_id: string;
+      to_division_id: string;
+      from_division_name: string;
+      to_division_name: string;
+      final_points: number | null;
+      final_position: number;
+    }
     
-    const promotions: any[] = []
-    const relegations: any[] = []
+    const promotions: DivisionChange[] = []
+    const relegations: DivisionChange[] = []
     
     for (const division of divisions) {
       const { data: divisionUsers } = await supabase
