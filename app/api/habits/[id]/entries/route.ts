@@ -93,7 +93,7 @@ export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const supabase = createClient() // Use the user's client for auth and RLS
+  const supabase = await createClient() // Use the user's client for auth and RLS
   
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
