@@ -1,45 +1,34 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 
-// Helper functions for week calculations
-function getWeekStart(date: Date): Date {
+// Helper to get the start of the *previous* week (Monday)
+function getLastWeekStart(date: Date): Date {
   const d = new Date(date)
   const day = d.getUTCDay()
-  // If Sunday (0), treat as end of week (day 7)
   const adjustedDay = day === 0 ? 7 : day
-  // Calculate days back to Monday (1)
-  const diff = d.getUTCDate() - (adjustedDay - 1)
+  const diff = d.getUTCDate() - (adjustedDay - 1) - 7 // Go back 7 more days for last week
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), diff, 0, 0, 0, 0))
-}
-
-function getWeekEnd(weekStart: Date): Date {
-  const end = new Date(weekStart)
-  end.setUTCDate(end.getUTCDate() + 6)
-  end.setUTCHours(23, 59, 59, 999)
-  return end
 }
 
 export async function GET(request: NextRequest) {
   try {
-    // Verify this is called by Vercel Cron
     const authHeader = request.headers.get('authorization')
     if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-      console.log('Unauthorized cron attempt')
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
     
-    console.log('Starting weekly division shuffle...')
+    console.log('Starting weekly division shuffle based on cumulative points...')
     const supabase = createAdminClient()
     
-    // Calculate last week's dates
     const now = new Date()
-    const weekStart = getWeekStart(now)
-    weekStart.setDate(weekStart.getDate() - 7) // Last week
-    const weekEnd = getWeekEnd(weekStart)
-    const weekStartStr = weekStart.toISOString().split('T')[0]
-    const weekEndStr = weekEnd.toISOString().split('T')[0]
+    const lastWeekStart = getLastWeekStart(now)
+    const lastWeekEnd = new Date(lastWeekStart)
+    lastWeekEnd.setDate(lastWeekEnd.getDate() + 6)
+    lastWeekEnd.setUTCHours(23, 59, 59, 999)
+
+    const weekStartStr = lastWeekStart.toISOString().split('T')[0]
+    const weekEndStr = lastWeekEnd.toISOString().split('T')[0]
     
-    // Get all divisions ordered by level
     const { data: divisions, error: divError } = await supabase
       .from('divisions')
       .select('*')
@@ -47,150 +36,91 @@ export async function GET(request: NextRequest) {
     
     if (divError || !divisions) {
       console.error('Error fetching divisions:', divError)
-      return NextResponse.json({ error: 'Failed to fetch divisions' }, { status: 500 })
+      throw divError
     }
     
-    interface DivisionChange {
-      user_id: string
-      from_division_id: string
-      to_division_id: string
-      from_division_name: string
-      to_division_name: string
-      final_points: number
-      final_position: number
-    }
+    const promotions: any[] = []
+    const relegations: any[] = []
     
-    const promotions: DivisionChange[] = []
-    const relegations: DivisionChange[] = []
-    
-    // Process each division
     for (const division of divisions) {
-      // Get all users in this division
       const { data: divisionUsers } = await supabase
         .from('user_divisions')
         .select('user_id')
         .eq('division_id', division.id)
       
-      if (!divisionUsers || divisionUsers.length === 0) {
-        console.log(`No users in ${division.name} division`)
-        continue
-      }
+      if (!divisionUsers || divisionUsers.length === 0) continue
       
       const userIds = divisionUsers.map(u => u.user_id)
       
-      // Get points for last week
-      const { data: userPoints } = await supabase
-        .from('user_points')
-        .select('user_id, total_points')
-        .in('user_id', userIds)
-        .eq('week_start', weekStartStr)
-        .order('total_points', { ascending: false })
-      
-      if (!userPoints || userPoints.length === 0) {
-        console.log(`No points data for ${division.name} division`)
-        continue
-      }
-      
-      // Determine promotions and relegations
-      // Promote top user (if not in Juicy division and division has more than 1 user)
-      if (division.level < 4 && userPoints.length > 1) {
-        const topUser = userPoints[0]
+      // Get cumulative points for all users in the division
+      const { data: userProfiles, error: profileError } = await supabase
+        .from('user_profiles')
+        .select('id, total_cumulative_points')
+        .in('id', userIds)
+        .order('total_cumulative_points', { ascending: false })
+
+      if (profileError) throw profileError
+      if (!userProfiles || userProfiles.length === 0) continue
+
+      // Promote top user (if not in Juicy and division has > 1 user)
+      if (division.level < 4 && userProfiles.length > 1) {
+        const topUser = userProfiles[0]
         const nextDivision = divisions.find(d => d.level === division.level + 1)
-        
         if (nextDivision) {
           promotions.push({
-            user_id: topUser.user_id,
+            user_id: topUser.id,
             from_division_id: division.id,
             to_division_id: nextDivision.id,
             from_division_name: division.name,
             to_division_name: nextDivision.name,
-            final_points: topUser.total_points,
+            final_points: topUser.total_cumulative_points,
             final_position: 1
           })
         }
       }
       
-      // Relegate bottom user (if not in Noodle division and division has more than 1 user)
-      if (division.level > 1 && userPoints.length > 1) {
-        const bottomUser = userPoints[userPoints.length - 1]
+      // Relegate bottom user (if not in Noodle and division has > 1 user)
+      if (division.level > 1 && userProfiles.length > 1) {
+        const bottomUser = userProfiles[userProfiles.length - 1]
         const prevDivision = divisions.find(d => d.level === division.level - 1)
-        
         if (prevDivision) {
           relegations.push({
-            user_id: bottomUser.user_id,
+            user_id: bottomUser.id,
             from_division_id: division.id,
             to_division_id: prevDivision.id,
             from_division_name: division.name,
             to_division_name: prevDivision.name,
-            final_points: bottomUser.total_points,
-            final_position: userPoints.length
+            final_points: bottomUser.total_cumulative_points,
+            final_position: userProfiles.length
           })
         }
       }
     }
     
-    // Apply all promotions
-    for (const promotion of promotions) {
-      // Update user division
+    // Apply promotions and relegations
+    const allChanges = [...promotions, ...relegations]
+    for (const change of allChanges) {
       await supabase
         .from('user_divisions')
-        .update({ 
-          division_id: promotion.to_division_id,
-          joined_division_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        })
-        .eq('user_id', promotion.user_id)
+        .update({ division_id: change.to_division_id, updated_at: new Date().toISOString() })
+        .eq('user_id', change.user_id)
       
-      // Log to division history
       await supabase
         .from('division_history')
         .insert({
-          user_id: promotion.user_id,
-          from_division_id: promotion.from_division_id,
-          to_division_id: promotion.to_division_id,
-          change_type: 'promotion',
+          user_id: change.user_id,
+          from_division_id: change.from_division_id,
+          to_division_id: change.to_division_id,
+          change_type: promotions.includes(change) ? 'promotion' : 'relegation',
           week_start: weekStartStr,
           week_end: weekEndStr,
-          final_points: promotion.final_points,
-          final_position: promotion.final_position
+          final_points: change.final_points,
+          final_position: change.final_position
         })
-      
-      console.log(`Promoted user ${promotion.user_id} from ${promotion.from_division_name} to ${promotion.to_division_name}`)
-    }
-    
-    // Apply all relegations
-    for (const relegation of relegations) {
-      // Update user division
-      await supabase
-        .from('user_divisions')
-        .update({ 
-          division_id: relegation.to_division_id,
-          joined_division_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        })
-        .eq('user_id', relegation.user_id)
-      
-      // Log to division history
-      await supabase
-        .from('division_history')
-        .insert({
-          user_id: relegation.user_id,
-          from_division_id: relegation.from_division_id,
-          to_division_id: relegation.to_division_id,
-          change_type: 'relegation',
-          week_start: weekStartStr,
-          week_end: weekEndStr,
-          final_points: relegation.final_points,
-          final_position: relegation.final_position
-        })
-      
-      console.log(`Relegated user ${relegation.user_id} from ${relegation.from_division_name} to ${relegation.to_division_name}`)
+      console.log(`${promotions.includes(change) ? 'Promoted' : 'Relegated'} user ${change.user_id} from ${change.from_division_name} to ${change.to_division_name}`)
     }
     
     // Reset weekly badge progress
-    console.log('Resetting weekly badge progress...')
-    
-    // Get all badges with weekly reset period
     const { data: weeklyBadges } = await supabase
       .from('badges')
       .select('id')
@@ -199,32 +129,20 @@ export async function GET(request: NextRequest) {
     
     if (weeklyBadges && weeklyBadges.length > 0) {
       const badgeIds = weeklyBadges.map(b => b.id)
-      
-      // Archive old weekly progress by updating last_reset_at
       await supabase
         .from('badge_progress')
-        .update({ 
-          last_reset_at: new Date().toISOString()
-        })
+        .update({ last_reset_at: new Date().toISOString() })
         .in('badge_id', badgeIds)
         .lt('period_end', now.toISOString())
-      
       console.log(`Reset progress for ${weeklyBadges.length} weekly badges`)
     }
-    
-    // Note: Habit points are now added immediately when habits are completed
-    // No need to calculate them at week end anymore
-    console.log('Habit points are calculated in real-time now')
     
     console.log('Weekly division shuffle and badge reset completed')
     
     return NextResponse.json({ 
       success: true, 
-      shuffled: new Date().toISOString(),
       promotions: promotions.length,
       relegations: relegations.length,
-      weekProcessed: weekStartStr,
-      badgesReset: weeklyBadges?.length || 0
     })
   } catch (error) {
     console.error('Error in weekly division shuffle:', error)

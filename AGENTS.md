@@ -476,6 +476,34 @@ A mini habit tracker inspired by HabitShare, allowing users to track daily habit
 
 ## Agent Updates
 
+### Gemini (2025-09-12): Cumulative Points System Refactor
+
+**Objective**: Transition the application from a weekly-resetting score to a persistent, all-time cumulative score, per the user's request.
+
+**Architectural Changes**:
+
+1.  **Database Schema Overhaul (Migration `022_cumulative_points_system.sql`)**:
+    -   The `user_profiles` table is now the single source of truth for scores, with new columns for `cumulative_exercise_points`, `cumulative_habit_points`, `cumulative_badge_points`, and a `total_cumulative_points` generated column.
+    -   The old `user_points` and `habit_weekly_summaries` tables have been dropped.
+    -   A new `weekly_exercise_tracking` table was created to manage the 10-hour/week cap on exercise point contributions.
+    -   New RPC functions (`increment_exercise_points`, `increment_habit_points`, `increment_badge_points`) were created for safe, concurrent updates to the cumulative scores.
+
+2.  **Event-Driven Point Calculation**:
+    -   The old `recalculateAllWeeklyPoints` master function was removed.
+    -   Points are now calculated and added to the cumulative total immediately when an event occurs.
+    -   **Exercise:** The Strava webhook now calls a new helper that uses the `weekly_exercise_tracking` table to calculate and apply only the necessary point difference while respecting the weekly cap.
+    -   **Habits:** The habit API now awards 0.5 points to the cumulative score at the moment a habit's weekly target is met, respecting the "top 5" rule.
+    -   **Badges:** The `BadgeCalculator` now adds points for a specific badge achievement directly to the cumulative score.
+
+3.  **API and Cron Job Updates**:
+    -   The Leaderboard API (`/api/divisions`) was rewritten to read and rank users based on `total_cumulative_points` from the `user_profiles` table.
+    -   The weekly Cron Job (`/api/cron/weekly-division-shuffle`) was updated to use the `total_cumulative_points` for its end-of-week ranking to determine promotions and relegations.
+
+4.  **Admin Panel**:
+    -   The `assignBadge` and `removeBadge` server actions were updated to correctly increment or decrement the `cumulative_badge_points` total.
+
+---
+
 ### Gemini (2025-09-10): Points Calculation & Timezone Refactor
 
 **Objective**: Resolve point inflation issues and ensure weekly calculations are fair and accurate for all users regardless of their timezone.

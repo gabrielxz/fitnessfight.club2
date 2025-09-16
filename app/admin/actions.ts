@@ -4,6 +4,8 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { revalidatePath } from 'next/cache'
 
+const TIER_POINTS = { bronze: 3, silver: 6, gold: 15 };
+
 export async function deleteUser(userId: string) {
   const supabase = await createClient()
   
@@ -15,102 +17,38 @@ export async function deleteUser(userId: string) {
     throw new Error('Unauthorized')
   }
 
-  // Use admin client for complete deletion
   const adminClient = createAdminClient()
   
-  // If the user is deleting themselves, sign them out first
   if (user.id === userId) {
     await supabase.auth.signOut()
   }
 
-  // Delete from strava_activities first (foreign key constraint)
-  const { error: activitiesError } = await adminClient
-    .from('strava_activities')
-    .delete()
-    .eq('user_id', userId)
+  // Cascade delete should handle most of this, but we explicitly clean up to be safe.
+  const tablesToDeleteFrom = [
+    'strava_activities',
+    'strava_connections',
+    'user_divisions',
+    'division_history',
+    'user_badges',
+    'weekly_exercise_tracking', // New table
+    'habit_entries',
+    'habits'
+  ];
 
-  if (activitiesError) {
-    console.error('Error deleting from strava_activities:', activitiesError)
-  }
-
-  // Delete from strava_connections
-  const { error: stravaError } = await adminClient
-    .from('strava_connections')
-    .delete()
-    .eq('user_id', userId)
-
-  if (stravaError) {
-    console.error('Error deleting from strava_connections:', stravaError)
-  }
-
-  // Delete from user_divisions
-  const { error: divisionError } = await adminClient
-    .from('user_divisions')
-    .delete()
-    .eq('user_id', userId)
-
-  if (divisionError) {
-    console.error('Error deleting from user_divisions:', divisionError)
-  }
-
-  // Delete from division_history
-  const { error: historyError } = await adminClient
-    .from('division_history')
-    .delete()
-    .eq('user_id', userId)
-
-  if (historyError) {
-    console.error('Error deleting from division_history:', historyError)
-  }
-
-  // Delete from user_badges
-  const { error: badgeError } = await adminClient
-    .from('user_badges')
-    .delete()
-    .eq('user_id', userId)
-
-  if (badgeError) {
-    console.error('Error deleting from user_badges:', badgeError)
-  }
-
-  // Delete from user_points
-  const { error: pointsError } = await adminClient
-    .from('user_points')
-    .delete()
-    .eq('user_id', userId)
-
-  if (pointsError) {
-    console.error('Error deleting from user_points:', pointsError)
+  for (const table of tablesToDeleteFrom) {
+    const { error } = await adminClient.from(table).delete().eq('user_id', userId)
+    if (error) console.error(`Error deleting from ${table}:`, error)
   }
 
   // Delete from user_profiles
-  const { error: profileError } = await adminClient
-    .from('user_profiles')
-    .delete()
-    .eq('id', userId)
+  const { error: profileError } = await adminClient.from('user_profiles').delete().eq('id', userId)
+  if (profileError) console.error('Error deleting from user_profiles:', profileError)
 
-  if (profileError) {
-    console.error('Error deleting from user_profiles:', profileError)
-  }
-
-  // Finally, delete the user from auth.users (this requires service role)
-  try {
-    const { error: authError } = await adminClient.auth.admin.deleteUser(userId)
-
-    if (authError) {
-      console.error('Error deleting from auth.users:', authError)
-      // Check if it's a permission error
-      if (authError.message?.includes('not authorized') || authError.message?.includes('permission')) {
-        throw new Error('Service role key is not configured properly. Please check SUPABASE_SERVICE_ROLE_KEY in environment variables.')
-      }
-      throw new Error(`Failed to delete user account: ${authError.message}`)
-    }
-    
-    console.log(`Successfully deleted user ${userId} from auth.users`)
-  } catch (error) {
-    console.error('Critical error during user deletion:', error)
-    // Re-throw to ensure the error is visible
-    throw error
+  // Finally, delete the user from auth.users
+  const { error: authError } = await adminClient.auth.admin.deleteUser(userId)
+  if (authError) {
+    console.error('Error deleting from auth.users:', authError)
+    throw new Error(`Failed to delete user account: ${authError.message}`)
   }
 
   revalidatePath('/admin')
@@ -119,176 +57,93 @@ export async function deleteUser(userId: string) {
 export async function assignBadge(userId: string, badgeId: string, tier: 'bronze' | 'silver' | 'gold') {
   const supabase = await createClient()
   
-  // Verify admin
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user || (user.email !== 'gabrielbeal@gmail.com' && 
-                 user.user_metadata?.full_name !== 'Gabriel Beal' &&
-                 user.user_metadata?.name !== 'Gabriel Beal')) {
+  if (!user || (user.email !== 'gabrielbeal@gmail.com')) {
     throw new Error('Unauthorized')
   }
 
   const adminClient = createAdminClient()
+  let pointsToAward = 0;
 
-  try {
-    // Check if user already has this badge
-    const { data: existing, error: checkError } = await adminClient
+  const { data: existing } = await adminClient
+    .from('user_badges')
+    .select('id, tier, points_awarded')
+    .eq('user_id', userId)
+    .eq('badge_id', badgeId)
+    .maybeSingle()
+
+  const newPointsValue = TIER_POINTS[tier];
+
+  if (existing) {
+    // Badge exists, could be an upgrade/downgrade
+    const previousPoints = existing.points_awarded || TIER_POINTS[existing.tier] || 0;
+    pointsToAward = newPointsValue - previousPoints;
+
+    const { error } = await adminClient
       .from('user_badges')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('badge_id', badgeId)
-      .maybeSingle() // Use maybeSingle instead of single to avoid error if not found
+      .update({ tier, updated_at: new Date().toISOString(), points_awarded: newPointsValue })
+      .eq('id', existing.id)
+    if (error) throw error;
 
-    if (checkError) {
-      console.error('Error checking existing badge:', checkError)
-      throw checkError
-    }
-
-    if (existing) {
-      // Update tier if it exists
-      const { error } = await adminClient
-        .from('user_badges')
-        .update({ tier, updated_at: new Date().toISOString() })
-        .eq('id', existing.id)
-
-      if (error) {
-        console.error('Error updating badge:', error)
-        throw error
-      }
-    } else {
-      // Insert new badge
-      const { error } = await adminClient
-        .from('user_badges')
-        .insert({
-          user_id: userId,
-          badge_id: badgeId,
-          tier,
-          earned_at: new Date().toISOString()
-        })
-
-      if (error) {
-        console.error('Error inserting badge:', error)
-        throw error
-      }
-    }
-    
-    // Recalculate badge points for the user
-    const { data: allBadges } = await adminClient
+  } else {
+    // New badge for this user
+    pointsToAward = newPointsValue;
+    const { error } = await adminClient
       .from('user_badges')
-      .select('tier')
-      .eq('user_id', userId)
-    
-    let totalBadgePoints = 0
-    if (allBadges) {
-      allBadges.forEach(b => {
-        if (b.tier === 'gold') totalBadgePoints += 15
-        else if (b.tier === 'silver') totalBadgePoints += 6
-        else if (b.tier === 'bronze') totalBadgePoints += 3
+      .insert({
+        user_id: userId,
+        badge_id: badgeId,
+        tier,
+        earned_at: new Date().toISOString(),
+        points_awarded: newPointsValue
       })
-    }
-    
-    // Get current week for updating points
-    const now = new Date()
-    const currentDay = now.getUTCDay()
-    const daysToMonday = currentDay === 0 ? 6 : currentDay - 1
-    const weekStart = new Date(Date.UTC(
-      now.getUTCFullYear(),
-      now.getUTCMonth(),
-      now.getUTCDate() - daysToMonday,
-      0, 0, 0, 0
-    ))
-    const weekStartStr = weekStart.toISOString().split('T')[0]
-    
-    // Update user_points with new badge total
-    const { error: pointsError } = await adminClient
-      .from('user_points')
-      .update({
-        badge_points: totalBadgePoints,
-        updated_at: new Date().toISOString()
-      })
-      .eq('user_id', userId)
-      .eq('week_start', weekStartStr)
-    
-    if (pointsError) {
-      console.error('Failed to update badge points after assignment:', pointsError)
-    }
-
-    revalidatePath('/admin')
-  } catch (error) {
-    console.error('Error in assignBadge:', error)
-    throw error
+    if (error) throw error;
   }
+
+  if (pointsToAward !== 0) {
+    const { error: rpcError } = await adminClient.rpc('increment_badge_points', {
+      p_user_id: userId,
+      p_points_to_add: pointsToAward
+    })
+    if (rpcError) {
+      console.error('Failed to update badge points after assignment:', rpcError)
+    }
+  }
+
+  revalidatePath('/admin')
 }
 
 export async function removeBadge(userBadgeId: string) {
   const supabase = await createClient()
   
-  // Verify admin
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user || (user.email !== 'gabrielbeal@gmail.com' && 
-                 user.user_metadata?.full_name !== 'Gabriel Beal' &&
-                 user.user_metadata?.name !== 'Gabriel Beal')) {
+  if (!user || (user.email !== 'gabrielbeal@gmail.com')) {
     throw new Error('Unauthorized')
   }
 
   const adminClient = createAdminClient()
   
-  // Get the badge info before deleting to know which user to update
   const { data: badge } = await adminClient
     .from('user_badges')
-    .select('user_id, tier')
+    .select('user_id, tier, points_awarded')
     .eq('id', userBadgeId)
     .single()
   
-  if (!badge) {
-    throw new Error('Badge not found')
-  }
+  if (!badge) throw new Error('Badge not found')
 
-  const { error } = await adminClient
-    .from('user_badges')
-    .delete()
-    .eq('id', userBadgeId)
+  const pointsToRemove = badge.points_awarded || TIER_POINTS[badge.tier] || 0;
 
+  const { error } = await adminClient.from('user_badges').delete().eq('id', userBadgeId)
   if (error) throw error
-  
-  // Recalculate badge points for the affected user
-  const { data: remainingBadges } = await adminClient
-    .from('user_badges')
-    .select('tier')
-    .eq('user_id', badge.user_id)
-  
-  let newBadgePoints = 0
-  if (remainingBadges) {
-    remainingBadges.forEach(b => {
-      if (b.tier === 'gold') newBadgePoints += 15
-      else if (b.tier === 'silver') newBadgePoints += 6
-      else if (b.tier === 'bronze') newBadgePoints += 3
+
+  if (pointsToRemove !== 0) {
+    const { error: rpcError } = await adminClient.rpc('increment_badge_points', {
+      p_user_id: badge.user_id,
+      p_points_to_add: -pointsToRemove // Subtract points
     })
-  }
-  
-  // Get current week for updating points
-  const now = new Date()
-  const currentDay = now.getUTCDay()
-  const daysToMonday = currentDay === 0 ? 6 : currentDay - 1
-  const weekStart = new Date(Date.UTC(
-    now.getUTCFullYear(),
-    now.getUTCMonth(),
-    now.getUTCDate() - daysToMonday,
-    0, 0, 0, 0
-  ))
-  const weekStartStr = weekStart.toISOString().split('T')[0]
-  
-  // Update user_points with new badge total
-  const { error: pointsError } = await adminClient
-    .from('user_points')
-    .update({
-      badge_points: newBadgePoints,
-      updated_at: new Date().toISOString()
-    })
-    .eq('user_id', badge.user_id)
-    .eq('week_start', weekStartStr)
-  
-  if (pointsError) {
-    console.error('Failed to update badge points after deletion:', pointsError)
+    if (rpcError) {
+      console.error('Failed to update badge points after deletion:', rpcError)
+    }
   }
 
   revalidatePath('/admin')
@@ -297,102 +152,22 @@ export async function removeBadge(userBadgeId: string) {
 export async function changeDivision(userId: string, divisionId: string) {
   const supabase = await createClient()
   
-  // Verify admin
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user || (user.email !== 'gabrielbeal@gmail.com' && 
-                 user.user_metadata?.full_name !== 'Gabriel Beal' &&
-                 user.user_metadata?.name !== 'Gabriel Beal')) {
+  if (!user || (user.email !== 'gabrielbeal@gmail.com')) {
     throw new Error('Unauthorized')
   }
 
   const adminClient = createAdminClient()
 
-  try {
-    // Check if user has a division assignment
-    const { data: existing, error: checkError } = await adminClient
-      .from('user_divisions')
-      .select('*')
-      .eq('user_id', userId)
-      .maybeSingle() // Use maybeSingle to avoid error if not found
+  const { error } = await adminClient
+    .from('user_divisions')
+    .update({ division_id: divisionId, updated_at: new Date().toISOString() })
+    .eq('user_id', userId)
 
-    if (checkError) {
-      console.error('Error checking existing division:', checkError)
-      throw checkError
-    }
-
-    if (existing) {
-      // Record history of the change
-      const { data: oldDivision } = await adminClient
-        .from('divisions')
-        .select('*')
-        .eq('id', existing.division_id)
-        .single()
-
-      const { data: newDivision } = await adminClient
-        .from('divisions')
-        .select('*')
-        .eq('id', divisionId)
-        .single()
-
-      if (oldDivision && newDivision) {
-        // Insert division history record
-        const now = new Date()
-        const weekStart = new Date(now)
-        weekStart.setDate(now.getDate() - now.getDay()) // Start of current week
-        const weekEnd = new Date(weekStart)
-        weekEnd.setDate(weekStart.getDate() + 6) // End of current week
-        
-        const { error: historyError } = await adminClient
-          .from('division_history')
-          .insert({
-            user_id: userId,
-            from_division_id: oldDivision.id,
-            to_division_id: newDivision.id,
-            change_type: oldDivision.level < newDivision.level ? 'promotion' : 'relegation',
-            week_start: weekStart.toISOString().split('T')[0],
-            week_end: weekEnd.toISOString().split('T')[0],
-            final_points: 0,
-            final_position: 0
-          })
-        
-        if (historyError) {
-          console.error('Error inserting division history:', historyError)
-          // Don't throw, just log - history is not critical
-        }
-      }
-
-      // Update the division
-      const { error } = await adminClient
-        .from('user_divisions')
-        .update({ 
-          division_id: divisionId,
-          joined_division_at: new Date().toISOString()
-        })
-        .eq('user_id', userId)
-
-      if (error) {
-        console.error('Error updating division:', error)
-        throw error
-      }
-    } else {
-      // Insert new division assignment
-      const { error } = await adminClient
-        .from('user_divisions')
-        .insert({
-          user_id: userId,
-          division_id: divisionId,
-          joined_division_at: new Date().toISOString()
-        })
-
-      if (error) {
-        console.error('Error inserting division:', error)
-        throw error
-      }
-    }
-
-    revalidatePath('/admin')
-  } catch (error) {
-    console.error('Error in changeDivision:', error)
+  if (error) {
+    console.error('Error changing division:', error)
     throw error
   }
+
+  revalidatePath('/admin')
 }

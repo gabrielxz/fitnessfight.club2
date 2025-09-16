@@ -1,17 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
-// Helper functions for week calculations
-function getWeekStart(date: Date): Date {
-  const d = new Date(date)
-  const day = d.getUTCDay()
-  // If Sunday (0), treat as end of week (day 7)
-  const adjustedDay = day === 0 ? 7 : day
-  // Calculate days back to Monday (1)
-  const diff = d.getUTCDate() - (adjustedDay - 1)
-  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), diff, 0, 0, 0, 0))
-}
-
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient()
@@ -21,8 +10,8 @@ export async function GET(request: NextRequest) {
 
     let divisionIdToFetch: string | null = divisionId
 
+    // If no divisionId is provided, and a user is logged in, fetch their division
     if (!divisionIdToFetch && user) {
-      // If no divisionId is provided, fetch the user's division
       const { data: userDivision } = await supabase
         .from('user_divisions')
         .select('division_id')
@@ -33,9 +22,8 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // If still no division, default to the lowest level division for public view
     if (!divisionIdToFetch) {
-      // If still no divisionId, we can default to the first division or handle as an error
-      // For a public leaderboard, let's default to the lowest level division
       const { data: lowestDivision } = await supabase
         .from('divisions')
         .select('id')
@@ -62,85 +50,68 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Division not found' }, { status: 404 })
     }
 
-    // Get current week
-    const weekStart = getWeekStart(new Date())
-    const weekStartStr = weekStart.toISOString().split('T')[0]
-
-    // Get all users in the division
+    // Get all users in the specified division
     const { data: divisionUsers } = await supabase
       .from('user_divisions')
       .select('user_id')
       .eq('division_id', divisionIdToFetch)
 
-    // Get user IDs for batch queries
     const userIds = divisionUsers?.map(u => u.user_id) || []
-    
-    // Get profile info from user_profiles
+
+    if (userIds.length === 0) {
+      // No users in this division, return an empty leaderboard
+      return NextResponse.json({
+        division,
+        position: 0,
+        totalInDivision: 0,
+        zone: 'safe',
+        leaderboard: [],
+        currentUser: null
+      })
+    }
+
+    // Get profile info and cumulative points for all users in the division
     const { data: userProfiles } = await supabase
       .from('user_profiles')
-      .select('id, full_name, email')
+      .select('id, full_name, email, total_cumulative_points')
       .in('id', userIds)
-    
-    // Get weekly points and hours from user_points
-    const { data: userWeeklyData } = await supabase
-      .from('user_points')
-      .select('user_id, total_points, total_hours')
-      .in('user_id', userIds)
-      .eq('week_start', weekStartStr)
-    
-    const profileMap = new Map(
-      userProfiles?.map(p => [
-        p.id,
-        {
-          name: p.full_name || p.email?.split('@')[0] || null
-        }
-      ]) || []
-    )
 
-    // Get Strava connections for all users
+    // Get Strava connections for all users in the division
     const { data: stravaConnections } = await supabase
       .from('strava_connections')
       .select('user_id, strava_firstname, strava_lastname, strava_profile')
       .in('user_id', userIds)
 
-    // Get badges for all users
+    // Get badges for all users in the division
     const { data: userBadges } = await supabase
       .from('user_badges')
-      .select(`
-        user_id,
-        tier,
-        badge:badges(emoji, name)
-      `)
+      .select('user_id, tier, badge:badges(emoji, name)')
       .in('user_id', userIds)
 
-    // Combine all data
-    const leaderboard = divisionUsers?.map(divUser => {
-      const weeklyData = userWeeklyData?.find(p => p.user_id === divUser.user_id)
-      const connection = stravaConnections?.find(c => c.user_id === divUser.user_id)
-      const badges = userBadges?.filter(b => b.user_id === divUser.user_id)
+    // Combine all data into a leaderboard
+    const leaderboard = userProfiles?.map(profile => {
+      const connection = stravaConnections?.find(c => c.user_id === profile.id)
+      const badges = userBadges?.filter(b => b.user_id === profile.id)
         .map(b => ({
           emoji: (b.badge as { emoji?: string; name?: string })?.emoji,
           name: (b.badge as { emoji?: string; name?: string })?.name,
           tier: b.tier,
         })) || []
       
-      const profile = profileMap.get(divUser.user_id)
       const stravaName = connection
         ? `${connection.strava_firstname || ''} ${connection.strava_lastname || ''}`.trim()
         : null
       
       return {
-        user_id: divUser.user_id,
-        name: stravaName || profile?.name || `User ${divUser.user_id.substring(0, 8)}`,
+        user_id: profile.id,
+        name: stravaName || profile.full_name || profile.email?.split('@')[0] || `User ${profile.id.substring(0, 8)}`,
         strava_profile: connection?.strava_profile,
-        total_points: weeklyData?.total_points || 0,    // Use weekly points from user_points
-        total_hours: weeklyData?.total_hours || 0,      // Weekly hours for display
+        total_points: profile.total_cumulative_points || 0,
         badges,
-        has_strava: !!connection,
       }
     }) || []
     
-    // Sort by points descending
+    // Sort by cumulative points descending
     leaderboard.sort((a, b) => b.total_points - a.total_points)
 
     const position = user ? leaderboard.findIndex(u => u.user_id === user.id) + 1 : 0
@@ -162,7 +133,6 @@ export async function GET(request: NextRequest) {
       currentUser: user ? {
         id: user.id,
         points: leaderboard.find(u => u.user_id === user.id)?.total_points || 0,
-        hours: leaderboard.find(u => u.user_id === user.id)?.total_hours || 0
       } : null
     })
 

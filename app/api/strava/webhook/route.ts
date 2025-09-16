@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { BadgeCalculator } from '@/lib/badges/BadgeCalculator'
-import { recalculateAllWeeklyPoints } from '@/lib/points-helpers'
+import { recalculateAndApplyExercisePointsForWeek } from '@/lib/points-helpers'
 
 // GET handler for webhook subscription verification
 export async function GET(request: NextRequest) {
@@ -119,7 +119,7 @@ export async function POST(request: NextRequest) {
       }
       
       // Always recalculate points for the affected week
-      await recalculateAllWeeklyPoints(connection.user_id, activityDate, userTimezone, supabase)
+      await recalculateAndApplyExercisePointsForWeek(connection.user_id, activityDate, userTimezone, supabase)
     }
 
     // Mark webhook as processed

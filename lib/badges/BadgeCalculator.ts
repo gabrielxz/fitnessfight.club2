@@ -547,17 +547,17 @@ export class BadgeCalculator {
     }
     
     if (pointsToAward > 0) {
-      const { weekStart } = getWeekBoundaries(new Date(activity.start_date_local), timezone)
-      const weekStartStr = weekStart.toISOString().split('T')[0]
-
-      // Use a function to safely increment the badge_points
-      await this.supabase.rpc('increment_badge_points', {
+      // Call the new RPC function to increment the cumulative score
+      const { error: rpcError } = await this.supabase.rpc('increment_badge_points', {
         p_user_id: activity.user_id,
-        p_week_start: weekStartStr,
         p_points_to_add: pointsToAward
       })
 
-      console.log(`Awarded ${pointsToAward} badge points to user ${activity.user_id} for week ${weekStartStr}`)
+      if (rpcError) {
+        console.error(`[BadgeCalculator] Error incrementing badge points for user ${activity.user_id}:`, rpcError)
+      } else {
+        console.log(`Awarded ${pointsToAward} cumulative badge points to user ${activity.user_id}`)
+      }
     }
   }
 }
