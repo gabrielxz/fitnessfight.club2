@@ -90,8 +90,8 @@ async function processHabitCompletion(
 
 // POST handler to add or update a habit entry for a specific date
 export async function POST(
-  request: NextRequest,
-  { params }: { params: { id: string } }
+  request: Request,
+  context: { params: { id: string } }
 ) {
   const supabase = await createClient() // Use the user's client for auth and RLS
   
@@ -101,7 +101,7 @@ export async function POST(
   }
 
   const { date, status } = await request.json()
-  const habitId = params.id
+  const habitId = context.params.id
 
   if (!date || !status || !['SUCCESS', 'FAILURE', 'NEUTRAL'].includes(status)) {
     return NextResponse.json({ error: 'Missing or invalid date or status' }, { status: 400 })
