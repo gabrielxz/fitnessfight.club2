@@ -65,17 +65,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to fetch habit entries' }, { status: 500 })
     }
 
-    // Get weekly summaries
-    const { data: summaries, error: summariesError } = await supabase
-      .from('habit_weekly_summaries')
-      .select('*')
-      .in('habit_id', habitIds)
-      .gte('week_start', oldestWeekStart.toISOString().split('T')[0])
-      .order('week_start', { ascending: false })
-
-    if (summariesError) {
-      console.error('Error fetching summaries:', summariesError)
-    }
+    // Note: habit_weekly_summaries table was removed in the cumulative points refactor
+    // We'll calculate summaries on the fly from entries
 
     // Organize data by week
     interface WeeklyHabitData {
@@ -107,19 +98,13 @@ export async function GET(request: NextRequest) {
             e.week_start === weekStart.toISOString().split('T')[0]
           ) || []
 
-          // Get summary for this habit and week
-          const summary = summaries?.find(s => 
-            s.habit_id === habit.id && 
-            s.week_start === weekStart.toISOString().split('T')[0]
-          )
-
-          // Calculate current week progress
+          // Calculate week progress from entries
           const successCount = weekEntries.filter(e => e.status === 'SUCCESS').length
 
           return {
             ...habit,
             entries: weekEntries,
-            summary: summary || {
+            summary: {
               successes: successCount,
               target: habit.target_frequency,
               percentage: habit.target_frequency > 0 ? (successCount / habit.target_frequency) * 100 : 0
