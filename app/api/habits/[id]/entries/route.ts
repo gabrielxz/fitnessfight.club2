@@ -36,7 +36,6 @@ async function processHabitCompletion(
     .from('habit_entries')
     .select('date', { count: 'exact' })
     .eq('habit_id', habitId)
-    .eq('user_id', userId)
     .eq('status', 'SUCCESS')
     .gte('date', weekStartStr)
     .lte('date', weekEndStr)
@@ -89,25 +88,55 @@ export async function POST(
     return NextResponse.json({ error: 'Missing or invalid date or status' }, { status: 400 })
   }
 
-  try {
-    if (status === 'NEUTRAL') {
-      await supabase.from('habit_entries').delete().eq('habit_id', habitId).eq('date', date)
-    } else {
-      await supabase.from('habit_entries').upsert(
+  // First verify the habit belongs to the user
+  const { data: habit, error: habitError } = await supabase
+    .from('habits')
+    .select('id')
+    .eq('id', habitId)
+    .eq('user_id', user.id)
+    .single()
+
+  if (habitError || !habit) {
+    console.error('[Habit Entry Error] Habit not found or not owned by user', habitError)
+    return NextResponse.json({ error: 'Habit not found' }, { status: 404 })
+  }
+
+  // Now update the entry
+  let entry = null
+  const weekStartDate = getWeekBoundaries(new Date(date), user.user_metadata?.timezone || 'UTC').weekStart.toISOString().split('T')[0]
+
+  if (status === 'NEUTRAL') {
+    const { error } = await supabase
+      .from('habit_entries')
+      .delete()
+      .eq('habit_id', habitId)
+      .eq('date', date)
+
+    if (error) {
+      console.error('[Habit Entry Error] Delete failed:', error)
+      return NextResponse.json({ error: 'Failed to delete habit entry', details: error.message }, { status: 500 })
+    }
+  } else {
+    const { data, error } = await supabase
+      .from('habit_entries')
+      .upsert(
         {
           habit_id: habitId,
-          user_id: user.id,
           date: date,
           status: status,
-          week_start: getWeekBoundaries(new Date(date), user.user_metadata?.timezone || 'UTC').weekStart.toISOString().split('T')[0]
+          week_start: weekStartDate
         },
         { onConflict: 'habit_id, date' }
       )
+      .select()
+      .single()
+
+    if (error) {
+      console.error('[Habit Entry Error] Upsert failed:', error)
+      return NextResponse.json({ error: 'Failed to update habit entry', details: error.message }, { status: 500 })
     }
-  } catch (error) {
-    const errorObj = error as { code?: string; message?: string }
-    console.error('[Habit Entry Error]', errorObj)
-    return NextResponse.json({ error: 'Failed to update habit entry', details: errorObj.message }, { status: 500 })
+
+    entry = data
   }
 
   const adminSupabase = createAdminClient()
@@ -119,5 +148,29 @@ export async function POST(
     user.user_metadata?.timezone || 'UTC'
   )
 
-  return NextResponse.json({ success: true })
+  // Calculate summary for the week
+  const { data: weekEntries } = await supabase
+    .from('habit_entries')
+    .select('*')
+    .eq('habit_id', habitId)
+    .eq('week_start', weekStartDate)
+
+  const successCount = weekEntries?.filter(e => e.status === 'SUCCESS').length || 0
+  const { data: habitData } = await supabase
+    .from('habits')
+    .select('target_frequency')
+    .eq('id', habitId)
+    .single()
+
+  const summary = {
+    successes: successCount,
+    target: habitData?.target_frequency || 0,
+    percentage: habitData?.target_frequency ? (successCount / habitData.target_frequency) * 100 : 0
+  }
+
+  return NextResponse.json({
+    success: true,
+    entry,
+    summary
+  })
 }
