@@ -97,19 +97,11 @@ export async function GET(request: NextRequest) {
     weekStart.setHours(0, 0, 0, 0)
     const weekStartStr = weekStart.toISOString().split('T')[0]
 
-    console.log('[Divisions API] Fetching weekly hours for week:', weekStartStr)
-    console.log('[Divisions API] User IDs to fetch:', userIds.length)
-
-    const { data: weeklyExercise, error: weeklyError } = await supabase
+    const { data: weeklyExercise } = await supabase
       .from('weekly_exercise_tracking')
       .select('user_id, hours_logged')
       .eq('week_start', weekStartStr)
       .in('user_id', userIds)
-
-    if (weeklyError) {
-      console.error('[Divisions API] Error fetching weekly exercise:', weeklyError)
-    }
-    console.log('[Divisions API] Weekly exercise records found:', weeklyExercise?.length || 0)
 
     // Combine all data into a leaderboard
     const leaderboard = userProfiles?.map(profile => {
