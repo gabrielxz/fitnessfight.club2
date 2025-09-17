@@ -135,7 +135,7 @@ export async function GET(request: NextRequest) {
       .from('badges')
       .select('id')
       .eq('active', true)
-      .eq('criteria->reset_period', 'weekly')
+      .eq('criteria->>reset_period', 'weekly')
     
     if (weeklyBadges && weeklyBadges.length > 0) {
       const badgeIds = weeklyBadges.map(b => b.id)

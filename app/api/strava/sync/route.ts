@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { BadgeCalculator } from '@/lib/badges/BadgeCalculator'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { recalculateAndApplyExercisePointsForWeek } from '@/lib/points-helpers'
+import { getWeekBoundaries } from '@/lib/date-helpers'
 
 export async function POST() {
   try {
@@ -62,12 +64,21 @@ export async function POST() {
 
     const activities = await response.json()
 
+    // Fetch user's timezone for accurate weekly boundaries
+    let userTimezone = 'UTC'
+    const { data: profile } = await supabase
+      .from('user_profiles')
+      .select('timezone')
+      .eq('id', user.id)
+      .single()
+    if (profile?.timezone) userTimezone = profile.timezone
+
     // Create badge calculator instance
     const badgeCalculator = new BadgeCalculator(supabase)
 
     // Store activities in database
     let syncedCount = 0
-    const affectedWeeks = new Set<string>()
+    const affectedDates: Date[] = []
     
     for (const activity of activities) {
       const { error } = await supabase
@@ -90,7 +101,7 @@ export async function POST() {
           kudos_count: activity.kudos_count,
           comment_count: activity.comment_count,
           athlete_count: activity.athlete_count,
-          photo_count: activity.photo_count,
+          photo_count: activity.total_photo_count || activity.photo_count || 0,
           map_summary_polyline: activity.map?.summary_polyline,
           trainer: activity.trainer,
           commute: activity.commute,
@@ -116,10 +127,8 @@ export async function POST() {
 
       if (!error) {
         syncedCount++
-        
-        // Track which weeks are affected
-        const weekStart = getWeekStart(new Date(activity.start_date))
-        affectedWeeks.add(weekStart.toISOString().split('T')[0])
+        // Track the specific activity date for precise weekly recalculation
+        affectedDates.push(new Date(activity.start_date_local || activity.start_date))
         
         // Calculate badges for this activity
         await badgeCalculator.calculateBadgesForActivity({
@@ -139,34 +148,15 @@ export async function POST() {
       }
     }
     
-    // Recalculate points for all affected weeks ONLY ONCE per week
-    // This prevents double-counting when multiple activities are synced
-    let totalPointsDifference = 0
-    for (const weekStartStr of affectedWeeks) {
-      const pointsDiff = await recalculateWeeklyPoints(user.id, new Date(weekStartStr), supabase, true)
-      totalPointsDifference += pointsDiff || 0
-    }
-    
-    // Now update cumulative points ONCE with the total difference
-    if (totalPointsDifference !== 0) {
-      const { data: profile } = await supabase
-        .from('user_profiles')
-        .select('cumulative_points')
-        .eq('id', user.id)
-        .single()
-      
-      const currentCumulative = profile?.cumulative_points || 0
-      const newCumulative = Math.max(0, currentCumulative + totalPointsDifference)
-      
-      await supabase
-        .from('user_profiles')
-        .upsert({
-          id: user.id,
-          cumulative_points: newCumulative,
-          updated_at: new Date().toISOString()
-        })
-      
-      console.log(`Updated cumulative points for user ${user.id}: ${currentCumulative.toFixed(2)} -> ${newCumulative.toFixed(2)} (${totalPointsDifference > 0 ? '+' : ''}${totalPointsDifference.toFixed(2)})`)
+    // Recalculate and apply exercise points for every affected date (helper is idempotent)
+    const processedWeeks = new Set<string>()
+    for (const date of affectedDates) {
+      // Deduplicate by computed week_start in user's timezone
+      const { weekStart } = getWeekBoundaries(date, userTimezone)
+      const weekKey = weekStart.toISOString().split('T')[0]
+      if (processedWeeks.has(weekKey)) continue
+      await recalculateAndApplyExercisePointsForWeek(user.id, date, userTimezone, supabase)
+      processedWeeks.add(weekKey)
     }
     
     // Ensure user has a division assignment (if they don't have one yet)
@@ -233,94 +223,4 @@ async function refreshStravaToken(refreshToken: string) {
   }
 }
 
-// Helper functions for week calculations
-function getWeekStart(date: Date): Date {
-  const d = new Date(date)
-  const day = d.getUTCDay()
-  // If Sunday (0), treat as end of week (day 7)
-  const adjustedDay = day === 0 ? 7 : day
-  // Calculate days back to Monday (1)
-  const diff = d.getUTCDate() - (adjustedDay - 1)
-  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), diff, 0, 0, 0, 0))
-}
-
-function getWeekEnd(weekStart: Date): Date {
-  const end = new Date(weekStart)
-  end.setUTCDate(end.getUTCDate() + 6)
-  end.setUTCHours(23, 59, 59, 999)
-  return end
-}
-
-// Recalculate all points for a user for a given week
-async function recalculateWeeklyPoints(userId: string, weekStart: Date, supabase: SupabaseClient, skipCumulativeUpdate: boolean = false) {
-  try {
-    const weekEnd = getWeekEnd(weekStart)
-    
-    // Get all activities for this user in this week
-    const { data: activities, error } = await supabase
-      .from('strava_activities')
-      .select('moving_time, start_date')
-      .eq('user_id', userId)
-      .gte('start_date', weekStart.toISOString())
-      .lte('start_date', weekEnd.toISOString())
-      .is('deleted_at', null)
-    
-    if (error) {
-      console.error('Error fetching activities for points calculation:', error)
-      return
-    }
-    
-    // Calculate total hours and points for this week
-    const totalHours = activities.reduce((sum, activity) => sum + (activity.moving_time / 3600), 0)
-    const weeklyExercisePoints = Math.min(totalHours, 10) // Cap at 10 points per week
-    
-    // Track weekly exercise hours for capping
-    const weekStartStr = weekStart.toISOString().split('T')[0]
-
-    // Get existing tracking for this week
-    const { data: existingTracking } = await supabase
-      .from('weekly_exercise_tracking')
-      .select('hours_logged')
-      .eq('user_id', userId)
-      .eq('week_start', weekStartStr)
-      .single()
-
-    const previousHours = existingTracking?.hours_logged || 0
-    const pointsDifference = weeklyExercisePoints - Math.min(previousHours, 10)
-
-    // Update or insert weekly exercise tracking
-    if (activities.length > 0 || existingTracking) {
-      await supabase
-        .from('weekly_exercise_tracking')
-        .upsert({
-          user_id: userId,
-          week_start: weekStartStr,
-          hours_logged: totalHours,
-          updated_at: new Date().toISOString()
-        })
-    }
-    
-    // Update cumulative points in user_profiles (skip during batch sync to prevent double-counting)
-    if (!skipCumulativeUpdate && pointsDifference !== 0) {
-      // Use the RPC function to safely increment exercise points
-      const { error: rpcError } = await supabase.rpc('increment_exercise_points', {
-        p_user_id: userId,
-        p_points_to_add: pointsDifference
-      })
-
-      if (rpcError) {
-        console.error('Error updating cumulative exercise points:', rpcError)
-      } else {
-        console.log(`Updated cumulative exercise points for user ${userId}: ${pointsDifference > 0 ? '+' : ''}${pointsDifference.toFixed(2)} points`)
-      }
-    }
-    
-    console.log(`Weekly points for user ${userId}: ${weeklyExercisePoints.toFixed(2)} points (${totalHours.toFixed(2)} hours) from ${activities.length} activities`)
-    
-    // Return the points difference for batch processing
-    return pointsDifference
-  } catch (error) {
-    console.error('Error in recalculateWeeklyPoints:', error)
-    return 0
-  }
-}
+// legacy recalculation removed; unified via recalculateAndApplyExercisePointsForWeek

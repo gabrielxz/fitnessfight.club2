@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { getWeekBoundaries } from '@/lib/date-helpers'
 
 export async function GET(request: NextRequest) {
   try {
@@ -70,10 +71,10 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    // Get profile info and cumulative points for all users in the division
+    // Get profile info with timezone and cumulative points for all users in the division
     const { data: userProfiles } = await supabase
       .from('user_profiles')
-      .select('id, full_name, email, total_cumulative_points')
+      .select('id, full_name, email, timezone, total_cumulative_points')
       .in('id', userIds)
 
     // Get Strava connections for all users in the division
@@ -88,20 +89,28 @@ export async function GET(request: NextRequest) {
       .select('user_id, tier, badge:badges(emoji, name)')
       .in('user_id', userIds)
 
-    // Get current week's exercise hours for all users in the division
+    // Compute each user's current week_start (timezone-aware), then fetch matching weekly rows
     const now = new Date()
-    const dayOfWeek = now.getDay()
-    const diff = now.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1) // Adjust for Sunday
-    const weekStart = new Date(now)
-    weekStart.setDate(diff)
-    weekStart.setHours(0, 0, 0, 0)
-    const weekStartStr = weekStart.toISOString().split('T')[0]
+    const userWeekStarts = new Map<string, string>()
+    const distinctWeekStarts = new Set<string>()
 
-    const { data: weeklyExercise } = await supabase
-      .from('weekly_exercise_tracking')
-      .select('user_id, hours_logged')
-      .eq('week_start', weekStartStr)
-      .in('user_id', userIds)
+    for (const profile of userProfiles || []) {
+      const tz = (profile as any).timezone || 'UTC'
+      const { weekStart } = getWeekBoundaries(now, tz)
+      const weekStartStr = weekStart.toISOString().split('T')[0]
+      userWeekStarts.set(profile.id, weekStartStr)
+      distinctWeekStarts.add(weekStartStr)
+    }
+
+    let weeklyExercise: { user_id: string; week_start: string; hours_logged: number }[] = []
+    if (userIds.length > 0 && distinctWeekStarts.size > 0) {
+      const { data: weeklyRows } = await supabase
+        .from('weekly_exercise_tracking')
+        .select('user_id, week_start, hours_logged')
+        .in('user_id', userIds)
+        .in('week_start', Array.from(distinctWeekStarts))
+      weeklyExercise = weeklyRows || []
+    }
 
     // Combine all data into a leaderboard
     const leaderboard = userProfiles?.map(profile => {
@@ -117,7 +126,8 @@ export async function GET(request: NextRequest) {
         ? `${connection.strava_firstname || ''} ${connection.strava_lastname || ''}`.trim()
         : null
 
-      const weeklyHours = weeklyExercise?.find(w => w.user_id === profile.id)?.hours_logged || 0
+      const targetWeek = userWeekStarts.get(profile.id)
+      const weeklyHours = weeklyExercise?.find(w => w.user_id === profile.id && w.week_start === targetWeek)?.hours_logged || 0
 
       return {
         user_id: profile.id,

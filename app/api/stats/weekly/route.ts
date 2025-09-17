@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { getWeekBoundaries } from '@/lib/date-helpers'
 
 export async function GET() {
   try {
@@ -11,19 +12,21 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Get current week start (Monday in UTC)
-    const now = new Date()
-    const day = now.getUTCDay()
-    // If Sunday (0), treat as end of week (day 7)
-    const adjustedDay = day === 0 ? 7 : day
-    // Calculate days back to Monday (1)
-    const diff = now.getUTCDate() - (adjustedDay - 1)
-    const currentWeekStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), diff, 0, 0, 0, 0))
+    // Resolve user timezone
+    let timezone = 'UTC'
+    const { data: profileTz } = await supabase
+      .from('user_profiles')
+      .select('timezone')
+      .eq('id', user.id)
+      .single()
+    if (profileTz?.timezone) timezone = profileTz.timezone
 
-    // Get last week start
-    const lastWeekStart = new Date(currentWeekStart)
-    lastWeekStart.setDate(lastWeekStart.getDate() - 7)
-    const lastWeekEnd = new Date(currentWeekStart)
+    // Get current and last week boundaries in user timezone
+    const now = new Date()
+    const { weekStart: currentWeekStart, weekEnd: currentWeekEnd } = getWeekBoundaries(now, timezone)
+    const lastWeekAnchor = new Date(currentWeekStart)
+    lastWeekAnchor.setUTCDate(lastWeekAnchor.getUTCDate() - 1) // go to previous week
+    const { weekStart: lastWeekStart, weekEnd: lastWeekEnd } = getWeekBoundaries(lastWeekAnchor, timezone)
 
     // Fetch current week activities
     const { data: currentWeekActivities } = await supabase
@@ -31,6 +34,7 @@ export async function GET() {
       .select('moving_time, distance')
       .eq('user_id', user.id)
       .gte('start_date', currentWeekStart.toISOString())
+      .lte('start_date', currentWeekEnd.toISOString())
       .is('deleted_at', null)
 
     // Fetch last week activities
@@ -39,7 +43,7 @@ export async function GET() {
       .select('moving_time')
       .eq('user_id', user.id)
       .gte('start_date', lastWeekStart.toISOString())
-      .lt('start_date', lastWeekEnd.toISOString())
+      .lte('start_date', lastWeekEnd.toISOString())
       .is('deleted_at', null)
 
     // Calculate stats
@@ -58,35 +62,35 @@ export async function GET() {
       0
     ) / 1000 // Convert to km
 
-    // Get cumulative points from user profile
+    // Get total cumulative points from user profile
     const { data: profile } = await supabase
       .from('user_profiles')
-      .select('cumulative_points')
+      .select('total_cumulative_points')
       .eq('id', user.id)
       .single()
-    
-    // Get points data for current week hours tracking
+
+    // Get weekly tracked hours for both weeks (timezone-aware week_start date)
     const currentWeekStartStr = currentWeekStart.toISOString().split('T')[0]
     const lastWeekStartStr = lastWeekStart.toISOString().split('T')[0]
-    
-    const { data: currentWeekData } = await supabase
-      .from('user_points')
-      .select('total_hours')
+
+    const { data: currentWeekRow } = await supabase
+      .from('weekly_exercise_tracking')
+      .select('hours_logged')
       .eq('user_id', user.id)
       .eq('week_start', currentWeekStartStr)
       .single()
-    
-    const { data: lastWeekData } = await supabase
-      .from('user_points')
-      .select('total_hours')
+
+    const { data: lastWeekRow } = await supabase
+      .from('weekly_exercise_tracking')
+      .select('hours_logged')
       .eq('user_id', user.id)
       .eq('week_start', lastWeekStartStr)
       .single()
 
     return NextResponse.json({
-      currentWeekHours: currentWeekData?.total_hours || currentWeekHours,
-      lastWeekHours: lastWeekData?.total_hours || lastWeekHours,
-      cumulativePoints: profile?.cumulative_points || 0,  // Total lifetime points
+      currentWeekHours: currentWeekRow?.hours_logged ?? currentWeekHours,
+      lastWeekHours: lastWeekRow?.hours_logged ?? lastWeekHours,
+      cumulativePoints: profile?.total_cumulative_points || 0,  // Total lifetime points
       activityCount: currentWeekActivities?.length || 0,
       totalDistance
     })

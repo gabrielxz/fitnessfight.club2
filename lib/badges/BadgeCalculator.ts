@@ -316,25 +316,30 @@ export class BadgeCalculator {
   }
 
   private async handleWeeklyStreakBadge(badge: Badge, activity: Activity, progress: BadgeProgress, timezone: string) {
-    const { data: weeklyActivity } = await this.supabase
-      .from('user_points')
-      .select('week_start')
+    // Use weekly_exercise_tracking instead of deprecated user_points
+    const { data: weeklyRows } = await this.supabase
+      .from('weekly_exercise_tracking')
+      .select('week_start, hours_logged')
       .eq('user_id', activity.user_id)
-      .gt('total_hours', 0)
       .order('week_start', { ascending: false })
 
-    if (!weeklyActivity) return
+    if (!weeklyRows || weeklyRows.length === 0) return
 
     let streak = 0
     let lastWeek: Date | null = null
 
-    for (const week of weeklyActivity) {
-      const weekDate = new Date(week.week_start)
+    for (const row of weeklyRows) {
+      if ((row.hours_logged || 0) <= 0) {
+        // Streak breaks on a week without activity
+        if (streak > 0) break
+        else continue
+      }
+      const weekDate = new Date(row.week_start)
       if (!lastWeek) {
         streak = 1
         lastWeek = weekDate
       } else {
-        const diffDays = (lastWeek.getTime() - weekDate.getTime()) / (1000 * 60 * 60 * 24)
+        const diffDays = Math.round((lastWeek.getTime() - weekDate.getTime()) / (1000 * 60 * 60 * 24))
         if (diffDays === 7) {
           streak++
           lastWeek = weekDate

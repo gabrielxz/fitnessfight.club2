@@ -476,6 +476,20 @@ A mini habit tracker inspired by HabitShare, allowing users to track daily habit
 
 ## Agent Updates
 
+### Codex CLI (2025-09-17): Stability + Correctness Fixes
+
+Objective: Align divisions, manual sync, cron, badges, and stats with the cumulative points architecture and timezone-aware weekly tracking.
+
+Changes:
+- Divisions Leaderboard: Weekly hours are now computed per-user using timezone-aware week boundaries and the matching `weekly_exercise_tracking` row. This fixes zero/incorrect hours when users are in different timezones.
+- Manual Sync: Unified with the webhook flow. After activity upserts, the sync calls `recalculateAndApplyExercisePointsForWeek` (idempotent) for each affected week (deduped by the user’s timezone). Removed legacy weekly recalculation and the direct writes to `user_profiles.cumulative_points`. Photos are normalized via `total_photo_count || photo_count` for consistency with webhook.
+- Cron Weekly Reset: Corrected JSON filter to select weekly badges using `criteria->>reset_period = 'weekly'` so periodic badge progress resets execute reliably.
+- Badge Streak Logic: Replaced deprecated `user_points` dependency with `weekly_exercise_tracking` when computing weekly streaks to avoid runtime errors if streak badges are active.
+- Weekly Stats API: Modernized to use timezone-aware week boundaries, read hours from `weekly_exercise_tracking`, and report `total_cumulative_points` from `user_profiles`.
+
+Notes:
+- No RLS/security tightening was performed in this pass (requested to defer). Functionality fixes only.
+- If you encounter build issues with `date-fns-tz` in Vercel, we can adjust configuration or imports; local build was not runnable in the sandbox.
 ### Gemini (2025-09-12): Cumulative Points System Refactor
 
 **Objective**: Transition the application from a weekly-resetting score to a persistent, all-time cumulative score, per the user's request.
