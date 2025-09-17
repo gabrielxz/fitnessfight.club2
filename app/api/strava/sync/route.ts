@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { BadgeCalculator } from '@/lib/badges/BadgeCalculator'
-import type { SupabaseClient } from '@supabase/supabase-js'
 import { recalculateAndApplyExercisePointsForWeek } from '@/lib/points-helpers'
 import { getWeekBoundaries } from '@/lib/date-helpers'
 

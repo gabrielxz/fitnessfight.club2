@@ -190,7 +190,7 @@ export class BadgeCalculator {
     }
   }
 
-  private async handleCountBadge(badge: Badge, activity: Activity, progress: BadgeProgress, timezone: string) {
+  private async handleCountBadge(badge: Badge, activity: Activity, progress: BadgeProgress, _timezone: string) {
     const { criteria } = badge
     let qualifies = false
 
@@ -215,7 +215,7 @@ export class BadgeCalculator {
     }
   }
 
-  private async handleCumulativeBadge(badge: Badge, activity: Activity, progress: BadgeProgress, timezone: string) {
+  private async handleCumulativeBadge(badge: Badge, activity: Activity, progress: BadgeProgress, _timezone: string) {
     const { criteria } = badge
     console.log(`[BadgeCalculator] Handling cumulative badge: ${badge.code}`)
     
@@ -275,7 +275,7 @@ export class BadgeCalculator {
     await this.supabase.from('badge_progress').upsert({ ...progress })
   }
 
-  private async handleSingleActivityBadge(badge: Badge, activity: Activity, progress: BadgeProgress, timezone: string) {
+  private async handleSingleActivityBadge(badge: Badge, activity: Activity, progress: BadgeProgress, _timezone: string) {
     const { criteria } = badge
     let value = 0
 
@@ -315,7 +315,7 @@ export class BadgeCalculator {
     }
   }
 
-  private async handleWeeklyStreakBadge(badge: Badge, activity: Activity, progress: BadgeProgress, timezone: string) {
+  private async handleWeeklyStreakBadge(badge: Badge, activity: Activity, progress: BadgeProgress, _timezone: string) {
     // Use weekly_exercise_tracking instead of deprecated user_points
     const { data: weeklyRows } = await this.supabase
       .from('weekly_exercise_tracking')
@@ -359,7 +359,7 @@ export class BadgeCalculator {
     await this.supabase.from('badge_progress').upsert({ ...progress })
   }
 
-  private async handleVarietyBadge(badge: Badge, activity: Activity, progress: BadgeProgress, timezone: string) {
+  private async handleVarietyBadge(badge: Badge, activity: Activity, progress: BadgeProgress, _timezone: string) {
     const { criteria } = badge
     
     // Check if this badge is looking for specific sports (Net Gain badge)
@@ -487,7 +487,7 @@ export class BadgeCalculator {
     await this.supabase.from('badge_progress').upsert({ ...progress })
   }
 
-  private async handleWeeklyCountBadge(badge: Badge, activity: Activity, progress: BadgeProgress, timezone: string) {
+  private async handleWeeklyCountBadge(badge: Badge, activity: Activity, progress: BadgeProgress, _timezone: string) {
     const { criteria } = badge
     
     // For Belfie badge - count weeks with photos

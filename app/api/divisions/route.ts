@@ -72,10 +72,18 @@ export async function GET(request: NextRequest) {
     }
 
     // Get profile info with timezone and cumulative points for all users in the division
-    const { data: userProfiles } = await supabase
+    const { data: userProfilesRaw } = await supabase
       .from('user_profiles')
       .select('id, full_name, email, timezone, total_cumulative_points')
       .in('id', userIds)
+    type ProfileRow = {
+      id: string
+      full_name: string | null
+      email: string | null
+      timezone: string | null
+      total_cumulative_points: number | null
+    }
+    const userProfiles: ProfileRow[] = (userProfilesRaw || []) as ProfileRow[]
 
     // Get Strava connections for all users in the division
     const { data: stravaConnections } = await supabase
@@ -95,7 +103,7 @@ export async function GET(request: NextRequest) {
     const distinctWeekStarts = new Set<string>()
 
     for (const profile of userProfiles || []) {
-      const tz = (profile as any).timezone || 'UTC'
+      const tz = profile.timezone || 'UTC'
       const { weekStart } = getWeekBoundaries(now, tz)
       const weekStartStr = weekStart.toISOString().split('T')[0]
       userWeekStarts.set(profile.id, weekStartStr)
