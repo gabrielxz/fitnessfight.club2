@@ -274,67 +274,45 @@ async function recalculateWeeklyPoints(userId: string, weekStart: Date, supabase
     const totalHours = activities.reduce((sum, activity) => sum + (activity.moving_time / 3600), 0)
     const weeklyExercisePoints = Math.min(totalHours, 10) // Cap at 10 points per week
     
-    // Get existing points for this week to calculate the difference
-    const { data: existingWeekPoints } = await supabase
-      .from('user_points')
-      .select('id, total_points')
+    // Track weekly exercise hours for capping
+    const weekStartStr = weekStart.toISOString().split('T')[0]
+
+    // Get existing tracking for this week
+    const { data: existingTracking } = await supabase
+      .from('weekly_exercise_tracking')
+      .select('hours_logged')
       .eq('user_id', userId)
-      .eq('week_start', weekStart.toISOString().split('T')[0])
+      .eq('week_start', weekStartStr)
       .single()
-    
-    const previousWeekPoints = existingWeekPoints?.total_points || 0
-    const pointsDifference = weeklyExercisePoints - previousWeekPoints
-    
-    // Update or insert user_points record for weekly tracking
-    if (existingWeekPoints) {
+
+    const previousHours = existingTracking?.hours_logged || 0
+    const pointsDifference = weeklyExercisePoints - Math.min(previousHours, 10)
+
+    // Update or insert weekly exercise tracking
+    if (activities.length > 0 || existingTracking) {
       await supabase
-        .from('user_points')
-        .update({
-          total_hours: totalHours,
-          total_points: weeklyExercisePoints,
-          activities_count: activities.length,
-          last_activity_at: activities.length > 0 ? activities[activities.length - 1].start_date : null,
+        .from('weekly_exercise_tracking')
+        .upsert({
+          user_id: userId,
+          week_start: weekStartStr,
+          hours_logged: totalHours,
           updated_at: new Date().toISOString()
         })
-        .eq('id', existingWeekPoints.id)
-      
-    } else if (activities.length > 0) {
-      await supabase
-        .from('user_points')
-        .insert({
-          user_id: userId,
-          week_start: weekStart.toISOString().split('T')[0],
-          week_end: weekEnd.toISOString().split('T')[0],
-          total_hours: totalHours,
-          total_points: weeklyExercisePoints,
-          activities_count: activities.length,
-          last_activity_at: activities[activities.length - 1].start_date
-        })
-      
     }
     
     // Update cumulative points in user_profiles (skip during batch sync to prevent double-counting)
     if (!skipCumulativeUpdate && pointsDifference !== 0) {
-      // Get current cumulative points
-      const { data: profile } = await supabase
-        .from('user_profiles')
-        .select('cumulative_points')
-        .eq('id', userId)
-        .single()
-      
-      const currentCumulative = profile?.cumulative_points || 0
-      const newCumulative = Math.max(0, currentCumulative + pointsDifference)
-      
-      // Update cumulative points
-      await supabase
-        .from('user_profiles')
-        .upsert({
-          id: userId,
-          cumulative_points: newCumulative,
-          updated_at: new Date().toISOString()
-        })
-      
-      console.log(`Updated cumulative points for user ${userId}: ${currentCumulative.toFixed(2)} -> ${newCumulative.toFixed(2)} (${pointsDifference > 0 ? '+' : ''}${pointsDifference.toFixed(2)})`)
+      // Use the RPC function to safely increment exercise points
+      const { error: rpcError } = await supabase.rpc('increment_exercise_points', {
+        p_user_id: userId,
+        p_points_to_add: pointsDifference
+      })
+
+      if (rpcError) {
+        console.error('Error updating cumulative exercise points:', rpcError)
+      } else {
+        console.log(`Updated cumulative exercise points for user ${userId}: ${pointsDifference > 0 ? '+' : ''}${pointsDifference.toFixed(2)} points`)
+      }
     }
     
     console.log(`Weekly points for user ${userId}: ${weeklyExercisePoints.toFixed(2)} points (${totalHours.toFixed(2)} hours) from ${activities.length} activities`)
