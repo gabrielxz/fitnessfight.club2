@@ -9,7 +9,11 @@ export async function GET() {
   const { data: { user } } = await supabase.auth.getUser()
   
   if (!user) {
-    return NextResponse.redirect(new URL('/login', process.env.NEXT_PUBLIC_SUPABASE_URL))
+    // Redirect to local login page (avoid cross-origin redirects that can be blocked on iOS)
+    const headersList = await headers()
+    const host = headersList.get('host') || 'fitnessfight.club'
+    const protocol = host.includes('localhost') ? 'http' : 'https'
+    return NextResponse.redirect(`${protocol}://${host}/login`)
   }
 
   // Get the actual host from the request headers
@@ -18,7 +22,9 @@ export async function GET() {
   const protocol = host.includes('localhost') ? 'http' : 'https'
   
   const clientId = process.env.STRAVA_CLIENT_ID
-  const redirectUri = `${protocol}://${host}/api/strava/callback`
+  // Prefer explicit base URL to avoid mismatches with Strava settings (iOS-safe)
+  const redirectBase = process.env.STRAVA_REDIRECT_BASE_URL || `${protocol}://${host}`
+  const redirectUri = `${redirectBase}/api/strava/callback`
   
   // Strava OAuth authorization URL
   const stravaAuthUrl = new URL('https://www.strava.com/oauth/authorize')

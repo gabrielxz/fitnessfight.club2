@@ -498,6 +498,8 @@ Objective: Ensure logout and Strava connect work reliably on iOS Safari and PWA.
 Changes:
 - Logout (Navigation): Replaced form POST to `/auth/signout` with a client-side sign out using the Supabase browser client followed by a hard redirect to `/login`. Adds a brief disabled state to prevent double-taps. This avoids service worker caching and iOS form submission quirks.
 - Strava Connect (Profile): Replaced Next.js `Link` to `/api/strava/connect` with a button that performs a hard navigation via `window.location.href`. Adds a simple “Redirecting…” state. This prevents client-side prefetch/transition flicker on iOS.
+ - Strava Disconnect: Added `/api/strava/disconnect` endpoint and wired the Profile “Disconnect” action to call it and reload. Previously, the button was a no-op.
+ - Strava Redirect Base: The connect route now prefers `STRAVA_REDIRECT_BASE_URL` when constructing the OAuth redirect URI to avoid host mismatches (useful for iOS/PWA and custom domains). Falls back to the request host.
 
 User impact:
 - iOS users can reliably sign out with a single tap and are returned to the login screen.

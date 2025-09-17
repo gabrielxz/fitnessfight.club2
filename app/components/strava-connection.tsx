@@ -37,10 +37,19 @@ export default function StravaConnection({
           </div>
           <button
             onClick={() => {
-              if (confirm('Are you sure you want to disconnect your Strava account?')) {
-                // TODO: Implement disconnect functionality
-                console.log('Disconnecting Strava...')
-              }
+              if (connecting) return
+              if (!confirm('Are you sure you want to disconnect your Strava account?')) return
+              setConnecting(true)
+              fetch('/api/strava/disconnect', { method: 'POST', cache: 'no-store' })
+                .then(async (res) => {
+                  if (!res.ok) throw new Error('Failed to disconnect')
+                  // Hard reload to refresh server-rendered profile state
+                  window.location.reload()
+                })
+                .catch(() => {
+                  alert('Failed to disconnect. Please try again.')
+                  setConnecting(false)
+                })
             }}
             className="text-sm text-red-400 hover:text-red-300"
           >
