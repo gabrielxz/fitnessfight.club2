@@ -490,6 +490,18 @@ Changes:
 Notes:
 - No RLS/security tightening was performed in this pass (requested to defer). Functionality fixes only.
 - If you encounter build issues with `date-fns-tz` in Vercel, we can adjust configuration or imports; local build was not runnable in the sandbox.
+
+### Codex CLI (2025-09-17): iOS Auth + OAuth UX Fixes
+
+Objective: Ensure logout and Strava connect work reliably on iOS Safari and PWA.
+
+Changes:
+- Logout (Navigation): Replaced form POST to `/auth/signout` with a client-side sign out using the Supabase browser client followed by a hard redirect to `/login`. Adds a brief disabled state to prevent double-taps. This avoids service worker caching and iOS form submission quirks.
+- Strava Connect (Profile): Replaced Next.js `Link` to `/api/strava/connect` with a button that performs a hard navigation via `window.location.href`. Adds a simple “Redirecting…” state. This prevents client-side prefetch/transition flicker on iOS.
+
+User impact:
+- iOS users can reliably sign out with a single tap and are returned to the login screen.
+- The Strava connect button consistently opens the Strava consent screen and returns connected without the “flash and back” behavior.
 ### Gemini (2025-09-12): Cumulative Points System Refactor
 
 **Objective**: Transition the application from a weekly-resetting score to a persistent, all-time cumulative score, per the user's request.

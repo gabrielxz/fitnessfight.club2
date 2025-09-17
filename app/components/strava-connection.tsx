@@ -1,7 +1,7 @@
 'use client'
 
 import Image from 'next/image'
-import Link from 'next/link'
+import { useState } from 'react'
 
 interface StravaConnectionProps {
   isConnected: boolean
@@ -14,6 +14,7 @@ export default function StravaConnection({
   stravaName, 
   stravaProfile 
 }: StravaConnectionProps) {
+  const [connecting, setConnecting] = useState(false)
   if (isConnected && stravaName) {
     return (
       <div className="glass-card p-6">
@@ -56,9 +57,16 @@ export default function StravaConnection({
       <p className="text-gray-400 mb-6">
         Link your Strava account to automatically sync your activities and join the fight.
       </p>
-      <Link
-        href="/api/strava/connect"
-        className="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-full text-white bg-orange-600 hover:bg-orange-700"
+      <button
+        type="button"
+        onClick={() => {
+          if (connecting) return
+          setConnecting(true)
+          // Use hard navigation to avoid client-side prefetch/transition quirks on iOS
+          window.location.href = '/api/strava/connect'
+        }}
+        className={`inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-full text-white bg-orange-600 hover:bg-orange-700 ${connecting ? 'opacity-70 cursor-not-allowed' : ''}`}
+        disabled={connecting}
       >
         <svg 
           className="w-5 h-5 mr-2" 
@@ -67,8 +75,8 @@ export default function StravaConnection({
         >
           <path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7 13.828h4.169" />
         </svg>
-        Connect with Strava
-      </Link>
+        {connecting ? 'Redirecting…' : 'Connect with Strava'}
+      </button>
     </div>
   )
 }

@@ -5,6 +5,7 @@ import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { User } from '@supabase/supabase-js'
 import { useState } from 'react'
+import { createClient as createBrowserSupabase } from '@/lib/supabase/client'
 
 interface NavigationProps {
   user: User | null
@@ -13,6 +14,8 @@ interface NavigationProps {
 export default function Navigation({ user }: NavigationProps) {
   const pathname = usePathname()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [signingOut, setSigningOut] = useState(false)
+  const supabase = createBrowserSupabase()
 
   // Check if user is admin
   const isAdmin = user?.email === 'gabrielbeal@gmail.com' || 
@@ -101,16 +104,28 @@ export default function Navigation({ user }: NavigationProps) {
                     {userName[0].toUpperCase()}
                   </div>
                 </div>
-                <form action="/auth/signout" method="POST">
-                  <button
-                    type="submit"
-                    className="text-gray-400 hover:text-white transition-colors"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                    </svg>
-                  </button>
-                </form>
+                <button
+                  type="button"
+                  aria-label="Sign out"
+                  onClick={async () => {
+                    if (signingOut) return
+                    setSigningOut(true)
+                    try {
+                      await supabase.auth.signOut()
+                    } catch (e) {
+                      // no-op: fall through to redirect regardless
+                    } finally {
+                      // Use hard redirect to avoid any SW cache oddities
+                      window.location.href = '/login'
+                    }
+                  }}
+                  className={`text-gray-400 hover:text-white transition-colors ${signingOut ? 'opacity-60 cursor-not-allowed' : ''}`}
+                  disabled={signingOut}
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                  </svg>
+                </button>
               </>
             ) : (
               <Link
