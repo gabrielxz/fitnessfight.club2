@@ -88,6 +88,20 @@ export async function GET(request: NextRequest) {
       .select('user_id, tier, badge:badges(emoji, name)')
       .in('user_id', userIds)
 
+    // Get current week's exercise hours for all users in the division
+    const now = new Date()
+    const dayOfWeek = now.getDay()
+    const diff = now.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1) // Adjust for Sunday
+    const weekStart = new Date(now.setDate(diff))
+    weekStart.setHours(0, 0, 0, 0)
+    const weekStartStr = weekStart.toISOString().split('T')[0]
+
+    const { data: weeklyExercise } = await supabase
+      .from('weekly_exercise_tracking')
+      .select('user_id, hours_logged')
+      .eq('week_start', weekStartStr)
+      .in('user_id', userIds)
+
     // Combine all data into a leaderboard
     const leaderboard = userProfiles?.map(profile => {
       const connection = stravaConnections?.find(c => c.user_id === profile.id)
@@ -97,16 +111,19 @@ export async function GET(request: NextRequest) {
           name: (b.badge as { emoji?: string; name?: string })?.name,
           tier: b.tier,
         })) || []
-      
+
       const stravaName = connection
         ? `${connection.strava_firstname || ''} ${connection.strava_lastname || ''}`.trim()
         : null
-      
+
+      const weeklyHours = weeklyExercise?.find(w => w.user_id === profile.id)?.hours_logged || 0
+
       return {
         user_id: profile.id,
         name: stravaName || profile.full_name || profile.email?.split('@')[0] || `User ${profile.id.substring(0, 8)}`,
         strava_profile: connection?.strava_profile,
         total_points: profile.total_cumulative_points || 0,
+        total_hours: weeklyHours,
         badges,
       }
     }) || []
