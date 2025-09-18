@@ -59,32 +59,6 @@ export default function HabitList() {
     setUserTimezone(detectedTimezone)
   }, [])
 
-  // Calculate when week ends in user's timezone
-  const getWeekEndInUserTimezone = () => {
-    if (!userTimezone) return null
-    
-    // Week ends at 23:59 UTC on Sunday
-    const now = new Date()
-    const currentDay = now.getUTCDay()
-    const daysUntilSunday = currentDay === 0 ? 0 : 7 - currentDay
-    
-    // Create date for next Sunday 23:59 UTC
-    const weekEndUTC = new Date(now)
-    weekEndUTC.setUTCDate(weekEndUTC.getUTCDate() + daysUntilSunday)
-    weekEndUTC.setUTCHours(23, 59, 59, 0)
-    
-    // Convert to user's timezone
-    const formatter = new Intl.DateTimeFormat('en-US', {
-      timeZone: userTimezone,
-      weekday: 'short',
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true
-    })
-    
-    return formatter.format(weekEndUTC)
-  }
-
   // Fetch habits and current week data
   const fetchHabits = useCallback(async (weeksToFetch = 1) => {
     try {
@@ -316,18 +290,6 @@ export default function HabitList() {
           >
             Next Week →
           </button>
-        </div>
-      )}
-
-      {/* Week end time notice */}
-      {userTimezone && (
-        <div className="mb-4 p-3 bg-amber-500/10 rounded-lg border border-amber-500/30">
-          <p className="text-sm text-amber-400">
-            ⏰ Week ends {getWeekEndInUserTimezone()} in your timezone ({userTimezone})
-          </p>
-          <p className="text-xs text-amber-400/70 mt-1">
-            Complete Sunday habits before this time to ensure they count for the current week.
-          </p>
         </div>
       )}
 

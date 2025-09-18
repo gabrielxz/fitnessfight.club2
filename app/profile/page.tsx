@@ -3,7 +3,6 @@ import { redirect } from 'next/navigation'
 import AnimatedBackground from '@/app/components/AnimatedBackground'
 import Navigation from '@/app/components/Navigation'
 import StravaConnection from '@/app/components/strava-connection'
-import SyncActivities from '@/app/components/sync-activities'
 import TimezoneSettings from '@/app/components/TimezoneSettings'
 
 export default async function ProfilePage() {
@@ -36,7 +35,6 @@ export default async function ProfilePage() {
               stravaName={stravaConnection ? `${stravaConnection.strava_firstname} ${stravaConnection.strava_lastname}` : null}
               stravaProfile={stravaConnection?.strava_profile}
             />
-            <SyncActivities />
             <TimezoneSettings />
           </div>
         </div>

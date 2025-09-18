@@ -71,11 +71,6 @@ export default function AthleteCard({
                 sizes="48px"
                 onError={() => setImageError(true)}
               />
-              {rank <= 3 && (
-                <div className="absolute -top-1 -right-1 w-6 h-6 bg-gradient-to-br from-yellow-500 to-orange-500 rounded-full flex items-center justify-center text-xs font-bold text-white">
-                  {rank}
-                </div>
-              )}
             </div>
           ) : (
             <div className={`

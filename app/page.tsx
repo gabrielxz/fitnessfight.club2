@@ -49,12 +49,6 @@ export default async function Page() {
               <span className="gradient-text">Fitness Fight Club</span>
             </h1>
             <p className="text-gray-400 text-lg">Points. Badges. Flex.</p>
-            <div className="inline-flex items-center gap-2 mt-4 px-4 py-2 glass-card">
-              <span>📅</span>
-              <span className="text-sm text-gray-300">
-                Week {getWeekNumber()} of {new Date().getFullYear()}
-              </span>
-            </div>
           </div>
           
           {user ? (
@@ -84,11 +78,4 @@ export default async function Page() {
       <InstallPrompt />
     </div>
   )
-}
-
-function getWeekNumber() {
-  const now = new Date()
-  const start = new Date(now.getFullYear(), 0, 1)
-  const diff = now.getTime() - start.getTime()
-  return Math.ceil(diff / (1000 * 60 * 60 * 24 * 7))
 }
