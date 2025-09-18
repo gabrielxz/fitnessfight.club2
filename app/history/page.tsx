@@ -45,19 +45,23 @@ export default async function HistoryPage() {
                 <div className="text-5xl">🥇</div>
               </div>
               
-              <div className="relative aspect-video rounded-xl overflow-hidden bg-gradient-to-br from-orange-900/20 to-yellow-900/20 border border-orange-500/20">
-                <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <div className="text-6xl mb-4 animate-pulse">🎭</div>
-                  <h3 className="text-xl font-bold text-gray-300 mb-2">
-                    Celebrity Congratulations Coming Soon!
-                  </h3>
-                  <p className="text-gray-400 text-center px-4">
-                    A mystery celebrity is preparing a special message for our champion...
-                  </p>
-                  <div className="mt-4 px-4 py-2 glass-card">
-                    <span className="text-orange-400 font-semibold">Stay tuned!</span>
-                  </div>
-                </div>
+              <div className="mb-4">
+                <p className="text-gray-300 mb-2">
+                  Congratulations from <span className="font-semibold text-orange-400">Jonathan Van Ness</span>
+                </p>
+                <p className="text-sm text-gray-400 italic">
+                  &ldquo;Queer Eye&rdquo; Grooming Expert &amp; Podcast Host
+                </p>
+              </div>
+
+              <div className="relative aspect-video rounded-xl overflow-hidden">
+                <iframe
+                  src="https://www.youtube.com/embed/HcUORb-xyXE"
+                  title="Jonathan Van Ness congratulates Omar Farías"
+                  className="absolute inset-0 w-full h-full"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                />
               </div>
             </div>
           </div>
