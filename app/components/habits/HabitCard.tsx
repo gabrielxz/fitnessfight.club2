@@ -24,6 +24,7 @@ interface HabitCardProps {
   weekStart: string
   currentDate: string
   isEligibleForPoints?: boolean
+  pendingUpdates?: Set<string>
   onStatusChange: (habitId: string, date: string, status: 'SUCCESS' | 'FAILURE' | 'NEUTRAL') => void
   onEdit: (habitId: string, name: string, targetFrequency: number) => void
   onDelete: (habitId: string) => void
@@ -36,6 +37,7 @@ export default function HabitCard({
   weekStart,
   currentDate,
   isEligibleForPoints = true,
+  pendingUpdates,
   onStatusChange,
   onEdit,
   onDelete
@@ -104,6 +106,7 @@ export default function HabitCard({
           entries={entries}
           weekStart={weekStart}
           currentDate={currentDate}
+          pendingUpdates={pendingUpdates}
           onStatusChange={onStatusChange}
         />
 

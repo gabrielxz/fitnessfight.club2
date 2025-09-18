@@ -8,6 +8,7 @@ interface HabitWeekViewProps {
   }>
   weekStart: string
   currentDate: string
+  pendingUpdates?: Set<string>
   onStatusChange: (habitId: string, date: string, status: 'SUCCESS' | 'FAILURE' | 'NEUTRAL') => void
 }
 
@@ -16,6 +17,7 @@ export default function HabitWeekView({
   entries,
   weekStart,
   currentDate,
+  pendingUpdates,
   onStatusChange
 }: HabitWeekViewProps) {
   const days = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su']
@@ -83,26 +85,34 @@ export default function HabitWeekView({
         const status = getStatusForDate(date)
         const isToday = date === currentDate
         const isPast = new Date(date) <= new Date(currentDate)
-        
+        const updateKey = `${habitId}-${date}`
+        const isPending = pendingUpdates?.has(updateKey) || false
+
         return (
           <div key={date} className="flex flex-col items-center">
             <div className="text-xs text-gray-400 mb-2">{days[index]}</div>
             <button
               onClick={() => {
-                if (isPast) {
+                if (isPast && !isPending) {
                   const newStatus = cycleStatus(status)
                   onStatusChange(habitId, date, newStatus)
                 }
               }}
-              disabled={!isPast}
+              disabled={!isPast || isPending}
               className={`
-                w-10 h-10 rounded-full transition-all duration-200
+                w-10 h-10 rounded-full transition-all duration-200 relative
                 ${getStatusColor(status)}
-                ${isPast ? 'hover:scale-110 cursor-pointer' : 'opacity-50 cursor-not-allowed'}
+                ${isPast && !isPending ? 'hover:scale-110 cursor-pointer' : ''}
+                ${!isPast ? 'opacity-50 cursor-not-allowed' : ''}
+                ${isPending ? 'opacity-75' : ''}
                 ${isToday ? 'ring-2 ring-yellow-500 ring-offset-2 ring-offset-slate-900' : ''}
               `}
-              title={getStatusTooltip(status, isPast)}
-            />
+              title={isPending ? 'Updating...' : getStatusTooltip(status, isPast)}
+            >
+              {isPending && (
+                <div className="absolute inset-0 rounded-full animate-pulse bg-white/20" />
+              )}
+            </button>
             {isToday && (
               <div className="text-[10px] text-yellow-500 mt-1 uppercase tracking-wider">Today</div>
             )}

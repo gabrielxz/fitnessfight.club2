@@ -41,22 +41,18 @@ export default function HabitList() {
   const [habits, setHabits] = useState<Habit[]>([])
   const [weeks, setWeeks] = useState<WeekData[]>([])
   const [currentDate, setCurrentDate] = useState<string>('')
-  const [userTimezone, setUserTimezone] = useState<string>('')
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [showAddDialog, setShowAddDialog] = useState(false)
   const [currentWeekIndex, setCurrentWeekIndex] = useState(0)
   const [totalWeeksLoaded, setTotalWeeksLoaded] = useState(1)
+  const [pendingUpdates, setPendingUpdates] = useState<Set<string>>(new Set())
 
-  // Get user's local date and timezone
+  // Get user's local date
   useEffect(() => {
     // Set current date in local timezone
     const localDate = new Date().toLocaleDateString('en-CA') // YYYY-MM-DD format
     setCurrentDate(localDate)
-    
-    // Detect user's timezone
-    const detectedTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone
-    setUserTimezone(detectedTimezone)
   }, [])
 
   // Fetch habits and current week data
@@ -69,15 +65,6 @@ export default function HabitList() {
       setHabits(data.habits || [])
       setWeeks(data.weeks || [])
       setTotalWeeksLoaded(weeksToFetch)
-      
-      // Fetch user's timezone preference if available
-      const profileResponse = await fetch('/api/user/profile')
-      if (profileResponse.ok) {
-        const profileData = await profileResponse.json()
-        if (profileData.timezone) {
-          setUserTimezone(profileData.timezone)
-        }
-      }
     } catch (error) {
       console.error('Error fetching habits:', error)
     } finally {
@@ -166,67 +153,111 @@ export default function HabitList() {
 
   // Handle status change
   const handleStatusChange = async (habitId: string, date: string, newStatus: 'SUCCESS' | 'FAILURE' | 'NEUTRAL') => {
-    console.log(`[CLIENT] Updating habit ${habitId} on ${date} to ${newStatus}`)
-    try {
-      const response = await fetch(`/api/habits/${habitId}/entries`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ date, status: newStatus })
-      })
-      
-      if (!response.ok) {
-        console.error(`[CLIENT] API error: ${response.status} ${response.statusText}`)
-        throw new Error('Failed to update status')
-      }
-      
-      const data = await response.json()
-      console.log(`[CLIENT] API response:`, data)
-      
-      // Update local state optimistically
-      setWeeks(prevWeeks => {
-        return prevWeeks.map(week => {
-          const updatedHabits = week.habits.map(habit => {
-            if (habit.id === habitId) {
-              // Update entries
-              const existingEntryIndex = habit.entries.findIndex(e => e.date === date)
-              const newEntries = [...habit.entries]
-              
-              if (newStatus === 'NEUTRAL') {
-                // Remove entry if neutral
-                if (existingEntryIndex >= 0) {
-                  newEntries.splice(existingEntryIndex, 1)
-                }
-              } else {
-                // Add or update entry
-                if (existingEntryIndex >= 0) {
-                  newEntries[existingEntryIndex] = { ...newEntries[existingEntryIndex], status: newStatus }
-                } else if (data.entry) {
-                  newEntries.push(data.entry)
-                }
+    // Generate a unique key for this update
+    const updateKey = `${habitId}-${date}`
+
+    // Update local state immediately (optimistic update)
+    setWeeks(prevWeeks => {
+      return prevWeeks.map(week => {
+        const updatedHabits = week.habits.map(habit => {
+          if (habit.id === habitId) {
+            // Update entries
+            const existingEntryIndex = habit.entries.findIndex(e => e.date === date)
+            const newEntries = [...habit.entries]
+
+            if (newStatus === 'NEUTRAL') {
+              // Remove entry if neutral
+              if (existingEntryIndex >= 0) {
+                newEntries.splice(existingEntryIndex, 1)
               }
-              
-              return {
-                ...habit,
-                entries: newEntries,
-                summary: data.summary || habit.summary
+            } else {
+              // Add or update entry
+              if (existingEntryIndex >= 0) {
+                newEntries[existingEntryIndex] = { ...newEntries[existingEntryIndex], status: newStatus }
+              } else {
+                // Create a new entry
+                newEntries.push({
+                  id: `temp-${Date.now()}`, // Temporary ID
+                  habit_id: habitId,
+                  date: date,
+                  status: newStatus,
+                  week_start: week.weekStart
+                })
               }
             }
-            return habit
-          })
-          
-          return { ...week, habits: updatedHabits }
+
+            // Calculate new summary
+            const successCount = newEntries.filter(e => e.status === 'SUCCESS').length
+            const newSummary = {
+              successes: successCount,
+              target: habit.target_frequency,
+              percentage: Math.round((successCount / habit.target_frequency) * 100)
+            }
+
+            return {
+              ...habit,
+              entries: newEntries,
+              summary: newSummary
+            }
+          }
+          return habit
         })
+
+        return { ...week, habits: updatedHabits }
       })
-      
-      // Force a refresh after a short delay to ensure database is updated
-      setTimeout(() => {
-        fetchHabits(totalWeeksLoaded)
-      }, 500)
-    } catch (error) {
+    })
+
+    // Mark this update as pending
+    setPendingUpdates(prev => new Set(prev).add(updateKey))
+
+    // Fire API call without awaiting (fire-and-forget)
+    fetch(`/api/habits/${habitId}/entries`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ date, status: newStatus })
+    })
+    .then(response => {
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status}`)
+      }
+      return response.json()
+    })
+    .then(data => {
+      // Update with real entry ID from server if needed
+      if (data.entry && newStatus !== 'NEUTRAL') {
+        setWeeks(prevWeeks => {
+          return prevWeeks.map(week => {
+            const updatedHabits = week.habits.map(habit => {
+              if (habit.id === habitId) {
+                // Replace temporary entry with real one from server
+                const entries = habit.entries.map(e =>
+                  e.date === date && e.id.startsWith('temp-') ? data.entry : e
+                )
+                return {
+                  ...habit,
+                  entries
+                }
+              }
+              return habit
+            })
+            return { ...week, habits: updatedHabits }
+          })
+        })
+      }
+    })
+    .catch(error => {
       console.error('Error updating status:', error)
-      // Refresh on error to ensure UI is in sync
+      // On error, revert the optimistic update by refetching
       fetchHabits(totalWeeksLoaded)
-    }
+    })
+    .finally(() => {
+      // Remove from pending updates
+      setPendingUpdates(prev => {
+        const next = new Set(prev)
+        next.delete(updateKey)
+        return next
+      })
+    })
   }
 
   // Calculate overall percentage
@@ -324,6 +355,7 @@ export default function HabitList() {
               weekStart={weeks[currentWeekIndex].weekStart}
               currentDate={currentDate}
               isEligibleForPoints={index < 5}
+              pendingUpdates={pendingUpdates}
               onStatusChange={handleStatusChange}
               onEdit={handleEditHabit}
               onDelete={handleDeleteHabit}

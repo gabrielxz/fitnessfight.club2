@@ -139,38 +139,25 @@ export async function POST(
     entry = data
   }
 
-  const adminSupabase = createAdminClient()
-  await processHabitCompletion(
-    adminSupabase,
-    user.id,
-    habitId,
-    date,
-    user.user_metadata?.timezone || 'UTC'
-  )
-
-  // Calculate summary for the week
-  const { data: weekEntries } = await supabase
-    .from('habit_entries')
-    .select('*')
-    .eq('habit_id', habitId)
-    .eq('week_start', weekStartDate)
-
-  const successCount = weekEntries?.filter(e => e.status === 'SUCCESS').length || 0
-  const { data: habitData } = await supabase
-    .from('habits')
-    .select('target_frequency')
-    .eq('id', habitId)
-    .single()
-
-  const summary = {
-    successes: successCount,
-    target: habitData?.target_frequency || 0,
-    percentage: habitData?.target_frequency ? (successCount / habitData.target_frequency) * 100 : 0
+  // Process habit completion asynchronously (non-blocking)
+  // This means we return to the client immediately while points are calculated in background
+  if (status === 'SUCCESS') {
+    const adminSupabase = createAdminClient()
+    processHabitCompletion(
+      adminSupabase,
+      user.id,
+      habitId,
+      date,
+      user.user_metadata?.timezone || 'UTC'
+    ).catch(error => {
+      console.error('[Habit Points] Background processing failed:', error)
+    })
   }
 
+  // Return minimal response for speed
+  // Client calculates summary optimistically
   return NextResponse.json({
     success: true,
-    entry,
-    summary
+    entry
   })
 }
