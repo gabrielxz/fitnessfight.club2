@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/cron/weekly-division-shuffle",
-      "schedule": "59 23 * * 0"
+      "schedule": "0 10 * * 1"
     }
   ]
 }
