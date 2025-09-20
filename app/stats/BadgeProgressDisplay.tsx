@@ -246,6 +246,12 @@ function getCriteriaDescription(criteria: BadgeCriteria): string {
     base = `Start activities after 9 PM`
   } else if (type === 'cumulative' && metric === 'distance_km') {
     base = activity_type ? `${activity_type} distance` : 'Total distance'
+  } else if (type === 'cumulative' && metric === 'distance_miles') {
+    if (activity_types && activity_types.length > 0) {
+      base = `${activity_types.join('/')} total miles`
+    } else {
+      base = 'Total miles'
+    }
   } else if (type === 'cumulative' && metric === 'elevation_gain') {
     base = 'Total elevation gain'
   } else if (type === 'single_activity' && metric === 'calories_per_hour') {

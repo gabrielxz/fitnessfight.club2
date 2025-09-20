@@ -73,6 +73,30 @@ export async function GET(request: NextRequest) {
 
     const tokenData: StravaTokenResponse = await tokenResponse.json()
 
+    // Ensure user profile exists before creating Strava connection
+    // This fixes the foreign key constraint error for users without profiles
+    const { data: profile } = await supabase
+      .from('user_profiles')
+      .select('id')
+      .eq('id', user.id)
+      .single()
+
+    if (!profile) {
+      // Create a basic profile if it doesn't exist
+      const { error: profileError } = await supabase
+        .from('user_profiles')
+        .insert({
+          id: user.id,
+          email: user.email,
+          updated_at: new Date().toISOString()
+        })
+
+      if (profileError) {
+        console.error('Error creating user profile:', profileError)
+        return NextResponse.redirect(new URL('/?error=profile_creation_error', request.url))
+      }
+    }
+
     // Store or update Strava connection in database
     const { error: dbError } = await supabase
       .from('strava_connections')

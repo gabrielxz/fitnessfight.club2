@@ -383,20 +383,25 @@ export class BadgeCalculator {
   private async handleCumulativeBadge(badge: Badge, activity: Activity, progress: BadgeProgress, _timezone: string) {
     const { criteria } = badge
     console.log(`[BadgeCalculator] Handling cumulative badge: ${badge.code}`)
-    
+
     // For cumulative badges (no reset period), we need to recalculate from all activities
     // to avoid double-counting when activities are reprocessed
-    
+
     // Get all activities for this user
     let query = this.supabase
       .from('strava_activities')
       .select('*')
       .eq('user_id', activity.user_id)
       .is('deleted_at', null)
-    
-    // Filter by activity type if specified
+
+    // Filter by activity type(s) if specified
     if (criteria.activity_type) {
       query = query.eq('type', criteria.activity_type)
+    } else if (criteria.activity_types && criteria.activity_types.length > 0) {
+      // Handle multiple activity types - check both type and sport_type fields
+      const typeConditions = criteria.activity_types.map(t => `type.eq.${t}`).join(',')
+      const sportTypeConditions = criteria.activity_types.map(t => `sport_type.eq.${t}`).join(',')
+      query = query.or(`${typeConditions},${sportTypeConditions}`)
     }
     
     const { data: allActivities, error: queryError } = await query
@@ -419,6 +424,9 @@ export class BadgeCalculator {
       switch (criteria.metric) {
         case 'distance_km':
           totalValue += (act.distance || 0) / 1000
+          break
+        case 'distance_miles':
+          totalValue += (act.distance || 0) / 1609.34
           break
         case 'elevation_gain':
           totalValue += act.total_elevation_gain || 0

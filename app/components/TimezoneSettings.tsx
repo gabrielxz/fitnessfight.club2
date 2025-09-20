@@ -109,38 +109,6 @@ export default function TimezoneSettings() {
     setSelectedTimezone(detectedTimezone)
   }
 
-  // Calculate when week ends in selected timezone
-  const getWeekEndPreview = () => {
-    if (!selectedTimezone) return null
-    
-    try {
-      // Week ends at 23:59 UTC on Sunday (weeks run Monday-Sunday)
-      const now = new Date()
-      const currentDay = now.getUTCDay()
-      const daysUntilSunday = currentDay === 0 ? 0 : 7 - currentDay
-      
-      // Create date for next Sunday 23:59 UTC
-      const weekEndUTC = new Date(now)
-      weekEndUTC.setUTCDate(weekEndUTC.getUTCDate() + daysUntilSunday)
-      weekEndUTC.setUTCHours(23, 59, 59, 0)
-      
-      // Convert to selected timezone
-      const formatter = new Intl.DateTimeFormat('en-US', {
-        timeZone: selectedTimezone,
-        weekday: 'long',
-        month: 'short',
-        day: 'numeric',
-        hour: 'numeric',
-        minute: '2-digit',
-        hour12: true
-      })
-      
-      return formatter.format(weekEndUTC)
-    } catch {
-      return null
-    }
-  }
-
   if (loading) {
     return (
       <div className="glass-card p-6">
@@ -184,17 +152,6 @@ export default function TimezoneSettings() {
         >
           🔍 Auto-detect my timezone
         </button>
-
-        {selectedTimezone && (
-          <div className="p-3 bg-white/5 rounded-lg">
-            <p className="text-sm text-gray-300">
-              <span className="font-medium">Week ends at:</span> {getWeekEndPreview()}
-            </p>
-            <p className="text-xs text-gray-400 mt-1">
-              Complete your Sunday habits before this time
-            </p>
-          </div>
-        )}
 
         {message && (
           <div className={`p-3 rounded-lg ${
