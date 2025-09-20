@@ -26,10 +26,12 @@ interface BadgeCriteria {
   gold: number;
   metric?: string;
   activity_type?: string;
+  activity_types?: string[];
   reset_period?: 'weekly' | 'monthly' | 'yearly';
   sports_list?: string[];
   min_elapsed_time?: number;
   min_habits?: number;
+  min_activities?: number;
 }
 
 interface Badge {
@@ -107,7 +109,7 @@ export class BadgeCalculator {
       .order('created_at', { ascending: true })
       .limit(5)
 
-    if (!habits || habits.length < criteria.min_habits) {
+    if (!habits || habits.length < (criteria.min_habits || 5)) {
       return // User doesn't have enough habits
     }
 
@@ -346,6 +348,9 @@ export class BadgeCalculator {
         break
       case 'weekly_count':
         await this.handleWeeklyCountBadge(badge, activity, currentProgress, timezone)
+        break
+      case 'activity_weeks':
+        await this.handleActivityWeeksBadge(badge, activity, currentProgress, timezone)
         break
     }
   }
@@ -654,7 +659,7 @@ export class BadgeCalculator {
 
   private async handleWeeklyCountBadge(badge: Badge, activity: Activity, progress: BadgeProgress, _timezone: string) {
     const { criteria } = badge
-    
+
     // For Belfie badge - count weeks with photos
     if (criteria.condition === 'photo_count > 0') {
       if ((activity.photo_count || 0) > 0) {
@@ -662,20 +667,80 @@ export class BadgeCalculator {
         const weekKey = progress.period_start || 'no_period'
         const metadata = progress.metadata || {}
         const countedWeeks = metadata.counted_weeks || []
-        
+
         if (!countedWeeks.includes(weekKey)) {
           countedWeeks.push(weekKey)
           progress.current_value = countedWeeks.length
           progress.metadata = { ...metadata, counted_weeks: countedWeeks }
-          
+
           const tierAchieved = this.checkTierProgress(progress.current_value, criteria, progress)
-          
+
           if (tierAchieved) {
             await this.awardBadge(badge, activity, tierAchieved, progress.current_value)
           }
-          
+
           await this.supabase.from('badge_progress').upsert({ ...progress })
         }
+      }
+    }
+  }
+
+  private async handleActivityWeeksBadge(badge: Badge, activity: Activity, progress: BadgeProgress, timezone: string) {
+    const { criteria } = badge
+
+    // Check if this activity is one of the required types
+    const activityTypes = criteria.activity_types || []
+    if (!activityTypes.includes(activity.type) && !activityTypes.includes(activity.sport_type)) {
+      return // Activity doesn't match required types
+    }
+
+    // Get current week period
+    const period = await this.getCurrentPeriod('weekly', activity.start_date_local, timezone)
+    if (!period.start) return
+
+    // Count qualifying activities for this week
+    const { data: weekActivities } = await this.supabase
+      .from('strava_activities')
+      .select('id')
+      .eq('user_id', activity.user_id)
+      .gte('start_date_local', period.start)
+      .lte('start_date_local', period.end + 'T23:59:59')
+      .in('type', activityTypes)
+      .is('deleted_at', null)
+
+    const { data: weekActivitiesSportType } = await this.supabase
+      .from('strava_activities')
+      .select('id')
+      .eq('user_id', activity.user_id)
+      .gte('start_date_local', period.start)
+      .lte('start_date_local', period.end + 'T23:59:59')
+      .in('sport_type', activityTypes)
+      .is('deleted_at', null)
+
+    // Combine and deduplicate
+    const allWeekActivities = new Set([
+      ...(weekActivities || []).map(a => a.id),
+      ...(weekActivitiesSportType || []).map(a => a.id)
+    ])
+
+    if (allWeekActivities.size >= (criteria.min_activities || 3)) {
+      // Week qualifies - check if already counted
+      const weekKey = period.start
+      const metadata = progress.metadata || {}
+      const countedWeeks = metadata.counted_weeks || []
+
+      if (!countedWeeks.includes(weekKey)) {
+        countedWeeks.push(weekKey)
+        progress.current_value = countedWeeks.length
+        progress.metadata = { ...metadata, counted_weeks: countedWeeks }
+
+        const tierAchieved = this.checkTierProgress(progress.current_value, criteria, progress)
+
+        if (tierAchieved) {
+          await this.awardBadge(badge, activity, tierAchieved, progress.current_value)
+        }
+
+        await this.supabase.from('badge_progress').upsert({ ...progress })
       }
     }
   }

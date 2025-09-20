@@ -10,10 +10,12 @@ interface BadgeCriteria {
   gold: number
   metric?: string
   activity_type?: string
+  activity_types?: string[]
   reset_period?: string
   sports_list?: string[]
   min_elapsed_time?: number
   min_habits?: number
+  min_activities?: number
 }
 
 interface Badge {
@@ -234,7 +236,7 @@ function BadgeProgressItem({ progress }: { progress: BadgeProgress }) {
 }
 
 function getCriteriaDescription(criteria: BadgeCriteria): string {
-  const { type, condition, bronze, silver, gold, metric, activity_type, reset_period, sports_list, min_elapsed_time } = criteria
+  const { type, condition, bronze, silver, gold, metric, activity_type, activity_types, reset_period, sports_list, min_elapsed_time, min_habits, min_activities } = criteria
 
   let base = ''
 
@@ -270,8 +272,12 @@ function getCriteriaDescription(criteria: BadgeCriteria): string {
       base = 'Try different sport types'
     }
   } else if (type === 'habit_weeks') {
-    const minHabits = min_habits ? ` (first ${min_habits} habits)` : ''
-    base = `Complete weeks with 100% habit completion${minHabits}`
+    const minHabitsText = min_habits ? ` (first ${min_habits} habits)` : ''
+    base = `Complete weeks with 100% habit completion${minHabitsText}`
+  } else if (type === 'activity_weeks') {
+    const types = activity_types ? activity_types.join('/') : ''
+    const minAct = min_activities || 3
+    base = `Complete weeks with ${minAct}+ ${types} activities`
   }
 
   const targets = `Bronze: ${bronze}, Silver: ${silver}, Gold: ${gold}`
