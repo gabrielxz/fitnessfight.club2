@@ -13,6 +13,7 @@ interface BadgeCriteria {
   reset_period?: string
   sports_list?: string[]
   min_elapsed_time?: number
+  min_habits?: number
 }
 
 interface Badge {
@@ -268,6 +269,9 @@ function getCriteriaDescription(criteria: BadgeCriteria): string {
     } else {
       base = 'Try different sport types'
     }
+  } else if (type === 'habit_weeks') {
+    const minHabits = min_habits ? ` (first ${min_habits} habits)` : ''
+    base = `Complete weeks with 100% habit completion${minHabits}`
   }
 
   const targets = `Bronze: ${bronze}, Silver: ${silver}, Gold: ${gold}`

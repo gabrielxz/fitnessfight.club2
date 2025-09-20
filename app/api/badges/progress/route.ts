@@ -127,6 +127,8 @@ export async function GET() {
       unit = 'weeks'
     } else if (criteria.type === 'unique_sports') {
       unit = 'sports'
+    } else if (criteria.type === 'habit_weeks') {
+      unit = 'weeks'
     }
 
     return {

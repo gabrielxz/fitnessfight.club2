@@ -29,6 +29,7 @@ interface BadgeCriteria {
   reset_period?: 'weekly' | 'monthly' | 'yearly';
   sports_list?: string[];
   min_elapsed_time?: number;
+  min_habits?: number;
 }
 
 interface Badge {
@@ -62,6 +63,163 @@ interface BadgeProgress {
 
 export class BadgeCalculator {
   constructor(private supabase: SupabaseClient) {}
+
+  async evaluateHabitBadgesForWeek(userId: string, weekStart: Date) {
+    console.log(`[BadgeCalculator] Evaluating habit badges for user ${userId}, week ${weekStart.toISOString()}`)
+
+    // Get habit badges
+    const { data: badges, error: badgesError } = await this.supabase
+      .from('badges')
+      .select('*')
+      .eq('active', true)
+      .eq('criteria->type', 'habit_weeks')
+
+    if (badgesError || !badges) {
+      console.error('[BadgeCalculator] Error fetching habit badges:', badgesError)
+      return
+    }
+
+    // Get user's timezone
+    const { data: profile } = await this.supabase
+      .from('user_profiles')
+      .select('timezone')
+      .eq('id', userId)
+      .single()
+
+    const timezone = profile?.timezone || 'UTC'
+
+    // Check each habit badge
+    for (const badge of badges) {
+      await this.evaluateHabitBadge(badge, userId, weekStart, timezone)
+    }
+  }
+
+  private async evaluateHabitBadge(badge: Badge, userId: string, weekStart: Date, timezone: string) {
+    const { criteria } = badge
+
+    // Get first 5 active habits for the user
+    const { data: habits } = await this.supabase
+      .from('habits')
+      .select('id, target_frequency')
+      .eq('user_id', userId)
+      .is('archived_at', null)
+      .order('position', { ascending: true })
+      .order('created_at', { ascending: true })
+      .limit(5)
+
+    if (!habits || habits.length < criteria.min_habits) {
+      return // User doesn't have enough habits
+    }
+
+    // Convert the UTC weekStart to the user's timezone week boundaries
+    // The cron job passes a UTC Monday, but we need the user's local Monday
+    const userWeekBoundaries = getWeekBoundaries(weekStart, timezone)
+    const userWeekStartStr = userWeekBoundaries.weekStart.toISOString().split('T')[0]
+
+    // Check if all first 5 habits achieved 100% for this week
+    let allComplete = true
+
+    for (const habit of habits.slice(0, 5)) {
+      const { data: entries } = await this.supabase
+        .from('habit_entries')
+        .select('status')
+        .eq('habit_id', habit.id)
+        .eq('week_start', userWeekStartStr)
+        .eq('status', 'SUCCESS')
+
+      const successes = entries?.length || 0
+      if (successes < habit.target_frequency) {
+        allComplete = false
+        break
+      }
+    }
+
+    if (!allComplete) {
+      return // Not all habits at 100%
+    }
+
+    // Week qualifies - update progress
+    const { data: progress } = await this.supabase
+      .from('badge_progress')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('badge_id', badge.id)
+      .is('period_start', null)
+      .single()
+
+    const currentProgress: BadgeProgress = progress || {
+      user_id: userId,
+      badge_id: badge.id,
+      current_value: 0,
+      bronze_achieved: false,
+      silver_achieved: false,
+      gold_achieved: false,
+      metadata: { counted_weeks: [] }
+    }
+
+    // Check if this week has already been counted
+    const metadata = currentProgress.metadata || {}
+    const countedWeeks = metadata.counted_weeks || []
+
+    if (!countedWeeks.includes(userWeekStartStr)) {
+      countedWeeks.push(userWeekStartStr)
+      currentProgress.current_value = countedWeeks.length
+      currentProgress.metadata = { ...metadata, counted_weeks: countedWeeks }
+
+      const tierAchieved = this.checkTierProgress(currentProgress.current_value, criteria, currentProgress)
+
+      if (tierAchieved) {
+        // Award badge but don't pass activity since this is habit-based
+        await this.awardBadgeForHabits(badge, userId, tierAchieved, currentProgress.current_value)
+      }
+
+      await this.supabase.from('badge_progress').upsert({ ...currentProgress })
+    }
+  }
+
+  private async awardBadgeForHabits(badge: Badge, userId: string, tier: string, value: number) {
+    const tierPoints: { [key: string]: number } = { bronze: 3, silver: 6, gold: 15 }
+    const { data: existing } = await this.supabase
+      .from('user_badges')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('badge_id', badge.id)
+      .single()
+
+    let pointsToAward = 0
+
+    if (existing) {
+      const tierOrder: { [key: string]: number } = { bronze: 1, silver: 2, gold: 3 }
+      if (tierOrder[tier] > tierOrder[existing.tier]) {
+        const previousPoints = existing.points_awarded || 0
+        pointsToAward = tierPoints[tier] - previousPoints
+
+        await this.supabase
+          .from('user_badges')
+          .update({ tier, progress_value: value, points_awarded: tierPoints[tier] })
+          .eq('id', existing.id)
+      }
+    } else {
+      pointsToAward = tierPoints[tier]
+      await this.supabase
+        .from('user_badges')
+        .insert({ user_id: userId, badge_id: badge.id, tier, progress_value: value, points_awarded: tierPoints[tier] })
+    }
+
+    if (pointsToAward > 0) {
+      // Award points to cumulative score
+      const { error: rpcError } = await this.supabase.rpc('increment_badge_points', {
+        p_user_id: userId,
+        p_points_to_add: pointsToAward
+      })
+
+      if (rpcError) {
+        console.error(`[BadgeCalculator] Error incrementing badge points for user ${userId}:`, rpcError)
+      } else {
+        console.log(`Awarded ${pointsToAward} cumulative badge points to user ${userId} for Rock Solid badge`)
+      }
+    }
+  }
 
   private async getCurrentPeriod(resetPeriod: string | undefined, activityDate: string, timezone: string) {
     if (!resetPeriod) return { start: null, end: null }
