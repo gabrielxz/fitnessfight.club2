@@ -13,21 +13,6 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 const badges = [
   {
-    code: 'tryhard',
-    name: 'Tryhard',
-    emoji: '🥵',
-    category: 'intensity',
-    description: "Score a certain amount of Strava's Relative Effort points in one week",
-    criteria: {
-      type: 'weekly_cumulative',
-      metric: 'suffer_score',
-      reset_period: 'weekly',
-      bronze: 150,
-      silver: 350,
-      gold: 600
-    }
-  },
-  {
     code: 'everester',
     name: 'Everester',
     emoji: '🏔',

@@ -136,12 +136,13 @@ export async function POST() {
           start_date_local: activity.start_date_local,
           distance: activity.distance,
           moving_time: activity.moving_time,
+          elapsed_time: activity.elapsed_time,
           calories: activity.calories || 0,
           total_elevation_gain: activity.total_elevation_gain,
           average_speed: activity.average_speed,
           type: activity.type,
           sport_type: activity.sport_type,
-          suffer_score: activity.suffer_score,
+          athlete_count: activity.athlete_count,
           photo_count: activity.photo_count
         })
       }

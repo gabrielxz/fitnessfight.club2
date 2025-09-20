@@ -12,6 +12,7 @@ interface BadgeCriteria {
   activity_type?: string
   reset_period?: string
   sports_list?: string[]
+  min_elapsed_time?: number
 }
 
 interface Badge {
@@ -232,10 +233,10 @@ function BadgeProgressItem({ progress }: { progress: BadgeProgress }) {
 }
 
 function getCriteriaDescription(criteria: BadgeCriteria): string {
-  const { type, condition, bronze, silver, gold, metric, activity_type, reset_period, sports_list } = criteria
-  
+  const { type, condition, bronze, silver, gold, metric, activity_type, reset_period, sports_list, min_elapsed_time } = criteria
+
   let base = ''
-  
+
   if (type === 'count' && condition?.includes('hour < 7')) {
     base = `Start activities before 7 AM`
   } else if (type === 'count' && condition?.includes('hour >= 21')) {
@@ -250,10 +251,11 @@ function getCriteriaDescription(criteria: BadgeCriteria): string {
     base = 'Average speed in a single ride'
   } else if (type === 'single_activity' && metric === 'moving_time_minutes') {
     base = activity_type ? `${activity_type} for minutes in a single session` : 'Activity duration in minutes'
+  } else if (type === 'single_activity' && metric === 'athlete_count') {
+    const minTime = min_elapsed_time ? ` (min ${min_elapsed_time / 60} minutes)` : ''
+    base = `Complete an activity with multiple athletes${minTime}`
   } else if (type === 'weekly_streak') {
     base = 'Consecutive weeks with activities'
-  } else if (type === 'weekly_cumulative' && metric === 'suffer_score') {
-    base = 'Relative Effort points in a week'
   } else if (type === 'weekly_cumulative' && metric === 'distance_miles') {
     base = activity_type ? `${activity_type} miles in a week` : 'Miles in a week'
   } else if (type === 'weekly_cumulative' && metric === 'moving_time_hours') {
@@ -267,9 +269,9 @@ function getCriteriaDescription(criteria: BadgeCriteria): string {
       base = 'Try different sport types'
     }
   }
-  
+
   const targets = `Bronze: ${bronze}, Silver: ${silver}, Gold: ${gold}`
   const period = reset_period === 'weekly' ? ' (resets weekly)' : ''
-  
+
   return `${base}. ${targets}${period}`
 }

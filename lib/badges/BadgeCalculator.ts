@@ -8,12 +8,13 @@ interface Activity {
   start_date_local: string
   distance: number
   moving_time: number
+  elapsed_time: number
   calories: number
   total_elevation_gain: number
   average_speed: number
   type: string
   sport_type: string
-  suffer_score?: number
+  athlete_count?: number
   photo_count?: number
 }
 
@@ -27,6 +28,7 @@ interface BadgeCriteria {
   activity_type?: string;
   reset_period?: 'weekly' | 'monthly' | 'yearly';
   sports_list?: string[];
+  min_elapsed_time?: number;
 }
 
 interface Badge {
@@ -279,6 +281,11 @@ export class BadgeCalculator {
     const { criteria } = badge
     let value = 0
 
+    // Check minimum elapsed time requirement if specified
+    if (criteria.min_elapsed_time && activity.elapsed_time < criteria.min_elapsed_time) {
+      return
+    }
+
     // Check activity type - support both type and sport_type fields
     if (criteria.activity_type) {
       if (activity.type !== criteria.activity_type && activity.sport_type !== criteria.activity_type) {
@@ -296,6 +303,9 @@ export class BadgeCalculator {
         break
       case 'moving_time_minutes':
         value = (activity.moving_time || 0) / 60
+        break
+      case 'athlete_count':
+        value = activity.athlete_count || 1
         break
     }
 
@@ -458,9 +468,6 @@ export class BadgeCalculator {
       let actValue = 0
       
       switch (criteria.metric) {
-        case 'suffer_score':
-          actValue = act.suffer_score || 0
-          break
         case 'distance_miles':
           actValue = (act.distance || 0) / 1609.34 // Convert meters to miles
           break
