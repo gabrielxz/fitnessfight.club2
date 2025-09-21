@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { User } from '@supabase/supabase-js'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -14,7 +15,7 @@ export default function LoginPage() {
   const supabase = createClient()
 
   // Helper function to ensure user has profile and division
-  const initializeUser = async (user: any) => {
+  const initializeUser = async (user: User) => {
     // Ensure user has profile (using upsert to handle existing profiles)
     const { error: profileError } = await supabase
       .from('user_profiles')
