@@ -13,6 +13,52 @@ export default function LoginPage() {
   const router = useRouter()
   const supabase = createClient()
 
+  // Helper function to ensure user has profile and division
+  const initializeUser = async (user: any) => {
+    // Ensure user has profile (using upsert to handle existing profiles)
+    const { error: profileError } = await supabase
+      .from('user_profiles')
+      .upsert({
+        id: user.id,
+        email: user.email,
+        updated_at: new Date().toISOString()
+      })
+
+    if (profileError) {
+      console.error('Error creating user profile:', profileError)
+    }
+
+    // Check if user has division assignment
+    const { data: userDivision } = await supabase
+      .from('user_divisions')
+      .select('*')
+      .eq('user_id', user.id)
+      .single()
+
+    if (!userDivision) {
+      // Assign to Noodle division
+      const { data: noodleDivision } = await supabase
+        .from('divisions')
+        .select('id')
+        .eq('name', 'Noodle')
+        .single()
+
+      if (noodleDivision) {
+        const { error: insertError } = await supabase
+          .from('user_divisions')
+          .insert({
+            user_id: user.id,
+            division_id: noodleDivision.id,
+            joined_division_at: new Date().toISOString()
+          })
+
+        if (insertError) {
+          console.error('Error assigning user to division:', insertError)
+        }
+      }
+    }
+  }
+
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
@@ -27,11 +73,17 @@ export default function LoginPage() {
         if (error) throw error
         alert('Check your email for the confirmation link!')
       } else {
-        const { error } = await supabase.auth.signInWithPassword({
+        const { data, error } = await supabase.auth.signInWithPassword({
           email,
           password,
         })
         if (error) throw error
+
+        // Initialize user profile and division if needed
+        if (data.user) {
+          await initializeUser(data.user)
+        }
+
         router.push('/')
       }
     } catch (error) {
