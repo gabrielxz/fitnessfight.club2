@@ -3,6 +3,23 @@
 import Image from 'next/image'
 import { useState } from 'react'
 
+// Format decimal hours to hours/minutes format
+function formatHoursToHoursMinutes(decimalHours: number): string {
+  const totalMinutes = Math.round(decimalHours * 60)
+  const hours = Math.floor(totalMinutes / 60)
+  const minutes = totalMinutes % 60
+
+  if (hours === 0 && minutes === 0) {
+    return '0m'
+  } else if (hours === 0) {
+    return `${minutes}m`
+  } else if (minutes === 0) {
+    return `${hours}h`
+  } else {
+    return `${hours}h ${minutes}m`
+  }
+}
+
 interface AthleteCardProps {
   rank: number
   name: string
@@ -102,7 +119,7 @@ export default function AthleteCard({
           <div className="text-xs text-gray-400 mt-1">Points</div>
         </div>
         <div className="rounded-xl p-3 text-center" style={{ backgroundColor: 'rgba(255, 255, 255, 0.05)' }}>
-          <div className="text-2xl font-bold text-blue-400">{hours.toFixed(2)}h</div>
+          <div className="text-2xl font-bold text-blue-400">{formatHoursToHoursMinutes(hours)}</div>
           <div className="text-xs text-gray-400 mt-1">This Week</div>
         </div>
       </div>
