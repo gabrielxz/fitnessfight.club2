@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { deleteUser, assignBadge, removeBadge, changeDivision } from './actions'
 import HabitSummaryGenerator from './HabitSummaryGenerator'
 import SummaryParticipantsManager from './SummaryParticipantsManager'
+import CompetitionResetSection from './CompetitionResetSection'
 
 interface User {
   user_id: string
@@ -411,9 +412,17 @@ export default function AdminDashboard({
         </div>
 
         {/* Summary Participants Management Section */}
-        <div className="glass-card p-6">
+        <div className="glass-card p-6 mb-8">
           <h2 className="text-2xl font-bold text-white mb-6">Manage Summary Participants</h2>
           <SummaryParticipantsManager users={users} />
+        </div>
+
+        {/* Competition Reset Section - DANGER ZONE */}
+        <div className="border-4 border-red-600 rounded-lg p-2 bg-red-950/20">
+          <div className="bg-gradient-to-r from-red-900/50 to-red-800/50 p-1 rounded">
+            <h2 className="text-2xl font-bold text-red-400 text-center mb-2">⚠️ DANGER ZONE ⚠️</h2>
+          </div>
+          <CompetitionResetSection />
         </div>
       </div>
     </div>
