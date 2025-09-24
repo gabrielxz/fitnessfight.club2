@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { deleteUser, assignBadge, removeBadge, changeDivision } from './actions'
+import HabitSummaryGenerator from './HabitSummaryGenerator'
+import SummaryParticipantsManager from './SummaryParticipantsManager'
 
 interface User {
   user_id: string
@@ -9,6 +11,7 @@ interface User {
   display_name: string
   email: string
   has_strava: boolean
+  has_division: boolean
   created_at: string
 }
 
@@ -361,9 +364,9 @@ export default function AdminDashboard({
         </div>
 
         {/* Division Management Section */}
-        <div className="glass-card p-6">
+        <div className="glass-card p-6 mb-8">
           <h2 className="text-2xl font-bold text-white mb-4">Change Division</h2>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <select
               value={selectedUser}
@@ -399,6 +402,18 @@ export default function AdminDashboard({
               Change Division
             </button>
           </div>
+        </div>
+
+        {/* WhatsApp Habit Summary Section */}
+        <div className="glass-card p-6 mb-8">
+          <h2 className="text-2xl font-bold text-white mb-6">WhatsApp Habit Summary</h2>
+          <HabitSummaryGenerator />
+        </div>
+
+        {/* Summary Participants Management Section */}
+        <div className="glass-card p-6">
+          <h2 className="text-2xl font-bold text-white mb-6">Manage Summary Participants</h2>
+          <SummaryParticipantsManager users={users} />
         </div>
       </div>
     </div>
