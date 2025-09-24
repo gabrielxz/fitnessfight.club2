@@ -12,24 +12,44 @@ export async function getSummaryParticipants() {
 
   const { data: participants, error } = await supabase
     .from('summary_participants')
-    .select(`
-      *,
-      user_profiles!inner(
-        id,
-        full_name,
-        email
-      ),
-      strava_connections(
-        strava_firstname,
-        strava_lastname
-      )
-    `)
+    .select('*')
     .order('sort_order', { ascending: true })
     .order('created_at', { ascending: true })
 
   if (error) {
     console.error('Error fetching participants:', error)
     throw error
+  }
+
+  // Now fetch the related user_profiles and strava_connections data
+  if (participants && participants.length > 0) {
+    const userIds = participants.map(p => p.user_id)
+
+    // Fetch user profiles
+    const { data: profiles } = await supabase
+      .from('user_profiles')
+      .select('id, full_name, email')
+      .in('id', userIds)
+
+    // Fetch strava connections
+    const { data: stravaConnections } = await supabase
+      .from('strava_connections')
+      .select('user_id, strava_firstname, strava_lastname')
+      .in('user_id', userIds)
+
+    // Merge the data
+    const enrichedParticipants = participants.map(p => {
+      const profile = profiles?.find(prof => prof.id === p.user_id)
+      const stravaConn = stravaConnections?.find(sc => sc.user_id === p.user_id)
+
+      return {
+        ...p,
+        user_profiles: profile || { id: p.user_id, full_name: null, email: null },
+        strava_connections: stravaConn ? [stravaConn] : []
+      }
+    })
+
+    return enrichedParticipants
   }
 
   return participants || []

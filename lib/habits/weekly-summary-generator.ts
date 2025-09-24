@@ -43,18 +43,7 @@ export async function generateHabitSummary(weekOffset: number = 0): Promise<stri
   // Get all participants
   const { data: participants, error: participantsError } = await supabase
     .from('summary_participants')
-    .select(`
-      *,
-      user_profiles!inner(
-        id,
-        full_name,
-        email
-      ),
-      strava_connections(
-        strava_firstname,
-        strava_lastname
-      )
-    `)
+    .select('*')
     .eq('include_in_summary', true)
     .order('sort_order', { ascending: true })
 
@@ -62,10 +51,35 @@ export async function generateHabitSummary(weekOffset: number = 0): Promise<stri
     return '⚠️ No participants found for habit summary. Add participants in the admin panel.'
   }
 
+  // Fetch user profiles and strava connections separately
+  const userIds = participants.map(p => p.user_id)
+
+  const { data: profiles } = await supabase
+    .from('user_profiles')
+    .select('id, full_name, email')
+    .in('id', userIds)
+
+  const { data: stravaConnections } = await supabase
+    .from('strava_connections')
+    .select('user_id, strava_firstname, strava_lastname')
+    .in('user_id', userIds)
+
+  // Enhance participants with profile data
+  const enrichedParticipants = participants.map(p => {
+    const profile = profiles?.find(prof => prof.id === p.user_id)
+    const stravaConn = stravaConnections?.find(sc => sc.user_id === p.user_id)
+
+    return {
+      ...p,
+      user_profiles: profile,
+      strava_connections: stravaConn ? [stravaConn] : []
+    }
+  })
+
   // Calculate results for each participant
   const results: ParticipantResult[] = []
 
-  for (const participant of participants) {
+  for (const participant of enrichedParticipants) {
     // Get display name (priority: custom > strava > profile > email)
     const displayName =
       participant.display_name ||
