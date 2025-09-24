@@ -1,14 +1,18 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 export async function getSummaryParticipants() {
-  const supabase = await createClient()
-
-  const { data: { user } } = await supabase.auth.getUser()
+  // First check authorization with regular client
+  const authClient = await createClient()
+  const { data: { user } } = await authClient.auth.getUser()
   if (!user || user.email !== 'gabrielbeal@gmail.com') {
     throw new Error('Unauthorized')
   }
+
+  // Use admin client for data fetching
+  const supabase = createAdminClient()
 
   const { data: participants, error } = await supabase
     .from('summary_participants')
@@ -56,12 +60,15 @@ export async function getSummaryParticipants() {
 }
 
 export async function addSummaryParticipant(userId: string, displayName?: string) {
-  const supabase = await createClient()
-
-  const { data: { user } } = await supabase.auth.getUser()
+  // First check authorization with regular client
+  const authClient = await createClient()
+  const { data: { user } } = await authClient.auth.getUser()
   if (!user || user.email !== 'gabrielbeal@gmail.com') {
     throw new Error('Unauthorized')
   }
+
+  // Use admin client for data operations
+  const supabase = createAdminClient()
 
   // Check if user already exists
   const { data: existing } = await supabase
@@ -101,12 +108,15 @@ export async function addSummaryParticipant(userId: string, displayName?: string
 }
 
 export async function removeSummaryParticipant(id: string) {
-  const supabase = await createClient()
-
-  const { data: { user } } = await supabase.auth.getUser()
+  // First check authorization with regular client
+  const authClient = await createClient()
+  const { data: { user } } = await authClient.auth.getUser()
   if (!user || user.email !== 'gabrielbeal@gmail.com') {
     throw new Error('Unauthorized')
   }
+
+  // Use admin client for data operations
+  const supabase = createAdminClient()
 
   const { error } = await supabase
     .from('summary_participants')
@@ -129,12 +139,15 @@ export async function updateSummaryParticipant(
     sort_order?: number
   }
 ) {
-  const supabase = await createClient()
-
-  const { data: { user } } = await supabase.auth.getUser()
+  // First check authorization with regular client
+  const authClient = await createClient()
+  const { data: { user } } = await authClient.auth.getUser()
   if (!user || user.email !== 'gabrielbeal@gmail.com') {
     throw new Error('Unauthorized')
   }
+
+  // Use admin client for data operations
+  const supabase = createAdminClient()
 
   const { error } = await supabase
     .from('summary_participants')
@@ -153,12 +166,15 @@ export async function updateSummaryParticipant(
 }
 
 export async function reorderSummaryParticipants(participantIds: string[]) {
-  const supabase = await createClient()
-
-  const { data: { user } } = await supabase.auth.getUser()
+  // First check authorization with regular client
+  const authClient = await createClient()
+  const { data: { user } } = await authClient.auth.getUser()
   if (!user || user.email !== 'gabrielbeal@gmail.com') {
     throw new Error('Unauthorized')
   }
+
+  // Use admin client for data operations
+  const supabase = createAdminClient()
 
   // Update sort order for each participant
   for (let i = 0; i < participantIds.length; i++) {
