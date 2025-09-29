@@ -474,6 +474,110 @@ A mini habit tracker inspired by HabitShare, allowing users to track daily habit
 
 ---
 
+## Admin Features
+
+### WhatsApp Habit Summary Generator (2025-01-12)
+**Purpose**: Generate weekly habit tracking summaries for posting to WhatsApp group
+
+**Features**:
+- **Participant Management**: Add/remove users to include in weekly summaries
+- **Custom Display Names**: Override names for summary display
+- **On-Demand Generation**: Button to generate summary for last completed week
+- **WhatsApp Formatting**: Uses markdown formatting compatible with WhatsApp
+- **One-Click Copy**: Copy formatted message to clipboard for pasting
+
+**Database**:
+- Table: `summary_participants` (user_id, display_name, include_in_summary, sort_order)
+- Uses admin client for permissions
+
+**Files**:
+- `/app/admin/HabitSummaryGenerator.tsx` - UI for generating summaries
+- `/app/admin/SummaryParticipantsManager.tsx` - Manage participant list
+- `/app/admin/summary-actions.ts` - Server actions
+- `/lib/habits/weekly-summary-generator.ts` - Summary generation logic
+- `/app/api/admin/generate-habit-summary/route.ts` - API endpoint
+- Migration: `025_create_summary_participants.sql`
+
+**Summary Format**:
+```
+🏆 *FitFight Habit Week Results* 🏆
+_Jan 15 to Jan 21, 2025_
+
+*Perfect Week Club* ⭐
+• Gabriel: 5/5 habits
+• Lisa: 6/6 habits
+
+*Keep Pushing* 💪
+• Mike: 4/5 habits
+
+_Keep crushing it, team!_
+```
+
+### Competition Reset Button (2025-01-12)
+**Purpose**: Nuclear reset for starting fresh competition periods
+
+**Features**:
+- **Multi-Step Confirmation**: 4-step process with increasing warnings
+- **Statistics Preview**: Shows exact counts of what will be deleted
+- **Type-to-Confirm**: Must type "RESET COMPETITION" exactly
+- **10-Second Safety Delay**: Prevents accidental clicks
+- **Comprehensive Deletion**: Removes all competition data while preserving infrastructure
+
+**What Gets Reset**:
+- ❌ All earned badges
+- ❌ All points (exercise, habit, badge)
+- ❌ All Strava activities
+- ❌ All habit tracking history
+- ❌ All weekly exercise tracking
+
+**What Stays**:
+- ✅ User accounts and profiles
+- ✅ Current division assignments
+- ✅ Habit definitions (not history)
+- ✅ Strava connections
+- ✅ WhatsApp summary participants
+
+**Files**:
+- `/app/admin/CompetitionResetSection.tsx` - UI component
+- `/app/admin/competition-reset-actions.ts` - Reset logic and stats
+- Uses admin client to avoid permission issues
+
+### User Diagnostics & Repair Tool (2025-01-12)
+**Purpose**: Diagnose and fix users with missing database entries
+
+**Problem Solved**:
+Users who connect via Strava may not get all necessary database entries created (user_profiles, user_divisions). This causes them to not appear in divisions despite being connected.
+
+**Features**:
+- **Automatic Detection**: Highlights users with Strava but no division
+- **Diagnostic Tool**: Shows complete data state for selected user:
+  - Auth user exists
+  - User profile exists
+  - Division assignment exists
+  - Strava connection exists
+- **One-Click Repair**: Automatically creates missing entries:
+  - Creates user_profiles entry if missing
+  - Assigns to Noodle division if no division exists
+  - Uses admin client for full permissions
+
+**Common Use Cases**:
+1. User connected Strava but isn't showing in any division
+2. After competition reset, ensuring all users have complete data
+3. Manual division assignment failing (no row to update)
+
+**Files**:
+- `/app/admin/UserDiagnosticsSection.tsx` - UI component
+- `/app/admin/user-fix-actions.ts` - Diagnostic and repair server actions
+- Updated `/app/admin/actions.ts` - Fixed `changeDivision` to INSERT if row doesn't exist
+
+**Technical Fix**:
+The `changeDivision` function now checks if a `user_divisions` entry exists:
+- If exists: UPDATE the division
+- If missing: INSERT new entry with selected division
+This fixes both the "Assign to Noodle" button and manual division changes.
+
+---
+
 ## Agent Updates
 
 ### Codex CLI (2025-09-17): Stability + Correctness Fixes

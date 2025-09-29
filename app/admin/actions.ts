@@ -151,7 +151,7 @@ export async function removeBadge(userBadgeId: string) {
 
 export async function changeDivision(userId: string, divisionId: string) {
   const supabase = await createClient()
-  
+
   const { data: { user } } = await supabase.auth.getUser()
   if (!user || (user.email !== 'gabrielbeal@gmail.com')) {
     throw new Error('Unauthorized')
@@ -159,14 +159,38 @@ export async function changeDivision(userId: string, divisionId: string) {
 
   const adminClient = createAdminClient()
 
-  const { error } = await adminClient
+  // Check if user already has a division entry
+  const { data: existing } = await adminClient
     .from('user_divisions')
-    .update({ division_id: divisionId, updated_at: new Date().toISOString() })
+    .select('user_id')
     .eq('user_id', userId)
+    .maybeSingle()
 
-  if (error) {
-    console.error('Error changing division:', error)
-    throw error
+  if (existing) {
+    // Update existing division
+    const { error } = await adminClient
+      .from('user_divisions')
+      .update({ division_id: divisionId, updated_at: new Date().toISOString() })
+      .eq('user_id', userId)
+
+    if (error) {
+      console.error('Error updating division:', error)
+      throw error
+    }
+  } else {
+    // Insert new division entry
+    const { error } = await adminClient
+      .from('user_divisions')
+      .insert({
+        user_id: userId,
+        division_id: divisionId,
+        joined_at: new Date().toISOString()
+      })
+
+    if (error) {
+      console.error('Error inserting division:', error)
+      throw error
+    }
   }
 
   revalidatePath('/admin')

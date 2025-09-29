@@ -5,6 +5,7 @@ import { deleteUser, assignBadge, removeBadge, changeDivision } from './actions'
 import HabitSummaryGenerator from './HabitSummaryGenerator'
 import SummaryParticipantsManager from './SummaryParticipantsManager'
 import CompetitionResetSection from './CompetitionResetSection'
+import UserDiagnosticsSection from './UserDiagnosticsSection'
 
 interface User {
   user_id: string
@@ -415,6 +416,12 @@ export default function AdminDashboard({
         <div className="glass-card p-6 mb-8">
           <h2 className="text-2xl font-bold text-white mb-6">Manage Summary Participants</h2>
           <SummaryParticipantsManager users={users} />
+        </div>
+
+        {/* User Diagnostics & Repair Section */}
+        <div className="glass-card p-6 mb-8">
+          <h2 className="text-2xl font-bold text-white mb-6">🔧 User Diagnostics & Repair</h2>
+          <UserDiagnosticsSection users={users} />
         </div>
 
         {/* Competition Reset Section - DANGER ZONE */}
