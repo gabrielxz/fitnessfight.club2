@@ -87,7 +87,7 @@ export async function ensureUserDataConsistency(userId: string) {
         .insert({
           user_id: userId,
           division_id: noodleDivision.id,
-          joined_at: new Date().toISOString()
+          joined_division_at: new Date().toISOString()
         })
 
       if (insertError) {

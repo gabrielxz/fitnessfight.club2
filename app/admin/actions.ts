@@ -184,7 +184,7 @@ export async function changeDivision(userId: string, divisionId: string) {
       .insert({
         user_id: userId,
         division_id: divisionId,
-        joined_at: new Date().toISOString()
+        joined_division_at: new Date().toISOString()
       })
 
     if (error) {
