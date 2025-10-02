@@ -167,22 +167,22 @@ export async function POST() {
       .single()
     
     if (!userDivision) {
-      // Assign to Noodle division if not assigned
-      const { data: noodleDivision } = await supabase
+      // Assign to bottom division (level 1) if not assigned
+      const { data: bottomDivision } = await supabase
         .from('divisions')
         .select('id')
-        .eq('name', 'Noodle')
+        .eq('level', 1)
         .single()
-      
-      if (noodleDivision) {
+
+      if (bottomDivision) {
         await supabase
           .from('user_divisions')
           .insert({
             user_id: user.id,
-            division_id: noodleDivision.id
+            division_id: bottomDivision.id
           })
-        
-        console.log(`Assigned user ${user.id} to Noodle division`)
+
+        console.log(`Assigned user ${user.id} to bottom division (level 1)`)
       }
     }
 

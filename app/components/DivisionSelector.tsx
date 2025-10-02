@@ -11,7 +11,7 @@ interface DivisionSelectorProps {
 }
 
 const divisionEmojis: Record<string, string> = {
-  'Noodle': '🍜',
+  'Zesty': '🌶️',
   'Sweaty': '💦',
   'Shreddy': '💪',
   'Juicy': '🧃'

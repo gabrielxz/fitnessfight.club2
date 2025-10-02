@@ -37,19 +37,19 @@ export default function LoginPage() {
       .single()
 
     if (!userDivision) {
-      // Assign to Noodle division
-      const { data: noodleDivision } = await supabase
+      // Assign to bottom division (level 1)
+      const { data: bottomDivision } = await supabase
         .from('divisions')
         .select('id')
-        .eq('name', 'Noodle')
+        .eq('level', 1)
         .single()
 
-      if (noodleDivision) {
+      if (bottomDivision) {
         const { error: insertError } = await supabase
           .from('user_divisions')
           .insert({
             user_id: user.id,
-            division_id: noodleDivision.id,
+            division_id: bottomDivision.id,
             joined_division_at: new Date().toISOString()
           })
 

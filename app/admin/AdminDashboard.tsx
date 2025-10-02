@@ -247,20 +247,20 @@ export default function AdminDashboard({
                       {getUserDivision(user.user_id) === 'Not Assigned' && (
                         <button
                           onClick={async () => {
-                            // Find Noodle division ID
-                            const noodleDiv = divisions.find(d => d.name === 'Noodle')
-                            if (noodleDiv) {
+                            // Find bottom division ID (level 1)
+                            const bottomDiv = divisions.find(d => d.level === 1)
+                            if (bottomDiv) {
                               setLoading(true)
                               try {
-                                await changeDivision(user.user_id, noodleDiv.id)
-                                setNotification({ 
-                                  message: `${user.display_name} assigned to ${noodleDiv.emoji} ${noodleDiv.name}`, 
-                                  type: 'success' 
+                                await changeDivision(user.user_id, bottomDiv.id)
+                                setNotification({
+                                  message: `${user.display_name} assigned to ${bottomDiv.emoji} ${bottomDiv.name}`,
+                                  type: 'success'
                                 })
                                 setTimeout(() => window.location.reload(), 1500)
                               } catch (error) {
-                                console.error('Error assigning to Noodle:', error)
-                                setNotification({ message: 'Failed to assign to Noodle', type: 'error' })
+                                console.error('Error assigning to bottom division:', error)
+                                setNotification({ message: 'Failed to assign to bottom division', type: 'error' })
                               }
                               setLoading(false)
                             }
@@ -268,7 +268,7 @@ export default function AdminDashboard({
                           disabled={loading}
                           className="ml-2 text-xs px-2 py-1 bg-orange-600 hover:bg-orange-700 rounded text-white disabled:opacity-50"
                         >
-                          Assign to Noodle
+                          Assign to Bottom Division
                         </button>
                       )}
                     </td>

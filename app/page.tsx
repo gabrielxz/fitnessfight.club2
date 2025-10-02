@@ -7,7 +7,7 @@ import WeekProgress from '@/app/components/WeekProgress'
 import InstallPrompt from '@/app/components/InstallPrompt'
 
 const divisionEmojis: Record<string, string> = {
-  'Noodle': '🍜',
+  'Zesty': '🌶️',
   'Sweaty': '💦',
   'Shreddy': '💪',
   'Juicy': '🧃'
