@@ -665,14 +665,17 @@ export class BadgeCalculator {
     await this.supabase.from('badge_progress').upsert({ ...progress })
   }
 
-  private async handleWeeklyCountBadge(badge: Badge, activity: Activity, progress: BadgeProgress, _timezone: string) {
+  private async handleWeeklyCountBadge(badge: Badge, activity: Activity, progress: BadgeProgress, timezone: string) {
     const { criteria } = badge
 
     // For Belfie badge - count weeks with photos
     if (criteria.condition === 'photo_count > 0') {
       if ((activity.photo_count || 0) > 0) {
-        // Check if this week has already been counted
-        const weekKey = progress.period_start || 'no_period'
+        // Calculate the week period from activity date
+        const period = await this.getCurrentPeriod('weekly', activity.start_date_local, timezone)
+        if (!period.start) return
+
+        const weekKey = period.start
         const metadata = progress.metadata || {}
         const countedWeeks = metadata.counted_weeks || []
 
