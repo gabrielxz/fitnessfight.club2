@@ -1,34 +1,33 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-
-// Helper to get week start (Monday)
-function getWeekStart(date: Date): Date {
-  const d = new Date(date)
-  const day = d.getUTCDay()
-  // If Sunday (0), treat as end of week (day 7)
-  const adjustedDay = day === 0 ? 7 : day
-  // Calculate days back to Monday (1)
-  const diff = d.getUTCDate() - (adjustedDay - 1)
-  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), diff, 0, 0, 0, 0))
-}
+import { getWeekBoundaries } from '@/lib/date-helpers'
 
 // GET /api/habits - Get user's habits with current week status
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient()
-    
+
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    // Get user's timezone
+    const { data: profile } = await supabase
+      .from('user_profiles')
+      .select('timezone')
+      .eq('id', user.id)
+      .single()
+
+    const timezone = profile?.timezone || 'America/New_York'
+
     // Get weeks parameter for history
     const { searchParams } = new URL(request.url)
     const weeksToFetch = parseInt(searchParams.get('weeks') || '1')
-    
-    // Calculate date ranges
+
+    // Calculate date ranges using user's timezone
     const now = new Date()
-    const currentWeekStart = getWeekStart(now)
+    const { weekStart: currentWeekStart } = getWeekBoundaries(now, timezone)
     const oldestWeekStart = new Date(currentWeekStart)
     oldestWeekStart.setDate(oldestWeekStart.getDate() - (7 * (weeksToFetch - 1)))
 
