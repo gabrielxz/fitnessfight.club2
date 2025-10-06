@@ -74,7 +74,7 @@ export class BadgeCalculator {
       .from('badges')
       .select('*')
       .eq('active', true)
-      .eq('criteria->type', 'habit_weeks')
+      .filter('criteria->>type', 'eq', 'habit_weeks')
 
     if (badgesError || !badges) {
       console.error('[BadgeCalculator] Error fetching habit badges:', badgesError)
