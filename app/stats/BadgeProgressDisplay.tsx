@@ -136,7 +136,7 @@ function BadgeProgressItem({ progress }: { progress: BadgeProgress }) {
   // Get tier colors
   const getTierColor = (tier: string) => {
     switch (tier) {
-      case 'bronze': return 'text-orange-600'
+      case 'bronze': return 'text-amber-600'
       case 'silver': return 'text-gray-400'
       case 'gold': return 'text-yellow-500'
       default: return 'text-gray-600'

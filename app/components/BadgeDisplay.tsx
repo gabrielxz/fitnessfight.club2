@@ -24,7 +24,7 @@ export default function BadgeDisplay({
   const tierColors = {
     gold: 'from-yellow-400 to-yellow-600',
     silver: 'from-gray-300 to-gray-500',
-    bronze: 'from-orange-600 to-orange-800'
+    bronze: 'from-amber-600 to-amber-800'
   }
   
   return (

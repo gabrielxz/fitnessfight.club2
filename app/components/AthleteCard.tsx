@@ -137,7 +137,7 @@ export default function AthleteCard({
                   absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-slate-900
                   ${badge.tier === 'gold' ? 'bg-gradient-to-br from-yellow-400 to-yellow-600' : ''}
                   ${badge.tier === 'silver' ? 'bg-gradient-to-br from-gray-300 to-gray-500' : ''}
-                  ${badge.tier === 'bronze' ? 'bg-gradient-to-br from-orange-600 to-orange-800' : ''}
+                  ${badge.tier === 'bronze' ? 'bg-gradient-to-br from-amber-600 to-amber-800' : ''}
                 `} />
               </div>
             ))}
