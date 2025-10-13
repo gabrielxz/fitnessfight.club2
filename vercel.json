@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/weekly-division-shuffle",
       "schedule": "0 10 * * 1"
+    },
+    {
+      "path": "/api/cron/daily-badge-check",
+      "schedule": "0 0 * * *"
     }
   ]
 }
