@@ -103,7 +103,7 @@ export async function GET(request: NextRequest) {
     const distinctWeekStarts = new Set<string>()
 
     for (const profile of userProfiles || []) {
-      const tz = profile.timezone || 'UTC'
+      const tz = profile.timezone || 'America/New_York'
       const { weekStart } = getWeekBoundaries(now, tz)
       const weekStartStr = weekStart.toISOString().split('T')[0]
       userWeekStarts.set(profile.id, weekStartStr)

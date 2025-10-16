@@ -81,6 +81,15 @@ export async function POST(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  // Get user's timezone from profile
+  const { data: profile } = await supabase
+    .from('user_profiles')
+    .select('timezone')
+    .eq('id', user.id)
+    .single()
+
+  const userTimezone = profile?.timezone || 'America/New_York'
+
   const { date, status } = await request.json()
   const { id: habitId } = await params
 
@@ -103,7 +112,7 @@ export async function POST(
 
   // Now update the entry
   let entry = null
-  const weekStartDate = getWeekBoundaries(new Date(date), user.user_metadata?.timezone || 'UTC').weekStart.toISOString().split('T')[0]
+  const weekStartDate = getWeekBoundaries(new Date(date), userTimezone).weekStart.toISOString().split('T')[0]
 
   if (status === 'NEUTRAL') {
     const { error } = await supabase
@@ -148,7 +157,7 @@ export async function POST(
       user.id,
       habitId,
       date,
-      user.user_metadata?.timezone || 'UTC'
+      userTimezone
     ).catch(error => {
       console.error('[Habit Points] Background processing failed:', error)
     })

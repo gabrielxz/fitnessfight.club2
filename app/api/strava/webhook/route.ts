@@ -67,13 +67,13 @@ export async function POST(request: NextRequest) {
       }
       
       // Fetch timezone separately to avoid join issues
-      let userTimezone = 'UTC'
+      let userTimezone = 'America/New_York'
       const { data: profile } = await supabase
         .from('user_profiles')
         .select('timezone')
         .eq('id', connection.user_id)
         .single()
-      
+
       if (profile?.timezone) {
         userTimezone = profile.timezone
       }

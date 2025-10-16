@@ -13,7 +13,7 @@ export async function GET() {
     }
 
     // Resolve user timezone
-    let timezone = 'UTC'
+    let timezone = 'America/New_York'
     const { data: profileTz } = await supabase
       .from('user_profiles')
       .select('timezone')

@@ -64,7 +64,7 @@ export async function POST() {
     const activities = await response.json()
 
     // Fetch user's timezone for accurate weekly boundaries
-    let userTimezone = 'UTC'
+    let userTimezone = 'America/New_York'
     const { data: profile } = await supabase
       .from('user_profiles')
       .select('timezone')
