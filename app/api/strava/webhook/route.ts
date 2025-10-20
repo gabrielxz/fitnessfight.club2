@@ -107,13 +107,15 @@ export async function POST(request: NextRequest) {
         case 'update':
           const activity = await fetchAndStoreActivity(object_id, connection, supabase)
           if (activity) {
-            activityDate = new Date(activity.start_date_local)
+            // Use start_date (UTC) instead of start_date_local to avoid timezone parsing bugs
+            activityDate = new Date(activity.start_date)
           }
           break
         case 'delete':
           const deletedActivity = await deleteActivity(object_id, supabase)
           if (deletedActivity) {
-            activityDate = new Date(deletedActivity.start_date_local)
+            // Use start_date (UTC) instead of start_date_local to avoid timezone parsing bugs
+            activityDate = new Date(deletedActivity.start_date)
           }
           break
       }
