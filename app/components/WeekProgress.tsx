@@ -24,7 +24,7 @@ export default function WeekProgress() {
 
       const msRemaining = monday.getTime() - now.getTime()
       const days = Math.ceil(msRemaining / (1000 * 60 * 60 * 24))
-      setDaysRemaining(Math.min(days, 8)) // Can be up to 8 days if early Monday
+      setDaysRemaining(Math.min(days, 7)) // Max 7 days in a week
 
       // Calculate week progress (0-100%) - Monday 10:00 UTC is both start and end
       const weekStart = new Date(now)

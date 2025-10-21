@@ -473,7 +473,7 @@ export class BadgeCalculator {
         value = (activity.average_speed || 0) * 3.6
         break
       case 'moving_time_minutes':
-        value = (activity.moving_time || 0) / 60
+        value = (activity.elapsed_time || 0) / 60
         break
       case 'athlete_count':
         value = activity.athlete_count || 1
