@@ -27,7 +27,8 @@ async function processHabitCompletion(
     return
   }
 
-  const entryDate = new Date(date)
+  // Parse the date string in the user's timezone by appending time
+  const entryDate = new Date(date + 'T12:00:00') // Use noon to avoid timezone parsing bugs
   const { weekStart, weekEnd } = getWeekBoundaries(entryDate, timezone)
   const weekStartStr = weekStart.toISOString().split('T')[0]
   const weekEndStr = weekEnd.toISOString().split('T')[0]
@@ -112,7 +113,10 @@ export async function POST(
 
   // Now update the entry
   let entry = null
-  const weekStartDate = getWeekBoundaries(new Date(date), userTimezone).weekStart.toISOString().split('T')[0]
+  // Parse the date string in the user's timezone by appending time
+  // The date comes from the client as "YYYY-MM-DD" which needs to be interpreted in the user's timezone
+  const dateInUserTZ = new Date(date + 'T12:00:00') // Use noon to avoid DST edge cases
+  const weekStartDate = getWeekBoundaries(dateInUserTZ, userTimezone).weekStart.toISOString().split('T')[0]
 
   if (status === 'NEUTRAL') {
     const { error } = await supabase
