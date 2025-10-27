@@ -1,16 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-
-// Helper functions for week calculations
-function getWeekStart(date: Date): Date {
-  const d = new Date(date)
-  const day = d.getUTCDay()
-  // If Sunday (0), treat as end of week (day 7)
-  const adjustedDay = day === 0 ? 7 : day
-  // Calculate days back to Monday (1)
-  const diff = d.getUTCDate() - (adjustedDay - 1)
-  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), diff, 0, 0, 0, 0))
-}
+import { getWeekBoundaries } from '@/lib/date-helpers'
 
 export async function GET() {
   const supabase = await createClient()
@@ -20,8 +10,18 @@ export async function GET() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  // Get current week for filtering weekly badges
-  const currentWeekStart = getWeekStart(new Date()).toISOString().split('T')[0]
+  // Get user's timezone for timezone-aware week calculation
+  const { data: profile } = await supabase
+    .from('user_profiles')
+    .select('timezone')
+    .eq('id', user.id)
+    .single()
+
+  const userTimezone = profile?.timezone || 'America/New_York'
+
+  // Get current week for filtering weekly badges (timezone-aware)
+  const { weekStart } = getWeekBoundaries(new Date(), userTimezone)
+  const currentWeekStart = weekStart.toISOString().split('T')[0]
 
   // Get all badges first
   const { data: allBadges } = await supabase
