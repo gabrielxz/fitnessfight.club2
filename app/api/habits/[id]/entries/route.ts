@@ -53,7 +53,7 @@ async function processHabitCompletion(
     return
   }
 
-  const previousSuccessCount = successEntries.filter(e => new Date(e.date).getTime() !== entryDate.getTime()).length
+  const previousSuccessCount = successEntries.filter(e => e.date !== date).length
 
   if (previousSuccessCount < target) {
     console.log(`[Habit Points] Habit ${habitId} completed for week ${weekStartStr}. Awarding points.`)
