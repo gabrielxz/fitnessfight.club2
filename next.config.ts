@@ -166,6 +166,7 @@ const withPWA = nextPwa({
 })
 
 const nextConfig: NextConfig = {
+  turbopack: {}, // Silence Turbopack/webpack compatibility warning in Next.js 16
   images: {
     remotePatterns: [
       {
