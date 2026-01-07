@@ -30,8 +30,44 @@ export default async function HistoryPage() {
             </div>
           </div>
 
-          {/* Season 2 - Omar Farías */}
+          {/* Season 3 - Brian Clonaris */}
           <div className="mb-12 animate-fadeIn">
+            <div className="glass-card p-8 rounded-2xl">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h2 className="text-3xl font-bold text-white mb-2">
+                    Season 3 Champion
+                  </h2>
+                  <p className="text-2xl gradient-text font-bold">
+                    Brian Clonaris
+                  </p>
+                </div>
+                <div className="text-5xl">🥇</div>
+              </div>
+
+              <div className="mb-4">
+                <p className="text-gray-300 mb-2">
+                  Congratulations from <span className="font-semibold text-orange-400">Tommy Chong</span>
+                </p>
+                <p className="text-sm text-gray-400 italic">
+                  Comedy Legend &amp; Star of &ldquo;That &apos;70s Show&rdquo;
+                </p>
+              </div>
+
+              <div className="relative aspect-video rounded-xl overflow-hidden">
+                <iframe
+                  src="https://www.youtube.com/embed/cnvI2NPkL5Q"
+                  title="Tommy Chong congratulates Brian Clonaris"
+                  className="absolute inset-0 w-full h-full"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Season 2 - Omar Farías */}
+          <div className="mb-12 animate-fadeIn" style={{ animationDelay: '0.2s' }}>
             <div className="glass-card p-8 rounded-2xl">
               <div className="flex items-center justify-between mb-6">
                 <div>
@@ -44,7 +80,7 @@ export default async function HistoryPage() {
                 </div>
                 <div className="text-5xl">🥇</div>
               </div>
-              
+
               <div className="mb-4">
                 <p className="text-gray-300 mb-2">
                   Congratulations from <span className="font-semibold text-orange-400">Jonathan Van Ness</span>
@@ -67,7 +103,7 @@ export default async function HistoryPage() {
           </div>
 
           {/* Season 1 - Samantha Perlmutter */}
-          <div className="mb-12 animate-fadeIn" style={{ animationDelay: '0.2s' }}>
+          <div className="mb-12 animate-fadeIn" style={{ animationDelay: '0.4s' }}>
             <div className="glass-card p-8 rounded-2xl">
               <div className="flex items-center justify-between mb-6">
                 <div>
