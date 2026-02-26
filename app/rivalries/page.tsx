@@ -1,10 +1,9 @@
 import { createClient } from '@/lib/supabase/server'
 import AnimatedBackground from '@/app/components/AnimatedBackground'
 import Navigation from '@/app/components/Navigation'
-import Leaderboard from '@/app/components/Leaderboard'
-import InstallPrompt from '@/app/components/InstallPrompt'
+import RivalriesView from './RivalriesView'
 
-export default async function Page() {
+export default async function RivalriesPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
@@ -12,21 +11,11 @@ export default async function Page() {
     <div className="min-h-screen relative">
       <AnimatedBackground />
       <Navigation user={user} />
-
       <main className="relative z-10 pt-24 pb-12 px-4 sm:px-6 lg:px-8">
         <div className="max-w-2xl mx-auto">
-          {/* Hero Section */}
-          <div className="text-center mb-10">
-            <h1 className="text-5xl lg:text-7xl font-black mb-4">
-              <span className="gradient-text">Fitness Fight Club</span>
-            </h1>
-            <p className="text-gray-400 text-lg">Points. Badges. Flex.</p>
-          </div>
-
-          <Leaderboard />
+          <RivalriesView />
         </div>
       </main>
-      <InstallPrompt />
     </div>
   )
 }

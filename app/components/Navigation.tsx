@@ -24,6 +24,8 @@ export default function Navigation({ user }: NavigationProps) {
 
   const navItems = [
     { href: '/', label: 'Leaderboard', icon: '🏆' },
+    { href: '/rivalries', label: 'Rivalries', icon: '⚔️' },
+    { href: '/faq', label: 'FAQ', icon: '📖' },
     ...(user ? [
       { href: '/habits', label: 'Habits', icon: '✅' },
       { href: '/profile', label: 'Profile', icon: '👤' },

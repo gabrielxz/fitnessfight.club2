@@ -110,9 +110,16 @@ A web application that syncs with Strava to track exercise data and create custo
    - Tracks all division changes
    - Records final points and position
 
-8. **user_points** - Weekly points cache
-   - Points calculation: 1 point per hour, max 10/week
-   - Cached to avoid recalculation on each page load
+8. **weekly_exercise_tracking** - Weekly exercise hours and cap enforcement
+   - Tracks hours logged per week (moving_time from activities)
+   - Enforces 10-hour/week cap for exercise points
+   - Points stored in user_profiles.total_cumulative_points (not in this table)
+
+   **Note**: The old `user_points` table was dropped in migration 022. Points are now tracked cumulatively in `user_profiles` with columns:
+   - `cumulative_exercise_points` - Exercise points (1 pt/hour, max 10/week)
+   - `cumulative_habit_points` - Habit completion points (0.5 pts per weekly target)
+   - `cumulative_badge_points` - Badge achievement points (3/6/15 for bronze/silver/gold)
+   - `total_cumulative_points` - Generated column (auto-sum of above three)
 
 ### Views
 - **weekly_activity_stats** - Pre-calculated weekly statistics
@@ -232,9 +239,42 @@ ALTER TABLE strava_activities DISABLE ROW LEVEL SECURITY;
 **Behavior**: Deletes user from:
 - auth.users (authentication account)
 - strava_activities (all activity data)
-- user_profiles, user_divisions, user_badges, user_points
+- user_profiles, user_divisions, user_badges, weekly_exercise_tracking, badge_progress
 - division_history records
 **Note**: User session is invalidated before deletion to prevent ghost sessions
+
+### 7. Timezone Inconsistency Across APIs (Fixed - Oct 2025)
+**Issue**: Different APIs were using different timezone sources and defaults:
+- Habits entries API used `user.user_metadata.timezone` (never set) → defaulted to UTC
+- Other APIs used `user_profiles.timezone` → defaulted to various values
+- This caused weekly reset to happen at different times for different features
+
+**Root Cause**: The habits entries API defaulting to UTC made activities/habits at midnight appear to belong to the previous day in EST, assigning them to the wrong week.
+
+**Solution**: Standardized all APIs to:
+- Fetch timezone from `user_profiles.timezone` table
+- Default to `America/New_York` (EST) when not set
+- Files updated: `app/api/habits/[id]/entries/route.ts`, `app/api/divisions/route.ts`, `app/api/stats/weekly/route.ts`, `app/api/strava/webhook/route.ts`, `app/api/strava/sync/route.ts`
+
+**Impact**: Weekly reset now consistently happens at Monday 12:00 AM EST for all users without custom timezones.
+
+### 8. Webhook Activity Week Assignment Bug (Fixed - Oct 2025)
+**Issue**: Strava webhook was using `start_date_local` to determine which week to assign exercise points, but JavaScript's `new Date()` parser treats the local time string as UTC, causing activities to be miscategorized.
+
+**Example**: Activity at 12:35 AM local time would be parsed as 12:35 AM UTC, then converted to user's timezone (8:35 PM previous day EST), placing it in the previous week instead of current week.
+
+**Solution**: Changed webhook to use `start_date` (proper UTC timestamp) instead of `start_date_local` in `/app/api/strava/webhook/route.ts`.
+
+**Impact**: Activities now correctly count toward the week they actually occurred in based on the user's timezone.
+
+### 9. Habit Entries Date Parsing Bug (Fixed - Oct 2025)
+**Issue**: When users clicked to mark habits as done on Monday, entries were saved with the previous week's `week_start`, making them invisible to users.
+
+**Root Cause**: Date strings like "2025-10-20" were parsed as midnight UTC by `new Date("2025-10-20")`, which when converted to EST became the previous day at 8pm, causing `week_start` calculation to use the previous week.
+
+**Solution**: Changed date parsing to append 'T12:00:00' (noon UTC) to ensure the date stays on the same calendar day when converted to any timezone in `/app/api/habits/[id]/entries/route.ts`.
+
+**Known Legacy Data**: 37 habit entries from 9 users (Oct 13-20, 2025) still have incorrect `week_start` values and are invisible to those users. These entries are all off by exactly 1 week. Could be fixed with a data migration if needed.
 
 ## Development Workflow
 
@@ -267,12 +307,13 @@ Run migrations in Supabase SQL Editor (in order):
 9. `009_update_cumulative_points.sql` - Cumulative points tracking
 10. `010_add_timezone_to_user_profiles.sql` - Timezone support
 11. `011_add_cumulative_points.sql` - Enhanced cumulative points
-12. `012_refactor_user_points.sql` - Split points into exercise/habit/badge
+12. `012_refactor_user_points.sql` - Split points into exercise/habit/badge (superseded by 022)
 13. `013_add_increment_badge_points_fn.sql` - Badge points function
 14. `014_add_user_id_to_habit_entries.sql` - Habit entries fix
 15. `016_fix_habit_summaries_rls.sql` - Habit summaries RLS fix
 16. `017_reset_badges_add_dates.sql` - Badge date fields
 17. `018_add_suffer_score.sql` - Relative Effort tracking
+18. `022_cumulative_points_system.sql` - Drop user_points table, move to cumulative scoring in user_profiles
 
 ## Utility Scripts
 
@@ -463,7 +504,8 @@ A mini habit tracker inspired by HabitShare, allowing users to track daily habit
 
 ### Integration
 - Added "Habits" link to Navigation (logged-in users only)
-- Weekly cron job calculates habit points and adds to user_points
+- Habit points (0.5 pts) awarded immediately to user_profiles.cumulative_habit_points when weekly target is met
+- Weekly cron job evaluates habit badges (Rock Solid) for users who achieved 100% on first 5 habits
 - Habits ordered by position, then creation date
 
 ### Implementation Notes
@@ -727,7 +769,8 @@ A mini habit tracker inspired by HabitShare, allowing users to track daily habit
 
 ### Integration
 - Added "Habits" link to Navigation (logged-in users only)
-- Weekly cron job calculates habit points and adds to user_points
+- Habit points (0.5 pts) awarded immediately to user_profiles.cumulative_habit_points when weekly target is met
+- Weekly cron job evaluates habit badges (Rock Solid) for users who achieved 100% on first 5 habits
 - Habits ordered by position, then creation date
 
 ### Implementation Notes
