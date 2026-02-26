@@ -299,6 +299,7 @@ const PODIUM_CONFIG = {
     avatarSize: 96,
     glowShadow: '0 0 0 3px rgba(234,179,8,0.9), 0 0 24px rgba(234,179,8,0.4)',
     outerShadow: '0 0 40px rgba(234,179,8,0.2), 0 8px 32px rgba(0,0,0,0.4)',
+    minHeight: 300,
   },
   2: {
     ringColor: 'rgba(209, 213, 219, 0.9)',
@@ -310,6 +311,7 @@ const PODIUM_CONFIG = {
     avatarSize: 72,
     glowShadow: '0 0 0 3px rgba(209,213,219,0.8)',
     outerShadow: '0 4px 16px rgba(0,0,0,0.3)',
+    minHeight: 220,
   },
   3: {
     ringColor: 'rgba(217, 119, 6, 0.9)',
@@ -321,13 +323,13 @@ const PODIUM_CONFIG = {
     avatarSize: 72,
     glowShadow: '0 0 0 3px rgba(217,119,6,0.8)',
     outerShadow: '0 4px 16px rgba(0,0,0,0.3)',
+    minHeight: 220,
   },
 } as const
 
-function PodiumCard({ entry, isCurrentUser, marginTop }: {
+function PodiumCard({ entry, isCurrentUser }: {
   entry: LeaderboardEntry
   isCurrentUser: boolean
-  marginTop?: number
 }) {
   const config = PODIUM_CONFIG[entry.rank as 1 | 2 | 3]
   const isFirst = entry.rank === 1
@@ -341,7 +343,7 @@ function PodiumCard({ entry, isCurrentUser, marginTop }: {
         boxShadow: isCurrentUser
           ? `${config.outerShadow}, 0 0 0 2px rgba(251,146,60,0.7)`
           : config.outerShadow,
-        marginTop: marginTop ?? 0,
+        minHeight: config.minHeight,
       }}
     >
       {/* Content area */}
@@ -534,14 +536,14 @@ export default function Leaderboard() {
       {podium.length > 0 && (
         <div className="mb-4">
           {podium.length === 3 ? (
-            <div className="grid grid-cols-3 gap-2 items-start">
+            <div className="flex gap-2 items-end">
               {[podium[1], podium[0], podium[2]].map(entry => (
-                <PodiumCard
-                  key={entry.user_id}
-                  entry={entry}
-                  isCurrentUser={entry.user_id === current_user_id}
-                  marginTop={entry.rank === 1 ? 0 : 40}
-                />
+                <div key={entry.user_id} className="flex-1">
+                  <PodiumCard
+                    entry={entry}
+                    isCurrentUser={entry.user_id === current_user_id}
+                  />
+                </div>
               ))}
             </div>
           ) : (
