@@ -327,9 +327,10 @@ const PODIUM_CONFIG = {
   },
 } as const
 
-function PodiumCard({ entry, isCurrentUser }: {
+function PodiumCard({ entry, isCurrentUser, marginTop }: {
   entry: LeaderboardEntry
   isCurrentUser: boolean
+  marginTop?: number
 }) {
   const config = PODIUM_CONFIG[entry.rank as 1 | 2 | 3]
   const isFirst = entry.rank === 1
@@ -343,7 +344,8 @@ function PodiumCard({ entry, isCurrentUser }: {
         boxShadow: isCurrentUser
           ? `${config.outerShadow}, 0 0 0 2px rgba(251,146,60,0.7)`
           : config.outerShadow,
-        minHeight: config.minHeight,
+        marginTop: marginTop ?? 0,
+        ...(isFirst ? { minHeight: config.minHeight } : {}),
       }}
     >
       {/* Content area */}
@@ -376,7 +378,7 @@ function PodiumCard({ entry, isCurrentUser }: {
         </div>
 
         {/* Name */}
-        <div className={`font-black leading-tight ${isFirst ? 'text-lg' : 'text-base'}`}>
+        <div className={`font-black leading-tight w-full ${isFirst ? 'text-lg' : 'text-base truncate'}`}>
           {isCurrentUser ? 'You' : entry.name}
         </div>
 
@@ -384,10 +386,11 @@ function PodiumCard({ entry, isCurrentUser }: {
         {entry.rival && (
           <Link
             href="/rivalries"
-            className="text-xs flex items-center justify-center gap-1 hover:text-orange-400 transition-colors -mt-1"
+            className="text-xs flex items-center justify-center gap-1 hover:text-orange-400 transition-colors -mt-1 max-w-full"
             style={{ color: 'rgba(255,255,255,0.4)' }}
           >
-            ⚔️ {entry.rival.name}
+            <span>⚔️</span>
+            <span className={isFirst ? '' : 'truncate'}>{entry.rival.name}</span>
           </Link>
         )}
 
@@ -536,14 +539,14 @@ export default function Leaderboard() {
       {podium.length > 0 && (
         <div className="mb-4">
           {podium.length === 3 ? (
-            <div className="flex gap-2 items-end">
+            <div className="grid grid-cols-3 gap-2 items-start">
               {[podium[1], podium[0], podium[2]].map(entry => (
-                <div key={entry.user_id} className="flex-1">
-                  <PodiumCard
-                    entry={entry}
-                    isCurrentUser={entry.user_id === current_user_id}
-                  />
-                </div>
+                <PodiumCard
+                  key={entry.user_id}
+                  entry={entry}
+                  isCurrentUser={entry.user_id === current_user_id}
+                  marginTop={entry.rank === 1 ? 0 : 40}
+                />
               ))}
             </div>
           ) : (
