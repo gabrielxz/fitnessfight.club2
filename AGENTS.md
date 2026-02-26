@@ -95,7 +95,7 @@ A web application that syncs with Strava to track exercise data and create custo
 
 4. **user_profiles** - User metadata and cumulative scores
    - `email`, `full_name`, `avatar_url`, `timezone`
-   - `cumulative_exercise_points` - Exercise points (1 pt/hr, max 9/week — see Season 4)
+   - `cumulative_exercise_points` - Exercise points (1 pt/hr, max 10/week)
    - `cumulative_habit_points` - Habit completion points (0.5 pts per weekly target met)
    - `cumulative_badge_points` - Badge achievement points (3/6/15 for bronze/silver/gold)
    - `total_cumulative_points` - GENERATED column (auto-sum of above three)
@@ -162,7 +162,7 @@ A web application that syncs with Strava to track exercise data and create custo
 - Explains kill marks, score multiplier, rivalry schedule
 
 ### Points System
-- **Exercise**: 1 pt/hour, capped at **9 hrs/week** (Season 4; was 10)
+- **Exercise**: 1 pt/hour, capped at **10 hrs/week** (planned to lower to 9 for Season 4 — not yet implemented)
 - **Habits**: 0.5 pts per habit that meets its weekly target; first 5 habits only
 - **Badges**: 3 pts (bronze) / 6 pts (silver) / 15 pts (gold), awarded once per tier
 - **Kill marks**: ×(1 + kills × 0.01) multiplier on total, applied at display/ranking time
