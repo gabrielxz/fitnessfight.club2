@@ -17,764 +17,418 @@ A web application that syncs with Strava to track exercise data and create custo
 ```
 ├── app/
 │   ├── admin/
-│   │   ├── page.tsx              # Admin dashboard page (fetches from auth.users)
-│   │   ├── AdminDashboard.tsx    # Admin UI component with user management
-│   │   └── actions.ts            # Server actions (deleteUser, assignBadge, changeDivision)
+│   │   ├── page.tsx                      # Admin dashboard page
+│   │   ├── AdminDashboard.tsx            # Admin UI component
+│   │   ├── actions.ts                    # Server actions (deleteUser, assignBadge)
+│   │   ├── HabitSummaryGenerator.tsx     # WhatsApp summary generator
+│   │   ├── SummaryParticipantsManager.tsx
+│   │   ├── CompetitionResetSection.tsx   # Nuclear reset button
+│   │   ├── UserDiagnosticsSection.tsx    # Diagnose/fix missing DB entries
+│   │   ├── summary-actions.ts
+│   │   ├── competition-reset-actions.ts
+│   │   └── user-fix-actions.ts
 │   ├── api/
-│   │   ├── badges/
-│   │   │   └── progress/         # Badge progress API with period support
+│   │   ├── admin/generate-habit-summary/ # Habit summary API
+│   │   ├── badges/progress/              # Badge progress API
 │   │   ├── cron/
-│   │   │   └── weekly-division-shuffle/  # Weekly division promotions/relegations + badge resets
-│   │   ├── divisions/            # Division standings API
-│   │   ├── stats/weekly/         # Weekly activity statistics
+│   │   │   └── weekly-division-shuffle/  # Weekly habit badge eval + badge resets
+│   │   ├── habits/                       # Habit CRUD + entries
+│   │   ├── leaderboard/                  # Unified leaderboard API (Season 4)
+│   │   ├── rivalries/                    # Rivalry periods + matchups API (Season 4)
+│   │   ├── stats/weekly/                 # Weekly activity statistics
 │   │   └── strava/
-│   │       ├── callback/         # Strava OAuth callback
-│   │       ├── connect/          # Initiate Strava OAuth
-│   │       ├── sync/             # Manual activity sync (with points/badges calculation)
-│   │       └── webhook/          # Strava webhook receiver + points calculation
+│   │       ├── callback/                 # Strava OAuth callback
+│   │       ├── connect/                  # Initiate Strava OAuth
+│   │       ├── disconnect/               # Disconnect Strava
+│   │       ├── sync/                     # Manual activity sync
+│   │       └── webhook/                  # Strava webhook receiver + points calculation
 │   ├── auth/
-│   │   ├── callback/             # Supabase OAuth callback
-│   │   ├── signout/              # Sign out handler
-│   │   └── auth-code-error/      # OAuth error page
+│   │   ├── callback/                     # Supabase OAuth callback
+│   │   ├── signout/                      # Sign out handler
+│   │   └── auth-code-error/              # OAuth error page
 │   ├── components/
-│   │   ├── DivisionLeaderboard.tsx # Division standings & leaderboard
-│   │   ├── DivisionSelector.tsx    # My Division/Global toggle
-│   │   ├── LoggedInView.tsx        # Authenticated user view
-│   │   ├── AthleteCard.tsx         # Individual athlete display
-│   │   ├── Navigation.tsx          # App navigation with mobile menu
-│   │   ├── strava-connection.tsx   # Strava connection UI
-│   │   ├── sync-activities.tsx     # Manual sync button
-│   │   └── WeekProgress.tsx        # Week progress bar
-│   ├── login/                       # Login/signup page
-│   ├── profile/                     # User profile page
-│   ├── stats/                       # Stats page (NEW)
-│   │   ├── page.tsx                 # Stats page server component
-│   │   └── BadgeProgressDisplay.tsx # Badge progress visualization
-│   └── page.tsx                     # Landing/Dashboard (conditional based on auth)
-├── context/                      # Release planning documents
-│   ├── release-1-divisions-and-points.md
-│   ├── release-2-ui-redesign.md
-│   └── release-3-badge-system.md
+│   │   ├── AnimatedBackground.tsx        # Canvas-based particle animation
+│   │   ├── Leaderboard.tsx               # Unified leaderboard (Season 4)
+│   │   ├── Navigation.tsx                # App navigation with mobile menu
+│   │   ├── InstallPrompt.tsx             # PWA install prompt
+│   │   └── strava-connection.tsx         # Strava connection UI
+│   ├── faq/
+│   │   ├── page.tsx                      # FAQ server component (Season 4)
+│   │   └── FAQContent.tsx                # FAQ accordion client component
+│   ├── habits/                           # Habit tracker pages
+│   ├── history/                          # Season history page
+│   ├── login/                            # Login/signup page
+│   ├── profile/                          # User profile page
+│   ├── rivalries/
+│   │   ├── page.tsx                      # Rivalries server component (Season 4)
+│   │   └── RivalriesView.tsx             # Rivalries UI client component
+│   ├── stats/                            # Stats page
+│   │   ├── page.tsx
+│   │   └── BadgeProgressDisplay.tsx
+│   └── page.tsx                          # Home page (unified leaderboard)
 ├── lib/
 │   ├── badges/
-│   │   └── BadgeCalculator.ts    # Badge calculation logic
+│   │   └── BadgeCalculator.ts            # Badge calculation logic
 │   └── supabase/
-│       ├── client.ts              # Browser client
-│       ├── server.ts              # Server client
-│       ├── admin.ts               # Admin client with service role
-│       └── middleware.ts          # Session refresh
-├── middleware.ts                 # Auth middleware
+│       ├── client.ts                     # Browser client
+│       ├── server.ts                     # Server client
+│       ├── admin.ts                      # Admin client (service role)
+│       └── middleware.ts                 # Session refresh
+├── middleware.ts                         # Auth middleware
 ├── scripts/
-│   └── setup-webhook.js          # Strava webhook management
-├── supabase/migrations/          # Database migrations
-│   ├── 001_create_strava_connections.sql
-│   ├── 002_create_strava_activities.sql
-│   ├── 003_create_divisions.sql
-│   ├── 004_create_badges.sql
-│   ├── 005_admin_policies.sql   # Admin RLS policies
-│   ├── 006_create_user_profiles.sql # User profiles for names/emails
-│   └── 007_add_weekly_badge_support.sql # Periodic badge support (NEW)
-└── vercel.json                   # Cron job configuration
+│   └── setup-webhook.js                  # Strava webhook management
+├── supabase/migrations/                  # Database migrations (run in order)
+└── vercel.json                           # Cron job configuration
 ```
 
 ## Database Schema
 
 ### Core Tables
-1. **strava_connections** - Stores user's Strava OAuth tokens and profile
+1. **strava_connections** - Strava OAuth tokens and profile
    - RLS: Public read (for webhooks), user-controlled write
 
-2. **strava_activities** - Stores all Strava activity data
+2. **strava_activities** - All Strava activity data
    - RLS: **DISABLED** (webhooks need to insert without auth)
-   - Soft delete support via `deleted_at` column
+   - Soft delete via `deleted_at`
 
-3. **strava_webhook_events** - Logs all webhook events for debugging
-   - Tracks processing status and errors
+3. **strava_webhook_events** - Webhook event log for debugging
 
-4. **user_profiles** - Stores user metadata from Google OAuth
-   - Created by migration 006_create_user_profiles.sql
-   - Stores email, full_name, avatar_url
-   - Populated on login via auth callback
-   - Prevents UUID display issues
-
-### Division System Tables (Release 1)
-5. **divisions** - Division definitions (Noodle, Sweaty, Shreddy, Juicy)
-   - 4 levels with fun names and emojis
-   - Min/max user limits per division
-
-6. **user_divisions** - Current division assignments
-   - Tracks which division each user is in
-   - Join date for division tenure tracking
-   - New users auto-assigned to Noodle division on first login
-
-7. **division_history** - Promotion/relegation history
-   - Tracks all division changes
-   - Records final points and position
-
-8. **weekly_exercise_tracking** - Weekly exercise hours and cap enforcement
-   - Tracks hours logged per week (moving_time from activities)
-   - Enforces 10-hour/week cap for exercise points
-   - Points stored in user_profiles.total_cumulative_points (not in this table)
-
-   **Note**: The old `user_points` table was dropped in migration 022. Points are now tracked cumulatively in `user_profiles` with columns:
-   - `cumulative_exercise_points` - Exercise points (1 pt/hour, max 10/week)
-   - `cumulative_habit_points` - Habit completion points (0.5 pts per weekly target)
+4. **user_profiles** - User metadata and cumulative scores
+   - `email`, `full_name`, `avatar_url`, `timezone`
+   - `cumulative_exercise_points` - Exercise points (1 pt/hr, max 9/week — see Season 4)
+   - `cumulative_habit_points` - Habit completion points (0.5 pts per weekly target met)
    - `cumulative_badge_points` - Badge achievement points (3/6/15 for bronze/silver/gold)
-   - `total_cumulative_points` - Generated column (auto-sum of above three)
+   - `total_cumulative_points` - GENERATED column (auto-sum of above three)
 
-### Views
-- **weekly_activity_stats** - Pre-calculated weekly statistics
+### Division System Tables (Legacy — not used in Season 4 UI)
+5. **divisions** - Division definitions (Noodle, Sweaty, Shreddy, Juicy)
+6. **user_divisions** - Current division assignments
+7. **division_history** - Promotion/relegation history
+
+### Points & Tracking
+8. **weekly_exercise_tracking** - Weekly exercise hours and cap enforcement
+   - Tracks hours logged per week; enforces the weekly exercise point cap
+
+### Badge System
+9. **badges** - Badge definitions with criteria JSON
+10. **user_badges** - Earned badges per user (with tier: bronze/silver/gold)
+11. **badge_progress** - Per-user progress toward each badge
+
+### Habit Tracker
+12. **habits** - User habit definitions (name, target_frequency 1-7, position, archived_at)
+13. **habit_entries** - Daily status per habit (SUCCESS/FAILURE/NEUTRAL)
+
+### Season 4: Rivalries
+14. **rivalry_periods** - Bi-weekly competition windows
+    - `period_number`, `start_date`, `end_date`
+    - `metric` (distance/moving_time/elevation_gain/suffer_score)
+    - `metric_label`, `metric_unit`
+    - RLS: public read, admin write only
+
+15. **rivalry_matchups** - Player pairings per period
+    - `period_id`, `player1_id`, `player2_id`, `winner_id` (NULL = in-progress or tie)
+    - Each player appears at most once per period
+    - RLS: public read, admin write only
+
+### Admin
+16. **summary_participants** - WhatsApp summary participant list
+
+---
 
 ## Key Features
 
+### Season 4: Unified Leaderboard + Rivalries (Current)
+
+**Leaderboard** (`/api/leaderboard`, `app/components/Leaderboard.tsx`):
+- Single ranked list — no divisions
+- Top 3 shown as a podium (1ST center, 2ND left, 3RD right)
+- Each entry shows: avatar, rank, name, rival name (⚔️ link), score, hours this week, kill marks, badge drawer
+- Kill marks (💀): awarded per rivalry win; each adds 1% to your score multiplier
+  - `adjusted_points = total_cumulative_points × (1 + kill_marks × 0.01)`
+  - Kill mark multiplier affects ranking AND display
+- Clickable score → breakdown popout (exercise / habit / badge / kills / total)
+- Soft zone tinting for rows 4+: warm orange (top 30%), cool blue (bottom 30%)
+- `isAbsoluteUrl()` guard prevents next/image errors from relative Strava avatar URLs
+
+**Rivalries** (`/api/rivalries`, `/rivalries`):
+- Bi-weekly 1v1 matchups on a rotating metric (distance, time, elevation, suffer score)
+- VS hero layout: large avatars, live metric progress bar, winner crown, kill marks
+- `SeasonSchedule` shows all periods with NOW indicator
+- Pairing logic (manual admin SQL): rank-adjacent, novel matchups preferred, odd player sits out
+- Tie = no kill mark awarded; winner gets 💀 on their record
+
+**FAQ** (`/faq`):
+- Accordion sections: Points, Leaderboard, Rivalries, Badges, General
+- Explains kill marks, score multiplier, rivalry schedule
+
+### Points System
+- **Exercise**: 1 pt/hour, capped at **9 hrs/week** (Season 4; was 10)
+- **Habits**: 0.5 pts per habit that meets its weekly target; first 5 habits only
+- **Badges**: 3 pts (bronze) / 6 pts (silver) / 15 pts (gold), awarded once per tier
+- **Kill marks**: ×(1 + kills × 0.01) multiplier on total, applied at display/ranking time
+
+### Badge System (7 active badge types)
+1. 🥵 **Tryhard** — Relative Effort (suffer score) in one week (600/350/150)
+2. 🏔 **Everester** — Cumulative elevation gain in meters (4424/2212/600)
+3. 🐂 **Iron Calves** — Bike miles in a week (90/50/10)
+4. 🧘 **Zen Master** — Yoga hours in a week (10/4/1)
+5. 📸 **Belfie** — Weeks with photo attachments (12/6/1)
+6. ⚽ **Pitch Perfect** — Soccer minutes in single session (100/60/30)
+7. 🎾 **Net Gain** — Distinct racquet sports played (4/2/1)
+
+Badge point values: Gold 15 pts / Silver 6 pts / Bronze 3 pts
+
+### Habit Tracker (`/habits`)
+- Add habits with name and target frequency (1-7 days/week)
+- Daily tracking: NEUTRAL → SUCCESS → FAILURE cycle
+- 0.5 pts per habit meeting weekly target; only first 5 habits count
+- Weekly cron evaluates habit badges for users with 100% completion
+- Soft delete preserves history
+
 ### Authentication Flow
 1. Users sign up/login via Supabase Auth (email or Google)
-2. Protected routes redirect to `/login` if not authenticated
-3. Session management handled by middleware
+2. Protected routes redirect to `/login`
+3. Session management via middleware
 
 ### Strava Integration
-1. **OAuth Connection**: Users connect via `/api/strava/connect`
-2. **Webhook Processing**: Automatic activity sync on create/update/delete
-3. **Manual Sync**: "Sync Now" button fetches last 30 activities
-4. **Token Refresh**: Automatic refresh when tokens expire
+1. **OAuth Connection**: `/api/strava/connect`
+2. **Webhook Processing**: Automatic sync on activity create/update/delete
+3. **Manual Sync**: "Sync Now" fetches last 30 activities
+4. **Token Refresh**: Automatic on expiry
+5. **Disconnect**: `/api/strava/disconnect`
 
-### Activity Tracking
-- Stores full activity data (distance, time, elevation, etc.)
-- Weekly hours calculation with week-over-week comparison
-- Soft delete for activities removed from Strava
+### Admin Dashboard (`/admin` — Gabriel Beal only)
+- **User Management**: View all users; delete; diagnose/repair missing DB entries
+- **Badge Management**: Manually assign/remove bronze/silver/gold badges
+- **WhatsApp Summary Generator**: Generate weekly habit summaries for group chat
+- **Competition Reset**: 4-step nuclear reset (clears points, badges, activities, habits)
+- Note: Division management UI still present but divisions are not used in Season 4 leaderboard
 
-### Division System (Release 1 - Implemented)
-- **4 Divisions**: Noodle 🍜 (Level 1) → Sweaty 💦 (Level 2) → Shreddy 💪 (Level 3) → Juicy 🧃 (Level 4)
-- **Display Order**: Juicy shown first (most competitive), then descending by level
-- **Points System**: 1 point per hour of exercise, capped at 10 points/week
-- **Weekly Promotions/Relegations**: Top 1 user promotes, bottom 1 user relegates (Sundays 11:59 PM UTC)
-- **Auto-assignment**: New users start in Noodle division
-- **Leaderboards**: Division-specific standings with promotion/relegation zones (only rank #1 and last rank show zone indicators)
+---
 
-### Admin Dashboard
-- **Access**: Hardcoded for gabrielbeal@gmail.com
-- **User Management**: View all users from auth.users with profiles
-- **Division Management**: Manually assign/reassign users to divisions
-- **Badge Management**: Award badges to users (Bronze/Silver/Gold tiers)
-- **User Deletion**: Complete removal including auth account (requires service role)
-- **Stats Display**: Total users, Strava connected, not connected counts
-- **Manual Assignment**: "Assign to Noodle" button for users without divisions
+## API Endpoints
+
+### Public
+- `GET /` — Home page (unified leaderboard)
+- `GET /rivalries` — Rivalry matchups page
+- `GET /faq` — FAQ page
+- `GET /login` — Auth page
+- `GET /auth/callback` — OAuth callback
+- `GET /api/strava/webhook` — Webhook verification
+- `POST /api/strava/webhook` — Webhook events
+
+### Protected (requires auth)
+- `GET /api/leaderboard` — Unified leaderboard with kill marks, rivals, badges
+- `GET /api/rivalries` — All rivalry periods + matchups with live stats
+- `GET /api/badges` — User's earned badges
+- `GET /api/badges/progress` — Badge progress for current user
+- `GET /api/habits` — User's habits + current week
+- `POST /api/habits` — Create habit
+- `PATCH /api/habits/[id]` — Update habit
+- `DELETE /api/habits/[id]` — Soft delete habit
+- `POST /api/habits/[id]/entries` — Set daily habit status
+- `GET /api/habits/history` — Paginated habit history
+- `GET /api/strava/connect` — Initiate Strava OAuth
+- `GET /api/strava/callback` — Strava OAuth callback
+- `POST /api/strava/sync` — Manual sync
+- `GET /api/stats/weekly` — Weekly stats
+- `GET /profile` — User profile
+- `GET /stats` — Badge progress visualization
+- `POST /auth/signout` — Sign out
+
+### Admin (Gabriel Beal only)
+- `GET /admin` — Admin dashboard
+- Server Actions: `deleteUser`, `assignBadge`, `removeBadge`, `changeDivision`
+- `POST /api/admin/generate-habit-summary` — Generate WhatsApp summary
+
+### Cron (requires `CRON_SECRET`)
+- `GET /api/cron/weekly-division-shuffle` — Evaluates habit badges for last week + resets weekly badge progress
+
+---
+
+## Rivalry Admin Operations (Manual SQL)
+
+Rivalries are managed via SQL in the Supabase dashboard (no UI yet).
+
+**Create a rivalry period:**
+```sql
+INSERT INTO rivalry_periods (period_number, start_date, end_date, metric, metric_label, metric_unit)
+VALUES (1, '2025-11-18', '2025-12-01', 'distance', 'Distance', 'km');
+```
+
+**Create matchups:**
+```sql
+INSERT INTO rivalry_matchups (period_id, player1_id, player2_id)
+VALUES
+  ('period-uuid'::uuid, 'user1-uuid'::uuid, 'user2-uuid'::uuid),
+  ('period-uuid'::uuid, 'user3-uuid'::uuid, 'user4-uuid'::uuid);
+```
+
+**Award kill mark (set winner):**
+```sql
+UPDATE rivalry_matchups
+SET winner_id = 'winner-uuid'::uuid
+WHERE period_id = 'period-uuid'::uuid
+  AND (player1_id = 'winner-uuid'::uuid OR player2_id = 'winner-uuid'::uuid);
+```
+
+---
+
+## Database Migrations (run in order)
+
+| # | File | Description |
+|---|------|-------------|
+| 001 | create_strava_connections.sql | Strava OAuth connections |
+| 002 | create_strava_activities.sql | Activity storage |
+| 003 | create_divisions.sql | Division system |
+| 004 | create_badges.sql | Badge system |
+| 005 | admin_policies.sql | Admin RLS policies |
+| 006 | create_user_profiles.sql | User profiles |
+| 007 | add_weekly_badge_support.sql | Periodic badge support |
+| 008 | create_habits.sql | Habit tracker |
+| 009 | update_cumulative_points.sql | Cumulative points |
+| 010 | add_timezone_to_user_profiles.sql | Timezone support |
+| 011 | add_cumulative_points.sql | Enhanced cumulative points |
+| 012 | refactor_user_points.sql | Split points columns |
+| 013 | add_increment_badge_points_fn.sql | Badge points function |
+| 014 | add_user_id_to_habit_entries.sql | Habit entries fix |
+| 016 | fix_habit_summaries_rls.sql | Habit summaries RLS |
+| 017 | reset_badges_add_dates.sql | Badge date fields |
+| 018 | add_suffer_score.sql | Relative Effort tracking |
+| 022 | cumulative_points_system.sql | Drop user_points; cumulative scoring |
+| 025 | create_summary_participants.sql | WhatsApp summary participants |
+| 026 | create_rivalries.sql | Rivalry periods + matchups (Season 4) |
+
+---
 
 ## Environment Variables
 ```bash
 # Supabase
 NEXT_PUBLIC_SUPABASE_URL=https://[project-id].supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=[anon-key]
-
-# IMPORTANT: Required for admin functions (user deletion, fetching all users)
-SUPABASE_SERVICE_ROLE_KEY=[service-role-key]
+SUPABASE_SERVICE_ROLE_KEY=[service-role-key]  # Required for admin functions
 
 # Strava OAuth
 STRAVA_CLIENT_ID=[client-id]
 STRAVA_CLIENT_SECRET=[client-secret]
-
-# Strava Webhooks
 STRAVA_WEBHOOK_VERIFY_TOKEN=[random-string]
+STRAVA_REDIRECT_BASE_URL=[production-url]   # e.g. https://fitnessfight.club
 
-# Cron Job Security (Release 1)
+# Cron Job Security
 CRON_SECRET=[secure-random-token]
 ```
+
+---
 
 ## Deployment
 
 ### Vercel
-- Auto-deploys from GitHub main branch
+- Auto-deploys from GitHub `main` branch
 - Environment variables set in Vercel dashboard
-- Function logs available for debugging webhooks
-- **Cron Jobs**: Weekly division shuffle runs Sundays at 11:59 PM UTC
+- **Cron Jobs**: Weekly habit badge evaluation runs Sundays at 11:59 PM UTC
 
 ### Strava Webhook Setup
 ```bash
-# View current subscription
-node scripts/setup-webhook.js view
-
-# Create new subscription
-node scripts/setup-webhook.js create
-
-# Delete existing subscription
-node scripts/setup-webhook.js delete
+node scripts/setup-webhook.js view    # View current subscription
+node scripts/setup-webhook.js create  # Create new subscription
+node scripts/setup-webhook.js delete  # Delete existing subscription
 ```
 
-## Known Issues & Solutions
-
-### 1. RLS Policy for Webhooks
-**Issue**: Webhooks run without auth context, blocked by RLS
-**Solution**: RLS disabled on `strava_activities` table
-```sql
-ALTER TABLE strava_activities DISABLE ROW LEVEL SECURITY;
-```
-
-### 2. Manual Activities
-**Note**: Manual activities entered on Strava website may not trigger webhooks immediately. Activities recorded through Strava app are more reliable.
-
-### 3. Manual Sync Points Calculation (Fixed)
-**Issue**: The "Sync Now" button was fetching activities but not calculating points/badges
-**Solution**: Updated `/api/strava/sync` endpoint to:
-- Track affected weeks during sync
-- Recalculate points for each affected week (prevents double-counting)
-- Calculate badges for each synced activity
-- Ensure division assignment for new users
-**Implementation**: Uses `recalculateWeeklyPoints` function that fetches all activities for a week and calculates totals from scratch
-
-### 4. Google OAuth Configuration
-**Setup Required**:
-- Add redirect URI in Google Cloud Console: `https://[supabase-id].supabase.co/auth/v1/callback`
-- Update Application Name in Google Cloud Console OAuth Consent Screen
-- Update Authorized Domains to include your production domain
-- Strava Callback Domain should match production domain (e.g., `fitnessfight.club`)
-
-### 5. User Display Issues
-**Issue**: Users not showing with real names or appearing as UUID fragments
-**Solution**: Run migration 006_create_user_profiles.sql to create profiles table
-- Profiles store Google OAuth metadata (name, email, avatar)
-- Admin dashboard fetches from auth.users using service role key
-- All users visible regardless of when they signed up
-
-### 6. Complete User Deletion
-**Requirement**: SUPABASE_SERVICE_ROLE_KEY must be set in environment variables
-**Behavior**: Deletes user from:
-- auth.users (authentication account)
-- strava_activities (all activity data)
-- user_profiles, user_divisions, user_badges, weekly_exercise_tracking, badge_progress
-- division_history records
-**Note**: User session is invalidated before deletion to prevent ghost sessions
-
-### 7. Timezone Inconsistency Across APIs (Fixed - Oct 2025)
-**Issue**: Different APIs were using different timezone sources and defaults:
-- Habits entries API used `user.user_metadata.timezone` (never set) → defaulted to UTC
-- Other APIs used `user_profiles.timezone` → defaulted to various values
-- This caused weekly reset to happen at different times for different features
-
-**Root Cause**: The habits entries API defaulting to UTC made activities/habits at midnight appear to belong to the previous day in EST, assigning them to the wrong week.
-
-**Solution**: Standardized all APIs to:
-- Fetch timezone from `user_profiles.timezone` table
-- Default to `America/New_York` (EST) when not set
-- Files updated: `app/api/habits/[id]/entries/route.ts`, `app/api/divisions/route.ts`, `app/api/stats/weekly/route.ts`, `app/api/strava/webhook/route.ts`, `app/api/strava/sync/route.ts`
-
-**Impact**: Weekly reset now consistently happens at Monday 12:00 AM EST for all users without custom timezones.
-
-### 8. Webhook Activity Week Assignment Bug (Fixed - Oct 2025)
-**Issue**: Strava webhook was using `start_date_local` to determine which week to assign exercise points, but JavaScript's `new Date()` parser treats the local time string as UTC, causing activities to be miscategorized.
-
-**Example**: Activity at 12:35 AM local time would be parsed as 12:35 AM UTC, then converted to user's timezone (8:35 PM previous day EST), placing it in the previous week instead of current week.
-
-**Solution**: Changed webhook to use `start_date` (proper UTC timestamp) instead of `start_date_local` in `/app/api/strava/webhook/route.ts`.
-
-**Impact**: Activities now correctly count toward the week they actually occurred in based on the user's timezone.
-
-### 9. Habit Entries Date Parsing Bug (Fixed - Oct 2025)
-**Issue**: When users clicked to mark habits as done on Monday, entries were saved with the previous week's `week_start`, making them invisible to users.
-
-**Root Cause**: Date strings like "2025-10-20" were parsed as midnight UTC by `new Date("2025-10-20")`, which when converted to EST became the previous day at 8pm, causing `week_start` calculation to use the previous week.
-
-**Solution**: Changed date parsing to append 'T12:00:00' (noon UTC) to ensure the date stays on the same calendar day when converted to any timezone in `/app/api/habits/[id]/entries/route.ts`.
-
-**Known Legacy Data**: 37 habit entries from 9 users (Oct 13-20, 2025) still have incorrect `week_start` values and are invisible to those users. These entries are all off by exactly 1 week. Could be fixed with a data migration if needed.
+---
 
 ## Development Workflow
 
 ### Local Development
 ```bash
-npm run dev
-# App runs on http://localhost:3000
+npm run dev   # http://localhost:3000
 # Uses same Supabase cloud database as production
 ```
 
 ### Test Credentials
-For local development and testing:
 - Email: `gabrielxz@yahoo.com`
 - Password: `gideonxz`
 
-### Testing Webhooks Locally
-- Use ngrok for local webhook testing (requires account)
-- Or deploy to Vercel and test with production URL
+---
 
-### Database Migrations
-Run migrations in Supabase SQL Editor (in order):
-1. `001_create_strava_connections.sql` - Strava OAuth connections
-2. `002_create_strava_activities.sql` - Activity storage
-3. `003_create_divisions.sql` - Division system (Release 1)
-4. `004_create_badges.sql` - Badge system (Release 3)
-5. `005_admin_policies.sql` - Admin RLS policies
-6. `006_create_user_profiles.sql` - User profile metadata
-7. `007_add_weekly_badge_support.sql` - Periodic badge support
-8. `008_create_habits.sql` - Habit tracker (Release 4)
-9. `009_update_cumulative_points.sql` - Cumulative points tracking
-10. `010_add_timezone_to_user_profiles.sql` - Timezone support
-11. `011_add_cumulative_points.sql` - Enhanced cumulative points
-12. `012_refactor_user_points.sql` - Split points into exercise/habit/badge (superseded by 022)
-13. `013_add_increment_badge_points_fn.sql` - Badge points function
-14. `014_add_user_id_to_habit_entries.sql` - Habit entries fix
-15. `016_fix_habit_summaries_rls.sql` - Habit summaries RLS fix
-16. `017_reset_badges_add_dates.sql` - Badge date fields
-17. `018_add_suffer_score.sql` - Relative Effort tracking
-18. `022_cumulative_points_system.sql` - Drop user_points table, move to cumulative scoring in user_profiles
+## Known Issues & Solutions
 
-## Utility Scripts
+### 1. RLS Policy for Webhooks
+**Issue**: Webhooks run without auth context, blocked by RLS
+**Solution**: RLS disabled on `strava_activities`
 
-Located in `/scripts/`:
-- `setup-webhook.js` - Strava webhook management
-- `delete-badges-and-add-dates.js` - Clear all badges and add date field support
-- `insert-new-badges.js` - Insert new badge definitions
-- `verify-badges.js` - Check badges in database
-- Various migration and fix scripts for points/habits
+### 2. Strava Relative Avatar URLs
+**Issue**: Some Strava profiles return relative URLs (e.g. `avatar/athlete/medium.png`) which break `next/image`
+**Solution**: `isAbsoluteUrl()` validator in `Leaderboard.tsx` and `RivalriesView.tsx` — falls back to initials avatar
 
-## Security Considerations
+### 3. Timezone Inconsistency (Fixed Oct 2025)
+All APIs standardized to fetch timezone from `user_profiles.timezone`, defaulting to `America/New_York`.
 
-1. **Strava tokens** stored encrypted in database
-2. **RLS enabled** on sensitive tables (users, connections)
-3. **Webhook verification** using `STRAVA_WEBHOOK_VERIFY_TOKEN`
-4. **Public read** on connections table (required for webhooks)
-5. **User isolation** - users can only see their own data
+### 4. Webhook Activity Week Assignment (Fixed Oct 2025)
+Webhook uses `start_date` (UTC) instead of `start_date_local` to prevent timezone parsing bugs.
 
-## API Endpoints
+### 5. Habit Entries Date Parsing (Fixed Oct 2025)
+Date strings appended with `T12:00:00` (noon UTC) to prevent off-by-one-day bugs when converting to user timezone.
 
-### Public Routes
-- `GET /` - Landing page (shows all divisions when not logged in, shows personalized dashboard when logged in)
-- `GET /login` - Authentication page
-- `GET /auth/callback` - OAuth callback
-- `GET /api/strava/webhook` - Webhook verification
-- `POST /api/strava/webhook` - Webhook events
+### 6. iOS Auth + OAuth (Fixed Sep 2025)
+- Logout: Client-side Supabase sign-out + hard redirect (avoids service worker caching)
+- Strava Connect: `window.location.href` hard navigation instead of Next.js `<Link>`
 
-### Protected Routes (requires auth)
-- `GET /` - Home page shows personalized dashboard when logged in
-- `GET /api/divisions` - Get division standings and leaderboard
-- `GET /api/badges` - Get user's earned badges
-- `GET /api/badges/progress` - Get badge progress for current user (with period support)
-- `GET /api/strava/connect` - Initiate Strava OAuth
-- `GET /api/strava/callback` - Strava OAuth callback
-- `POST /api/strava/sync` - Manual sync (calculates points and badges)
-- `GET /api/stats/weekly` - Weekly statistics (includes points)
-- `GET /profile` - User profile page
-- `GET /stats` - Stats page showing badge progress with visual bars
-- `POST /auth/signout` - Sign out
-
-### Admin Routes (requires admin user - Gabriel Beal)
-- `GET /admin` - Admin dashboard
-- Server Actions (via /admin):
-  - `deleteUser` - Remove user from app
-  - `assignBadge` - Manually assign badges
-  - `removeBadge` - Remove badges from users
-  - `changeDivision` - Promote/demote users between divisions
-
-### Cron Routes (requires CRON_SECRET)
-- `GET /api/cron/weekly-division-shuffle` - Weekly promotions/relegations
-
-## Completed Features
-- ✅ **Release 1**: Division system with points and weekly promotions/relegations
-- ✅ **Release 2**: UI Redesign with dark theme and glassmorphism effects
-- ✅ **Release 3**: Badge System with 10 badge types and Bronze/Silver/Gold tiers
-- ✅ **Admin Dashboard**: Complete admin interface for user management (Gabriel Beal only)
-
-### Release 2 Details (Completed)
-- **Dark Theme**: Gradient background (#0F0F1E → #1A1A2E → #2A1A3E)
-- **Glassmorphism**: Glass-card components with backdrop blur
-- **Animated Background**: Floating particle effects
-- **New Components**:
-  - AnimatedBackground: Canvas-based particle animation
-  - Navigation: Modern nav with user avatar and glassmorphism
-  - DivisionSelector: Toggle between "My Division" and "Global" views (authenticated users only)
-  - AthleteCard: Individual athlete cards with zone indicators and badges
-  - DivisionLeaderboard: Fetches and displays standings with proper zone calculation
-  - WeekProgress: Competition timeline with progress bar
-  - LoggedInView: Handles authenticated user view with division/global toggle
-- **Visual Enhancements**:
-  - Orange/yellow gradient accents (#FF6B35, #F7931E)
-  - Promotion/relegation zone badges
-  - Custom CSS animations (fadeIn, slideUp)
-  - Responsive design for all screen sizes
-
-### Release 3 Details (Completed + Enhanced)
-
-#### Original 10 Badge Types (Removed)
-- Early Bird, Night Owl, Power Hour, Consistency King, Globe Trotter, Mountain Climber, Speed Demon, Runner, Cyclist, Variety Pack
-
-#### New Badge System (December 2024)
-- **Badge Point Values Updated**:
-  - Gold: 15 points (was 10)
-  - Silver: 6 points (was 5)
-  - Bronze: 3 points (was 2)
-
-- **7 New Badge Types Implemented**:
-  1. **🥵 Tryhard** - Score Relative Effort points in one week (600/350/150)
-  2. **🏔 Everester** - Cumulative elevation gain in meters (4424/2212/600)
-  3. **🐂 Iron Calves** - Bike miles in a week (90/50/10)
-  4. **🧘 Zen Master** - Yoga hours in a week (10/4/1)
-  5. **📸 Belfie** - Weeks with photo attachments (12/6/1)
-  6. **⚽ Pitch Perfect** - Soccer minutes in single session (100/60/30)
-  7. **🎾 Net Gain** - Distinct racquet sports played (4/2/1)
-
-- **Database Changes**:
-  - Added `start_date` and `end_date` columns to badges table for time-limited badges
-  - Added `suffer_score` column to strava_activities (migration 018)
-  - All existing badges deleted for clean slate
-
-- **BadgeCalculator Enhancements**:
-  - Added `weekly_cumulative` type for week-based accumulation
-  - Added `weekly_count` type for counting qualifying weeks
-  - Enhanced `unique_sports` to handle specific sport lists
-  - Added date range checking for time-limited badges
-  - Support for Relative Effort (suffer_score) tracking
-
-- **Technical Implementation**:
-  - Automatic Calculation: BadgeCalculator runs on every webhook activity and manual sync
-  - Database Tables: badges, user_badges, badge_progress (with periodic support)
-  - Display: Badges shown on athlete cards in leaderboards + detailed progress on Stats page
-  - Stats Page: Visual progress bars with proper unit formatting for all badge types
-  - Periodic Badge Support: Weekly badges reset but preserve achievements
-  - Note: Badge removal on activity deletion not yet implemented (badges remain once earned)
-
-### Admin Dashboard Details (Completed)
-- **Access Control**: Hardcoded for Gabriel Beal (gabrielbeal@gmail.com)
-- **User Management**: View all users with divisions and badges
-- **Delete Users**: Remove users from app with confirmation
-- **Badge Management**: Manually assign/remove badges (Bronze/Silver/Gold)
-- **Division Management**: Promote/demote users between divisions
-- **Navigation**: Admin link appears in header for admin user only
-- **RLS Policies**: Custom admin policies in migration 005_admin_policies.sql
-
-## Future Enhancements
-- Custom leaderboards for groups
-- Weekly/monthly challenges
-- Activity comparisons with friends
-- Advanced statistics and progress tracking
-- Strava webhook subscription management UI
-- Service role key for better webhook security
-
-
-### Release 4: Habit Tracker (In Development - feature/habit-tracker branch)
-
-### Overview
-A mini habit tracker inspired by HabitShare, allowing users to track daily habits and earn points for consistency.
-
-### Database Schema (Migration 008_create_habits.sql)
-- **habits** - User habit definitions
-  - id, user_id, name (max 100 chars), target_frequency (1-7), position, archived_at
-  - RLS enabled for user data protection
-- **habit_entries** - Daily status tracking
-  - habit_id, date, status (SUCCESS/FAILURE/NEUTRAL), week_start
-  - Unique constraint on (habit_id, date)
-- **habit_weekly_summaries** - Weekly performance cache
-  - habit_id, user_id, week_start, successes, target, percentage, points_earned
-
-### Features
-1. **Habit Management**
-   - Add habits with name and target frequency (1-7 days/week)
-   - Edit habit name and frequency
-   - Delete habits (soft delete with archived_at)
-   - Unlimited habits allowed, but only first 5 count for points
-
-2. **Daily Tracking**
-   - Click day circles to cycle: NEUTRAL → SUCCESS → FAILURE
-   - Visual indicators: Green (SUCCESS), Red (FAILURE), Gray (NEUTRAL)
-   - "TODAY" indicator on current day
-   - Can only modify current and past days
-
-3. **Weekly View**
-   - Shows Mon-Sun with status circles
-   - "This Wk: X/7" progress display
-   - Overall percentage calculation
-   - Navigate through previous weeks
-
-4. **Points System**
-   - 0.5 points per completed habit (meeting weekly target)
-   - Only first 5 habits eligible for points
-   - Points calculated during weekly cron job
-   - Visual indicators: "+0.5 pts" badge for eligible habits
-
-5. **UI Components**
-   - `/habits` page - Main habits interface
-   - Glass-card design matching existing theme
-   - Add/Edit habit dialogs with sliders
-   - Responsive mobile layout
-   - Info message when >5 habits exist
-
-### API Endpoints
-- `GET /api/habits` - Get user's habits with current week
-- `POST /api/habits` - Create new habit
-- `PATCH /api/habits/[id]` - Update habit
-- `DELETE /api/habits/[id]` - Soft delete habit
-- `POST /api/habits/[id]/entries` - Set daily status
-- `GET /api/habits/history` - Get paginated history
-
-### Integration
-- Added "Habits" link to Navigation (logged-in users only)
-- Habit points (0.5 pts) awarded immediately to user_profiles.cumulative_habit_points when weekly target is met
-- Weekly cron job evaluates habit badges (Rock Solid) for users who achieved 100% on first 5 habits
-- Habits ordered by position, then creation date
-
-### Implementation Notes
-- Feature branch: `feature/habit-tracker`
-- Migration must be run before deployment
-- Points are capped at 2.5/week (5 habits × 0.5 points)
-- Soft delete preserves historical data
+### 7. Complete User Deletion
+Requires `SUPABASE_SERVICE_ROLE_KEY`. Deletes from: auth.users, strava_activities, user_profiles, user_divisions, user_badges, weekly_exercise_tracking, badge_progress, division_history.
 
 ---
 
-## Admin Features
+## Completed Seasons
 
-### WhatsApp Habit Summary Generator (2025-01-12)
-**Purpose**: Generate weekly habit tracking summaries for posting to WhatsApp group
-
-**Features**:
-- **Participant Management**: Add/remove users to include in weekly summaries
-- **Custom Display Names**: Override names for summary display
-- **On-Demand Generation**: Button to generate summary for last completed week
-- **WhatsApp Formatting**: Uses markdown formatting compatible with WhatsApp
-- **One-Click Copy**: Copy formatted message to clipboard for pasting
-
-**Database**:
-- Table: `summary_participants` (user_id, display_name, include_in_summary, sort_order)
-- Uses admin client for permissions
-
-**Files**:
-- `/app/admin/HabitSummaryGenerator.tsx` - UI for generating summaries
-- `/app/admin/SummaryParticipantsManager.tsx` - Manage participant list
-- `/app/admin/summary-actions.ts` - Server actions
-- `/lib/habits/weekly-summary-generator.ts` - Summary generation logic
-- `/app/api/admin/generate-habit-summary/route.ts` - API endpoint
-- Migration: `025_create_summary_participants.sql`
-
-**Summary Format**:
-```
-🏆 *FitFight Habit Week Results* 🏆
-_Jan 15 to Jan 21, 2025_
-
-*Perfect Week Club* ⭐
-• Gabriel: 5/5 habits
-• Lisa: 6/6 habits
-
-*Keep Pushing* 💪
-• Mike: 4/5 habits
-
-_Keep crushing it, team!_
-```
-
-### Competition Reset Button (2025-01-12)
-**Purpose**: Nuclear reset for starting fresh competition periods
-
-**Features**:
-- **Multi-Step Confirmation**: 4-step process with increasing warnings
-- **Statistics Preview**: Shows exact counts of what will be deleted
-- **Type-to-Confirm**: Must type "RESET COMPETITION" exactly
-- **10-Second Safety Delay**: Prevents accidental clicks
-- **Comprehensive Deletion**: Removes all competition data while preserving infrastructure
-
-**What Gets Reset**:
-- ❌ All earned badges
-- ❌ All points (exercise, habit, badge)
-- ❌ All Strava activities
-- ❌ All habit tracking history
-- ❌ All weekly exercise tracking
-
-**What Stays**:
-- ✅ User accounts and profiles
-- ✅ Current division assignments
-- ✅ Habit definitions (not history)
-- ✅ Strava connections
-- ✅ WhatsApp summary participants
-
-**Files**:
-- `/app/admin/CompetitionResetSection.tsx` - UI component
-- `/app/admin/competition-reset-actions.ts` - Reset logic and stats
-- Uses admin client to avoid permission issues
-
-### User Diagnostics & Repair Tool (2025-01-12)
-**Purpose**: Diagnose and fix users with missing database entries
-
-**Problem Solved**:
-Users who connect via Strava may not get all necessary database entries created (user_profiles, user_divisions). This causes them to not appear in divisions despite being connected.
-
-**Features**:
-- **Automatic Detection**: Highlights users with Strava but no division
-- **Diagnostic Tool**: Shows complete data state for selected user:
-  - Auth user exists
-  - User profile exists
-  - Division assignment exists
-  - Strava connection exists
-- **One-Click Repair**: Automatically creates missing entries:
-  - Creates user_profiles entry if missing
-  - Assigns to Noodle division if no division exists
-  - Uses admin client for full permissions
-
-**Common Use Cases**:
-1. User connected Strava but isn't showing in any division
-2. After competition reset, ensuring all users have complete data
-3. Manual division assignment failing (no row to update)
-
-**Files**:
-- `/app/admin/UserDiagnosticsSection.tsx` - UI component
-- `/app/admin/user-fix-actions.ts` - Diagnostic and repair server actions
-- Updated `/app/admin/actions.ts` - Fixed `changeDivision` to INSERT if row doesn't exist
-
-**Technical Fix**:
-The `changeDivision` function now checks if a `user_divisions` entry exists:
-- If exists: UPDATE the division
-- If missing: INSERT new entry with selected division
-This fixes both the "Assign to Noodle" button and manual division changes.
+- ✅ **Season 1**: Division system (Noodle → Sweaty → Shreddy → Juicy), weekly promotions/relegations
+- ✅ **Season 2**: UI Redesign — dark theme, glassmorphism, animated background
+- ✅ **Season 3**: Badge system (7 badge types, 3 tiers), habit tracker, cumulative points
+  - Champion: Brian Clonaris
+- ✅ **Season 4**: Unified leaderboard, rivalries with kill marks (💀), podium top-3 treatment, score breakdown popout, FAQ page
 
 ---
 
-## Agent Updates
+## Agent Update Log
+
+### Claude Sonnet 4.6 (2026-02-26): Season 4 Redesign
+
+**Objective**: Remove division system, add rivalries, redesign leaderboard.
+
+**Changes**:
+- Removed divisions from leaderboard; replaced `DivisionLeaderboard` + `LoggedInView` + `DivisionSelector` + `WeekProgress` with single `Leaderboard.tsx`
+- New `app/api/leaderboard/route.ts`: fetches all users, calculates kill mark multiplier, sorts by `adjusted_points`
+- New `app/api/rivalries/route.ts`: rivalry periods + matchups with live metric stats
+- New `app/rivalries/` (page + `RivalriesView.tsx`): VS hero layout, live progress bar, kill marks, season schedule
+- New `app/faq/` (page + `FAQContent.tsx`): accordion FAQ with badge reference table, rivalry schedule
+- Simplified `app/page.tsx` to only use `Leaderboard` + `Navigation` + `AnimatedBackground`
+- Navigation updated: added Rivalries (⚔️) and FAQ (📖) links
+- Cron job (`weekly-division-shuffle`): removed all division logic; now only evaluates habit badges and resets weekly badge progress
+- Migration `026_create_rivalries.sql`: additive-only, safe for production
+- Kill marks: 💀 emoji, each adds 1% to score multiplier, affects ranking
+- Score breakdown popout: click any score to see exercise/habit/badge/kills breakdown; solid dark background (`rgb(15,18,35)`)
+- Podium: top 3 displayed as 2nd|1st|3rd in grid; rank-specific ring/strip colors, pulsing ring + 👑 for 1st
+- Mobile podium fix: `grid items-start + marginTop=40` for 2nd/3rd; `truncate` on names/rivals in 2nd/3rd cards; `minHeight:300` on 1st to guarantee height difference
 
 ### Codex CLI (2025-09-17): Stability + Correctness Fixes
-
-Objective: Align divisions, manual sync, cron, badges, and stats with the cumulative points architecture and timezone-aware weekly tracking.
-
-Changes:
-- Divisions Leaderboard: Weekly hours are now computed per-user using timezone-aware week boundaries and the matching `weekly_exercise_tracking` row. This fixes zero/incorrect hours when users are in different timezones.
-- Manual Sync: Unified with the webhook flow. After activity upserts, the sync calls `recalculateAndApplyExercisePointsForWeek` (idempotent) for each affected week (deduped by the user’s timezone). Removed legacy weekly recalculation and the direct writes to `user_profiles.cumulative_points`. Photos are normalized via `total_photo_count || photo_count` for consistency with webhook.
-- Cron Weekly Reset: Corrected JSON filter to select weekly badges using `criteria->>reset_period = 'weekly'` so periodic badge progress resets execute reliably.
-- Badge Streak Logic: Replaced deprecated `user_points` dependency with `weekly_exercise_tracking` when computing weekly streaks to avoid runtime errors if streak badges are active.
-- Weekly Stats API: Modernized to use timezone-aware week boundaries, read hours from `weekly_exercise_tracking`, and report `total_cumulative_points` from `user_profiles`.
-
-Notes:
-- No RLS/security tightening was performed in this pass (requested to defer). Functionality fixes only.
-- If you encounter build issues with `date-fns-tz` in Vercel, we can adjust configuration or imports; local build was not runnable in the sandbox.
+- Divisions leaderboard: weekly hours computed per-user with timezone-aware week boundaries
+- Manual sync: unified with webhook flow, idempotent point recalculation
+- Cron weekly reset: corrected JSON filter for weekly badges
+- Badge streak logic: replaced deprecated `user_points` dependency with `weekly_exercise_tracking`
+- Weekly stats API: modernized with timezone-aware boundaries
 
 ### Codex CLI (2025-09-17): iOS Auth + OAuth UX Fixes
+- Logout: client-side Supabase sign-out + hard redirect
+- Strava connect: hard navigation via `window.location.href`
+- Strava disconnect: new `/api/strava/disconnect` endpoint
+- `STRAVA_REDIRECT_BASE_URL` env var for OAuth URI construction
 
-Objective: Ensure logout and Strava connect work reliably on iOS Safari and PWA.
-
-Changes:
-- Logout (Navigation): Replaced form POST to `/auth/signout` with a client-side sign out using the Supabase browser client followed by a hard redirect to `/login`. Adds a brief disabled state to prevent double-taps. This avoids service worker caching and iOS form submission quirks.
-- Strava Connect (Profile): Replaced Next.js `Link` to `/api/strava/connect` with a button that performs a hard navigation via `window.location.href`. Adds a simple “Redirecting…” state. This prevents client-side prefetch/transition flicker on iOS.
- - Strava Disconnect: Added `/api/strava/disconnect` endpoint and wired the Profile “Disconnect” action to call it and reload. Previously, the button was a no-op.
- - Strava Redirect Base: The connect route now prefers `STRAVA_REDIRECT_BASE_URL` when constructing the OAuth redirect URI to avoid host mismatches (useful for iOS/PWA and custom domains). Falls back to the request host.
-
-User impact:
-- iOS users can reliably sign out with a single tap and are returned to the login screen.
-- The Strava connect button consistently opens the Strava consent screen and returns connected without the “flash and back” behavior.
 ### Gemini (2025-09-12): Cumulative Points System Refactor
-
-**Objective**: Transition the application from a weekly-resetting score to a persistent, all-time cumulative score, per the user's request.
-
-**Architectural Changes**:
-
-1.  **Database Schema Overhaul (Migration `022_cumulative_points_system.sql`)**:
-    -   The `user_profiles` table is now the single source of truth for scores, with new columns for `cumulative_exercise_points`, `cumulative_habit_points`, `cumulative_badge_points`, and a `total_cumulative_points` generated column.
-    -   The old `user_points` and `habit_weekly_summaries` tables have been dropped.
-    -   A new `weekly_exercise_tracking` table was created to manage the 10-hour/week cap on exercise point contributions.
-    -   New RPC functions (`increment_exercise_points`, `increment_habit_points`, `increment_badge_points`) were created for safe, concurrent updates to the cumulative scores.
-
-2.  **Event-Driven Point Calculation**:
-    -   The old `recalculateAllWeeklyPoints` master function was removed.
-    -   Points are now calculated and added to the cumulative total immediately when an event occurs.
-    -   **Exercise:** The Strava webhook now calls a new helper that uses the `weekly_exercise_tracking` table to calculate and apply only the necessary point difference while respecting the weekly cap.
-    -   **Habits:** The habit API now awards 0.5 points to the cumulative score at the moment a habit's weekly target is met, respecting the "top 5" rule.
-    -   **Badges:** The `BadgeCalculator` now adds points for a specific badge achievement directly to the cumulative score.
-
-3.  **API and Cron Job Updates**:
-    -   The Leaderboard API (`/api/divisions`) was rewritten to read and rank users based on `total_cumulative_points` from the `user_profiles` table.
-    -   The weekly Cron Job (`/api/cron/weekly-division-shuffle`) was updated to use the `total_cumulative_points` for its end-of-week ranking to determine promotions and relegations.
-
-4.  **Admin Panel**:
-    -   The `assignBadge` and `removeBadge` server actions were updated to correctly increment or decrement the `cumulative_badge_points` total.
-
----
+- Migration `022_cumulative_points_system.sql`: dropped `user_points`, moved to cumulative columns in `user_profiles`
+- New `weekly_exercise_tracking` table for cap management
+- RPC functions: `increment_exercise_points`, `increment_habit_points`, `increment_badge_points`
+- Leaderboard and cron updated to use `total_cumulative_points`
 
 ### Gemini (2025-09-10): Points Calculation & Timezone Refactor
-
-**Objective**: Resolve point inflation issues and ensure weekly calculations are fair and accurate for all users regardless of their timezone.
-
-**Architectural Changes**:
-
-1.  **Timezone-Aware Date Logic**:
-    -   Created `lib/date-helpers.ts` to centralize all date-related calculations.
-    -   All weekly boundaries (Monday-Sunday) are now calculated based on the user's specific IANA timezone, fetched from their profile. This ensures an activity on a user's local Sunday evening correctly counts for that week.
-
-2.  **Unified Point Calculation**:
-    -   Created `lib/points-helpers.ts` containing a single `recalculateAllWeeklyPoints` function. This function is now the single source of truth for calculating a user's weekly score.
-    -   Refactored the Strava webhook (`/api/strava/webhook`) and the Habit API (`/api/habits/[id]/entries`) to call this centralized function, eliminating duplicate and inconsistent logic.
-    -   Fixed a critical bug where deleting a Strava activity would not trigger a recalculation of that week's points.
-
-3.  **Database Schema Refactor**:
-    -   **Migration `012_refactor_user_points.sql`**: Overhauled the `user_points` table to be the definitive record for weekly scores. It now contains distinct `exercise_points`, `habit_points`, and `badge_points` columns. The `total_points` column is now a **GENERATED column** that automatically sums the other three, ensuring data integrity.
-        
-        **IMPORTANT - total_points Implementation**:
-        - `total_points` is a PostgreSQL GENERATED ALWAYS AS column
-        - It automatically calculates as: `exercise_points + habit_points + badge_points`
-        - **DO NOT** attempt to update `total_points` directly - this will cause an error
-        - Only update the individual point columns (`exercise_points`, `habit_points`, `badge_points`)
-        - The database will automatically recalculate `total_points` when any component changes
-        - Any attempt to set `total_points` directly will result in error: "column 'total_points' can only be updated to DEFAULT"
-        
-    -   **Migration `013_add_increment_badge_points_fn.sql`**: Added a PostgreSQL function (`increment_badge_points`) to allow for safe, atomic updates to the new `badge_points` column, preventing race conditions.
-    -   **Migration `014_add_user_id_to_habit_entries.sql`**: Added a missing `user_id` column to the `habit_entries` table to improve data integrity and simplify RLS policies.
-
-4.  **Badge Point Integration**:
-    -   Modified the `BadgeCalculator` to award points directly to the correct weekly record in the `user_points` table via the new database function, rather than incorrectly adding them only to the `cumulative_points` on a user's profile.
-
-**Known Issue (Build Failure)**:
--   Despite the architectural improvements, these changes have introduced a persistent build error in the Vercel environment. The errors relate to module resolution for the `date-fns-tz` package and a type-checking failure in the Next.js Habits API route. These issues could not be resolved even after extensive troubleshooting of the code, configuration (`tsconfig.json`, `next.config.ts`), and dependencies.
-
-
-### Overview
-A mini habit tracker inspired by HabitShare, allowing users to track daily habits and earn points for consistency.
-
-### Database Schema (Migration 008_create_habits.sql)
-- **habits** - User habit definitions
-  - id, user_id, name (max 100 chars), target_frequency (1-7), position, archived_at
-  - RLS enabled for user data protection
-- **habit_entries** - Daily status tracking
-  - habit_id, date, status (SUCCESS/FAILURE/NEUTRAL), week_start
-  - Unique constraint on (habit_id, date)
-- **habit_weekly_summaries** - Weekly performance cache
-  - habit_id, user_id, week_start, successes, target, percentage, points_earned
-
-### Features
-1. **Habit Management**
-   - Add habits with name and target frequency (1-7 days/week)
-   - Edit habit name and frequency
-   - Delete habits (soft delete with archived_at)
-   - Unlimited habits allowed, but only first 5 count for points
-
-2. **Daily Tracking**
-   - Click day circles to cycle: NEUTRAL → SUCCESS → FAILURE
-   - Visual indicators: Green (SUCCESS), Red (FAILURE), Gray (NEUTRAL)
-   - "TODAY" indicator on current day
-   - Can only modify current and past days
-
-3. **Weekly View**
-   - Shows Mon-Sun with status circles
-   - "This Wk: X/7" progress display
-   - Overall percentage calculation
-   - Navigate through previous weeks
-
-4. **Points System**
-   - 0.5 points per completed habit (meeting weekly target)
-   - Only first 5 habits eligible for points
-   - Points calculated during weekly cron job
-   - Visual indicators: "+0.5 pts" badge for eligible habits
-
-5. **UI Components**
-   - `/habits` page - Main habits interface
-   - Glass-card design matching existing theme
-   - Add/Edit habit dialogs with sliders
-   - Responsive mobile layout
-   - Info message when >5 habits exist
-
-### API Endpoints
-- `GET /api/habits` - Get user's habits with current week
-- `POST /api/habits` - Create new habit
-- `PATCH /api/habits/[id]` - Update habit
-- `DELETE /api/habits/[id]` - Soft delete habit
-- `POST /api/habits/[id]/entries` - Set daily status
-- `GET /api/habits/history` - Get paginated history
-
-### Integration
-- Added "Habits" link to Navigation (logged-in users only)
-- Habit points (0.5 pts) awarded immediately to user_profiles.cumulative_habit_points when weekly target is met
-- Weekly cron job evaluates habit badges (Rock Solid) for users who achieved 100% on first 5 habits
-- Habits ordered by position, then creation date
-
-### Implementation Notes
-- Feature branch: `feature/habit-tracker`
-- Migration must be run before deployment
-- Points are capped at 2.5/week (5 habits × 0.5 points)
-- Soft delete preserves historical data
+- `lib/date-helpers.ts`: centralized timezone-aware date logic
+- `lib/points-helpers.ts`: single `recalculateAllWeeklyPoints` function
+- Migration `012`: `total_points` as GENERATED column (do not update directly)
