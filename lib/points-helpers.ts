@@ -50,8 +50,8 @@ export async function recalculateAndApplyExercisePointsForWeek(
     const previouslyTrackedHours = tracking?.hours_logged || 0
 
     // 3. Calculate the difference in points to apply
-    const pointsAlreadyAwarded = Math.min(previouslyTrackedHours, 10)
-    const newTotalPointsForWeek = Math.min(newTotalHours, 10)
+    const pointsAlreadyAwarded = Math.min(previouslyTrackedHours, 9)
+    const newTotalPointsForWeek = Math.min(newTotalHours, 9)
     const pointDifference = newTotalPointsForWeek - pointsAlreadyAwarded
 
     // 4. If there's a change, apply it to the cumulative score
