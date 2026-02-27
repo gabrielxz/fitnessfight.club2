@@ -60,19 +60,19 @@ export async function GET(request: NextRequest) {
     }
 
     // ── Rivalry pairing ─────────────────────────────────────────────────────
-    // The cron runs Sunday 11:59 PM UTC. If tomorrow (Monday) is the start_date
-    // of a rivalry period, generate pairings for it now.
-    const tomorrow = new Date(Date.UTC(
-      now.getUTCFullYear(),
-      now.getUTCMonth(),
-      now.getUTCDate() + 1
-    ))
-    const tomorrowStr = tomorrow.toISOString().split('T')[0]
+    // Look for a rivalry period whose start_date falls within ±2 days of now.
+    // This tolerates late/early cron runs, server clock drift, and timezone edge
+    // cases. The idempotency guard below prevents double-insertion.
+    const windowStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - 2))
+    const windowEnd   = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 2))
+    const windowStartStr = windowStart.toISOString().split('T')[0]
+    const windowEndStr   = windowEnd.toISOString().split('T')[0]
 
     const { data: upcomingPeriod } = await supabase
       .from('rivalry_periods')
       .select('id, period_number')
-      .eq('start_date', tomorrowStr)
+      .gte('start_date', windowStartStr)
+      .lte('start_date', windowEndStr)
       .maybeSingle()
 
     if (upcomingPeriod) {
