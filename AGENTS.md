@@ -250,10 +250,31 @@ Badge point values: Gold 15 pts / Silver 6 pts / Bronze 3 pts
 
 Rivalries are managed via SQL in the Supabase dashboard (no UI yet).
 
-**Create a rivalry period:**
+**Season 4 schedule (all periods — run once to populate):**
 ```sql
 INSERT INTO rivalry_periods (period_number, start_date, end_date, metric, metric_label, metric_unit)
-VALUES (1, '2025-11-18', '2025-12-01', 'distance', 'Distance', 'km');
+VALUES
+  (1,  '2026-02-23', '2026-03-08', 'distance', 'Distance', 'km'),
+  (2,  '2026-03-09', '2026-03-22', 'distance', 'Distance', 'km'),
+  (3,  '2026-03-23', '2026-04-05', 'distance', 'Distance', 'km'),
+  (4,  '2026-04-06', '2026-04-19', 'distance', 'Distance', 'km'),
+  (5,  '2026-04-20', '2026-05-03', 'distance', 'Distance', 'km'),
+  (6,  '2026-05-04', '2026-05-17', 'distance', 'Distance', 'km'),
+  (7,  '2026-05-18', '2026-05-31', 'distance', 'Distance', 'km'),
+  (8,  '2026-06-01', '2026-06-14', 'distance', 'Distance', 'km'),
+  (9,  '2026-06-15', '2026-06-28', 'distance', 'Distance', 'km'),
+  (10, '2026-06-29', '2026-07-12', 'distance', 'Distance', 'km'),
+  (11, '2026-07-13', '2026-07-26', 'distance', 'Distance', 'km'),
+  (12, '2026-07-27', '2026-08-09', 'distance', 'Distance', 'km'),
+  (13, '2026-08-10', '2026-08-17', 'distance', 'Distance', 'km');
+-- Note: periods start Monday (day after Sunday cron). Period 13 is 8 days (Aug 17 is a Monday).
+-- Update metric/metric_label/metric_unit for each period before it starts.
+```
+
+**Create a single rivalry period:**
+```sql
+INSERT INTO rivalry_periods (period_number, start_date, end_date, metric, metric_label, metric_unit)
+VALUES (1, '2026-02-23', '2026-03-08', 'distance', 'Distance', 'km');
 ```
 
 **Create matchups:**

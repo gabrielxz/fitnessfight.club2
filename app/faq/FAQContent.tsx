@@ -75,18 +75,20 @@ function BadgeRow({ emoji, name, bronze, silver, gold, unit }: {
 
 // ─── Rivalry Schedule ─────────────────────────────────────────────────────────
 
-// TODO: Update these periods to match the actual season schedule before launch
 const RIVALRY_SCHEDULE = [
-  { period: 1, label: 'Distance', dates: 'Weeks 1–2', icon: '🗺️' },
-  { period: 2, label: 'Time Exercised', dates: 'Weeks 3–4', icon: '⏱️' },
-  { period: 3, label: 'Elevation', dates: 'Weeks 5–6', icon: '⛰️' },
-  { period: 4, label: 'Distance', dates: 'Weeks 7–8', icon: '🗺️' },
-  { period: 5, label: 'Relative Effort', dates: 'Weeks 9–10', icon: '🥵' },
-  { period: 6, label: 'Time Exercised', dates: 'Weeks 11–12', icon: '⏱️' },
-  { period: 7, label: 'Elevation', dates: 'Weeks 13–14', icon: '⛰️' },
-  { period: 8, label: 'Distance', dates: 'Weeks 15–16', icon: '🗺️' },
-  { period: 9, label: 'Relative Effort', dates: 'Weeks 17–18', icon: '🥵' },
-  { period: 10, label: 'Time Exercised', dates: 'Weeks 19–20', icon: '⏱️' },
+  { period: 1,  label: 'Distance', dates: 'Feb 23 – Mar 8',  icon: '🗺️' },
+  { period: 2,  label: 'Distance', dates: 'Mar 9 – Mar 22',  icon: '🗺️' },
+  { period: 3,  label: 'Distance', dates: 'Mar 23 – Apr 5',  icon: '🗺️' },
+  { period: 4,  label: 'Distance', dates: 'Apr 6 – Apr 19',  icon: '🗺️' },
+  { period: 5,  label: 'Distance', dates: 'Apr 20 – May 3',  icon: '🗺️' },
+  { period: 6,  label: 'Distance', dates: 'May 4 – May 17',  icon: '🗺️' },
+  { period: 7,  label: 'Distance', dates: 'May 18 – May 31', icon: '🗺️' },
+  { period: 8,  label: 'Distance', dates: 'Jun 1 – Jun 14',  icon: '🗺️' },
+  { period: 9,  label: 'Distance', dates: 'Jun 15 – Jun 28', icon: '🗺️' },
+  { period: 10, label: 'Distance', dates: 'Jun 29 – Jul 12', icon: '🗺️' },
+  { period: 11, label: 'Distance', dates: 'Jul 13 – Jul 26', icon: '🗺️' },
+  { period: 12, label: 'Distance', dates: 'Jul 27 – Aug 9',  icon: '🗺️' },
+  { period: 13, label: 'Distance', dates: 'Aug 10 – Aug 17', icon: '🗺️' },
 ]
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
