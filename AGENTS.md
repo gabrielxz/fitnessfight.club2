@@ -246,6 +246,17 @@ Badge point values: Gold 15 pts / Silver 6 pts / Bronze 3 pts
 
 ---
 
+## Rivalry Pairing Algorithm (`lib/rivalries/pairing.ts`)
+
+The `computePairings` function runs automatically in the weekly cron job whenever the next Monday is a `rivalry_period.start_date`. It uses a greedy rank-adjacent algorithm:
+
+- **Parameters**: K0=4 (initial window), DELTA=3 (expansion), KMAX=10 (max window), RECENT_AVOIDANCE=2 periods
+- **Bye**: If player count is odd, lowest-ranked player is excluded from pairing (no bye history tracking)
+- **Window**: One-directional (downward from current rank); expands by DELTA if no unpaired player found
+- **Preference order**: (1) never faced → (2) faced but not within last 2 periods → (3) any (KMAX fallback)
+- **Tiebreaker**: Closest rank within preference levels; for KMAX fallback: least recently faced, then closest rank
+- **Idempotency**: Skips if matchups already exist for that period
+
 ## Rivalry Admin Operations (Manual SQL)
 
 Rivalries are managed via SQL in the Supabase dashboard (no UI yet).
