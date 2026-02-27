@@ -255,7 +255,8 @@ The `computePairings` function runs automatically in the weekly cron job wheneve
 - **Window**: One-directional (downward from current rank); expands by DELTA if no unpaired player found
 - **Preference order**: (1) never faced → (2) faced but not within last 2 periods → (3) any (KMAX fallback)
 - **Tiebreaker**: Closest rank within preference levels; for KMAX fallback: least recently faced, then closest rank
-- **Idempotency**: Skips if matchups already exist for that period
+- **Timing**: Cron looks for a period with `start_date` within ±2 days of today (tolerates clock drift / late runs)
+- **Idempotency**: Skips if matchups already exist for that period — safe to run multiple times in the window
 
 ## Rivalry Admin Operations (Manual SQL)
 
