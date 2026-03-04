@@ -68,12 +68,15 @@ export async function GET(request: NextRequest) {
     const windowStartStr = windowStart.toISOString().split('T')[0]
     const windowEndStr   = windowEnd.toISOString().split('T')[0]
 
-    const { data: upcomingPeriod } = await supabase
+    const { data: periodRows } = await supabase
       .from('rivalry_periods')
       .select('id, period_number')
       .gte('start_date', windowStartStr)
       .lte('start_date', windowEndStr)
-      .maybeSingle()
+      .order('start_date')
+      .limit(1)
+
+    const upcomingPeriod = periodRows?.[0] ?? null
 
     if (upcomingPeriod) {
       console.log(`Rivalry period ${upcomingPeriod.period_number} starts tomorrow — generating pairings...`)
@@ -91,7 +94,7 @@ export async function GET(request: NextRequest) {
         // Fetch all players sorted by total points descending
         const { data: profilesData } = await supabase
           .from('user_profiles')
-          .select('user_id, total_cumulative_points')
+          .select('id, total_cumulative_points')
           .order('total_cumulative_points', { ascending: false })
 
         // Fetch period numbers for all past periods (for recency calculation)
@@ -111,7 +114,7 @@ export async function GET(request: NextRequest) {
 
         if (profilesData) {
           const players: RankedPlayer[] = profilesData.map(p => ({
-            id: p.user_id,
+            id: p.id,
             total_points: p.total_cumulative_points ?? 0,
           }))
 
