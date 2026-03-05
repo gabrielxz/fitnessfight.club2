@@ -69,6 +69,9 @@ A web application that syncs with Strava to track exercise data and create custo
 ├── lib/
 │   ├── badges/
 │   │   └── BadgeCalculator.ts            # Badge calculation logic
+│   ├── rivalries/
+│   │   ├── pairing.ts                    # Greedy rank-adjacent pairing algorithm
+│   │   └── metrics.ts                    # Shared metric computation (9 types)
 │   └── supabase/
 │       ├── client.ts                     # Browser client
 │       ├── server.ts                     # Server client
@@ -120,13 +123,15 @@ A web application that syncs with Strava to track exercise data and create custo
 
 ### Season 4: Rivalries
 14. **rivalry_periods** - Bi-weekly competition windows
-    - `period_number`, `start_date`, `end_date`
-    - `metric` (distance/moving_time/elevation_gain/suffer_score)
+    - `period_number`, `start_date` (Monday), `end_date` (Sunday)
+    - `metric` — one of 9 types (see Rivalry Metrics section)
     - `metric_label`, `metric_unit`
     - RLS: public read, admin write only
 
 15. **rivalry_matchups** - Player pairings per period
-    - `period_id`, `player1_id`, `player2_id`, `winner_id` (NULL = in-progress or tie)
+    - `period_id`, `player1_id`, `player2_id`
+    - `winner_id` — NULL means tie or still in progress; resolved matchups are identified by `player1_score IS NOT NULL`
+    - `player1_score`, `player2_score` — scores in display units (km/hrs/m/count); NULL until period closes out
     - Each player appears at most once per period
     - RLS: public read, admin write only
 
@@ -151,11 +156,11 @@ A web application that syncs with Strava to track exercise data and create custo
 - `isAbsoluteUrl()` guard prevents next/image errors from relative Strava avatar URLs
 
 **Rivalries** (`/api/rivalries`, `/rivalries`):
-- Bi-weekly 1v1 matchups on a rotating metric (distance, time, elevation, suffer score)
+- Bi-weekly 1v1 matchups on a rotating metric (9 types — see Rivalry Metrics section)
+- Periods run Monday–Sunday; cron closes out the ending period then generates pairings for the next
 - VS hero layout: large avatars, live metric progress bar, winner crown, kill marks
 - `SeasonSchedule` shows all periods with NOW indicator
-- Pairing logic (manual admin SQL): rank-adjacent, novel matchups preferred, odd player sits out
-- Tie = no kill mark awarded; winner gets 💀 on their record
+- Tie (including 0-0) = no kill mark for either player; `winner_id` stays NULL
 
 **FAQ** (`/faq`):
 - Accordion sections: Points, Leaderboard, Rivalries, Badges, General
@@ -242,54 +247,69 @@ Badge point values: Gold 15 pts / Silver 6 pts / Bronze 3 pts
 - `POST /api/admin/generate-habit-summary` — Generate WhatsApp summary
 
 ### Cron (requires `CRON_SECRET`)
-- `GET /api/cron/weekly-division-shuffle` — Evaluates habit badges for last week + resets weekly badge progress
+- `GET /api/cron/weekly-division-shuffle` — Sunday 11:59 PM UTC: evaluates habit badges, resets weekly badge progress, closes out ended rivalry periods, generates pairings for upcoming rivalry periods
 
 ---
 
-## Rivalry Pairing Algorithm (`lib/rivalries/pairing.ts`)
+## Rivalry System
 
-The `computePairings` function runs automatically in the weekly cron job whenever the next Monday is a `rivalry_period.start_date`. It uses a greedy rank-adjacent algorithm:
+### Pairing Algorithm (`lib/rivalries/pairing.ts`)
+
+The `computePairings` function runs automatically in the weekly cron job when a `rivalry_period.start_date` falls within ±2 days of today. It uses a greedy rank-adjacent algorithm:
 
 - **Parameters**: K0=4 (initial window), DELTA=3 (expansion), KMAX=10 (max window), RECENT_AVOIDANCE=2 periods
-- **Bye**: If player count is odd, lowest-ranked player is excluded from pairing (no bye history tracking)
-- **Window**: One-directional (downward from current rank); expands by DELTA if no unpaired player found
+- **Bye**: If player count is odd, lowest-ranked player sits out (no bye history tracking)
+- **Window**: One-directional (downward from current rank); expands by DELTA if no unpaired candidate found
 - **Preference order**: (1) never faced → (2) faced but not within last 2 periods → (3) any (KMAX fallback)
 - **Tiebreaker**: Closest rank within preference levels; for KMAX fallback: least recently faced, then closest rank
-- **Timing**: Cron looks for a period with `start_date` within ±2 days of today (tolerates clock drift / late runs)
 - **Idempotency**: Skips if matchups already exist for that period — safe to run multiple times in the window
 
-## Rivalry Admin Operations (Manual SQL)
+### Close-out (`app/api/cron/weekly-division-shuffle/route.ts`)
 
-Rivalries are managed via SQL in the Supabase dashboard (no UI yet).
+Runs before pairing, every Sunday night. Finds periods where `end_date <= today` with `player1_score IS NULL` (unresolved). For each:
+1. Fetches Strava activities in `[period.start_date T00:00:00Z, period.end_date T23:59:59Z]`
+2. Computes scores via `computeMetricScores` → display units
+3. Sets `player1_score`, `player2_score`, `winner_id` (NULL for any tie, including 0-0)
 
-**Season 4 schedule (all periods — run once to populate):**
-```sql
-INSERT INTO rivalry_periods (period_number, start_date, end_date, metric, metric_label, metric_unit)
-VALUES
-  (1,  '2026-02-23', '2026-03-08', 'distance', 'Distance', 'km'),
-  (2,  '2026-03-09', '2026-03-22', 'distance', 'Distance', 'km'),
-  (3,  '2026-03-23', '2026-04-05', 'distance', 'Distance', 'km'),
-  (4,  '2026-04-06', '2026-04-19', 'distance', 'Distance', 'km'),
-  (5,  '2026-04-20', '2026-05-03', 'distance', 'Distance', 'km'),
-  (6,  '2026-05-04', '2026-05-17', 'distance', 'Distance', 'km'),
-  (7,  '2026-05-18', '2026-05-31', 'distance', 'Distance', 'km'),
-  (8,  '2026-06-01', '2026-06-14', 'distance', 'Distance', 'km'),
-  (9,  '2026-06-15', '2026-06-28', 'distance', 'Distance', 'km'),
-  (10, '2026-06-29', '2026-07-12', 'distance', 'Distance', 'km'),
-  (11, '2026-07-13', '2026-07-26', 'distance', 'Distance', 'km'),
-  (12, '2026-07-27', '2026-08-09', 'distance', 'Distance', 'km'),
-  (13, '2026-08-10', '2026-08-17', 'distance', 'Distance', 'km');
--- Note: periods start Monday (day after Sunday cron). Period 13 is 8 days (Aug 17 is a Monday).
--- Update metric/metric_label/metric_unit for each period before it starts.
-```
+`player1_score IS NOT NULL` = matchup is resolved. This distinguishes ties from pending matchups.
 
-**Create a single rivalry period:**
-```sql
-INSERT INTO rivalry_periods (period_number, start_date, end_date, metric, metric_label, metric_unit)
-VALUES (1, '2026-02-23', '2026-03-08', 'distance', 'Distance', 'km');
-```
+### Rivalry Metrics (`lib/rivalries/metrics.ts`)
 
-**Create matchups:**
+Shared helper used by both the cron close-out and the live `/api/rivalries` display.
+
+| Metric key | Label | Query | Unit | Sport filter |
+|---|---|---|---|---|
+| `total_distance` | All-Purpose Distance | SUM(distance) | km | All |
+| `run_distance` | Run & Walk Distance | SUM(distance) | km | Run, VirtualRun, TrailRun, Walk, Hike, Snowshoe |
+| `moving_time` | Hours Exercised | SUM(moving_time) | hrs | All |
+| `elevation_gain` | Elevation Climbed | SUM(total_elevation_gain) | m | All |
+| `unique_activity_types` | Variety Week | COUNT(DISTINCT sport_type) | types | All |
+| `strength_count` | Strength Sessions | COUNT(*) | sessions | WeightTraining, Workout, Crossfit, HIIT, Pilates |
+| `active_days` | Active Days | COUNT(DISTINCT date) | days | All |
+| `yoga_time` | Yoga Week | SUM(moving_time) | hrs | Yoga |
+| `dance_time` | Dance Week | SUM(moving_time) | hrs | Dance |
+
+### Season 4 Schedule
+
+| Period | Dates | Metric |
+|---|---|---|
+| 1–4 | Feb 23 – Apr 19 | All-Purpose Distance (pre-season + first real) |
+| 5 | Apr 20 – May 3 | Run & Walk Distance |
+| 6 | May 4 – May 17 | Strength Sessions |
+| 7 | May 18 – May 31 | Hours Exercised |
+| 8 | Jun 1 – Jun 14 | Active Days |
+| 9 | Jun 15 – Jun 28 | Elevation Climbed |
+| 10 | Jun 29 – Jul 12 | Variety Week |
+| 11 | Jul 13 – Jul 26 | Yoga Week |
+| 12 | Jul 27 – Aug 9 | Dance Week |
+| 13 | Aug 10 – Aug 17 | Run & Walk Distance |
+
+Period 4 (Apr 6) is the "real" start date. Periods 1–3 are pre-season warm-up.
+Period 13 is 8 days (not 14) — the season ends Aug 17.
+
+### Rivalry Admin Operations (Manual SQL)
+
+**Create matchups manually:**
 ```sql
 INSERT INTO rivalry_matchups (period_id, player1_id, player2_id)
 VALUES
@@ -297,12 +317,13 @@ VALUES
   ('period-uuid'::uuid, 'user3-uuid'::uuid, 'user4-uuid'::uuid);
 ```
 
-**Award kill mark (set winner):**
+**Manually resolve a matchup (override close-out):**
 ```sql
 UPDATE rivalry_matchups
-SET winner_id = 'winner-uuid'::uuid
-WHERE period_id = 'period-uuid'::uuid
-  AND (player1_id = 'winner-uuid'::uuid OR player2_id = 'winner-uuid'::uuid);
+SET winner_id = 'winner-uuid'::uuid,
+    player1_score = 42.3,
+    player2_score = 38.1
+WHERE id = 'matchup-uuid'::uuid;
 ```
 
 ---
@@ -331,6 +352,7 @@ WHERE period_id = 'period-uuid'::uuid
 | 022 | cumulative_points_system.sql | Drop user_points; cumulative scoring |
 | 025 | create_summary_participants.sql | WhatsApp summary participants |
 | 026 | create_rivalries.sql | Rivalry periods + matchups (Season 4) |
+| 029 | update_rivalry_metrics.sql | Expand metric CHECK to 9 types; add player1_score/player2_score; set Season 4 period schedule |
 
 ---
 
@@ -422,6 +444,21 @@ Requires `SUPABASE_SERVICE_ROLE_KEY`. Deletes from: auth.users, strava_activitie
 ---
 
 ## Agent Update Log
+
+### Claude Sonnet 4.6 (2026-03-04): Rivalry System — Pairing, Close-out, Metrics
+
+**Objective**: Build end-to-end rivalry automation (pairing + close-out) and fix cron bugs.
+
+**Changes**:
+- `lib/rivalries/pairing.ts`: greedy rank-adjacent pairing algorithm (K0=4, DELTA=3, KMAX=10, RECENT_AVOIDANCE=2)
+- `lib/rivalries/metrics.ts`: shared metric computation for 9 metric types; returns display-unit scores
+- Cron (`weekly-division-shuffle`): added rivalry close-out step (before pairing); fixed `user_id` → `id` column bug; fixed `.maybeSingle()` → `.order().limit(1)` to handle multiple rows
+- `/api/rivalries`: switched to shared metrics helper; fixed `elevation_gain` → `total_elevation_gain` column bug; now handles all 9 metric types for live display
+- Migration 029: expanded metric CHECK constraint; added `player1_score`/`player2_score` to rivalry_matchups; set all 13 periods' metric assignments
+- FAQ: updated rivalry schedule with correct labels and icons for all 13 periods
+- `generate_period1_pairings.js`: one-off script to manually populate Period 1 matchups (already run)
+- Tie rule: any tie including 0-0 → `winner_id = NULL`, no kill mark for either player
+- Close-out detection: `player1_score IS NOT NULL` = resolved; distinguishes ties from pending matchups
 
 ### Claude Sonnet 4.6 (2026-02-26): Season 4 Redesign
 
