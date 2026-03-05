@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { computeMetricScores, type MetricKey, type ActivityRow } from '@/lib/rivalries/metrics'
 
 interface MatchupWithStats {
   id: string
@@ -84,29 +85,16 @@ export async function GET() {
     }
 
     // Live metric stats from strava_activities for the current period date range
-    // metric is one of: 'distance', 'moving_time', 'elevation_gain', 'suffer_score'
-    const metric = currentPeriod.metric as string
+    const metric = currentPeriod.metric as MetricKey
     const { data: activities } = await supabase
       .from('strava_activities')
-      .select('user_id, distance, moving_time, elevation_gain, suffer_score')
+      .select('user_id, sport_type, distance, moving_time, total_elevation_gain, start_date')
       .in('user_id', involvedIds)
       .gte('start_date', `${currentPeriod.start_date}T00:00:00Z`)
       .lte('start_date', `${currentPeriod.end_date}T23:59:59Z`)
       .is('deleted_at', null)
 
-    // Aggregate metric per user
-    const metricByUser: Record<string, number> = {}
-    type ActivityRow = { user_id: string; distance: number | null; moving_time: number | null; elevation_gain: number | null; suffer_score: number | null }
-    for (const act of (activities as ActivityRow[] | null) || []) {
-      const val: number = (() => {
-        if (metric === 'distance') return act.distance ?? 0
-        if (metric === 'moving_time') return act.moving_time ?? 0
-        if (metric === 'elevation_gain') return act.elevation_gain ?? 0
-        if (metric === 'suffer_score') return act.suffer_score ?? 0
-        return 0
-      })()
-      metricByUser[act.user_id] = (metricByUser[act.user_id] || 0) + val
-    }
+    const metricByUser = computeMetricScores((activities ?? []) as ActivityRow[], metric)
 
     // Helper to build player info
     function buildPlayer(userId: string) {
@@ -115,18 +103,15 @@ export async function GET() {
       const stravaName = conn ? `${conn.strava_firstname || ''} ${conn.strava_lastname || ''}`.trim() : null
       const name = stravaName || profile?.full_name || profile?.email?.split('@')[0] || `User ${userId.slice(0, 8)}`
 
-      // Convert raw metric value to display units
-      let metricRaw = metricByUser[userId] ?? 0
-      // distance comes in meters → convert to km; moving_time in seconds → hours
-      if (metric === 'distance') metricRaw = metricRaw / 1000
-      if (metric === 'moving_time') metricRaw = metricRaw / 3600
+      // computeMetricScores already returns values in display units
+      const metricValue = metricByUser[userId] ?? 0
 
       return {
         user_id: userId,
         name,
         avatar: conn?.strava_profile ?? null,
         kill_marks: killMarksByUser[userId] ?? 0,
-        metric_value: Math.round(metricRaw * 100) / 100,
+        metric_value: Math.round(metricValue * 100) / 100,
       }
     }
 

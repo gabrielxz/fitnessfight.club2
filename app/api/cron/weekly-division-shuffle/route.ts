@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { BadgeCalculator } from '@/lib/badges/BadgeCalculator'
 import { computePairings, type RankedPlayer, type HistoricalMatchup } from '@/lib/rivalries/pairing'
+import { computeMetricScores, type MetricKey, type ActivityRow } from '@/lib/rivalries/metrics'
 
 // Helper to get the start of the *previous* week (Monday)
 function getLastWeekStart(date: Date): Date {
@@ -57,6 +58,52 @@ export async function GET(request: NextRequest) {
         .in('badge_id', badgeIds)
         .lt('period_end', now.toISOString())
       console.log(`Reset progress for ${weeklyBadges.length} weekly badges`)
+    }
+
+    // ── Rivalry close-out ────────────────────────────────────────────────────
+    // Find all periods that have ended (end_date <= today) with unresolved matchups.
+    // A matchup is unresolved when player1_score IS NULL (set to NULL at creation,
+    // gets a value — even 0 — when closed out, so ties are distinguishable).
+    const todayStr = now.toISOString().split('T')[0]
+
+    const { data: endedPeriods } = await supabase
+      .from('rivalry_periods')
+      .select('id, period_number, metric, start_date, end_date')
+      .lte('end_date', todayStr)
+
+    for (const period of endedPeriods ?? []) {
+      const { data: unresolvedMatchups } = await supabase
+        .from('rivalry_matchups')
+        .select('id, player1_id, player2_id')
+        .eq('period_id', period.id)
+        .is('player1_score', null)
+
+      if (!unresolvedMatchups || unresolvedMatchups.length === 0) continue
+
+      const allIds = [...new Set(unresolvedMatchups.flatMap(m => [m.player1_id, m.player2_id]))]
+
+      const { data: activities } = await supabase
+        .from('strava_activities')
+        .select('user_id, sport_type, distance, moving_time, total_elevation_gain, start_date')
+        .in('user_id', allIds)
+        .gte('start_date', `${period.start_date}T00:00:00Z`)
+        .lte('start_date', `${period.end_date}T23:59:59Z`)
+        .is('deleted_at', null)
+
+      const scores = computeMetricScores((activities ?? []) as ActivityRow[], period.metric as MetricKey)
+
+      for (const matchup of unresolvedMatchups) {
+        const s1 = Math.round((scores[matchup.player1_id] ?? 0) * 100) / 100
+        const s2 = Math.round((scores[matchup.player2_id] ?? 0) * 100) / 100
+        const winner_id = s1 > s2 ? matchup.player1_id : s2 > s1 ? matchup.player2_id : null
+
+        await supabase
+          .from('rivalry_matchups')
+          .update({ player1_score: s1, player2_score: s2, winner_id })
+          .eq('id', matchup.id)
+      }
+
+      console.log(`Rivalry period ${period.period_number} closed out: ${unresolvedMatchups.length} matchups resolved.`)
     }
 
     // ── Rivalry pairing ─────────────────────────────────────────────────────
