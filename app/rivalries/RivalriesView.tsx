@@ -49,16 +49,20 @@ interface RivalriesData {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function formatMetricValue(value: number, metric: string, unit: string): string {
-  if (metric === 'moving_time') {
+  // Time-based metrics: display as Xh Ym
+  if (metric === 'moving_time' || metric === 'yoga_time' || metric === 'dance_time') {
     const h = Math.floor(value)
     const m = Math.round((value - h) * 60)
     if (h === 0) return `${m}m`
     if (m === 0) return `${h}h`
     return `${h}h ${m}m`
   }
-  if (metric === 'distance') return `${value.toFixed(1)} ${unit}`
+  // Distance: 1 decimal place
+  if (metric === 'total_distance' || metric === 'run_distance') return `${value.toFixed(1)} ${unit}`
+  // Elevation: round to nearest meter
   if (metric === 'elevation_gain') return `${Math.round(value)} ${unit}`
-  return `${value} ${unit}`
+  // Integer counts: strength_count, active_days, unique_activity_types
+  return `${Math.round(value)} ${unit}`
 }
 
 function formatDate(dateStr: string): string {
@@ -158,7 +162,9 @@ function MatchupCard({ matchup, currentPeriod, currentUserId, isHero }: {
 
   const totalMetric = player1.metric_value + player2.metric_value
   const p1Pct = totalMetric > 0 ? (player1.metric_value / totalMetric) * 100 : 50
-  const p2Pct = 100 - p1Pct
+  // Tug-of-war: fill grows from center toward the leader.
+  // tugWidth is 0 when tied, up to 50 (half the bar) when one side has everything.
+  const tugWidth = Math.abs(p1Pct - 50) / 2
 
   return (
     <div
@@ -220,26 +226,23 @@ function MatchupCard({ matchup, currentPeriod, currentUserId, isHero }: {
           <span>{formatMetricValue(player2.metric_value, currentPeriod.metric, currentPeriod.metric_unit)}</span>
         </div>
 
-        {/* Progress bar */}
-        <div className="h-2.5 rounded-full overflow-hidden flex" style={{ backgroundColor: 'rgba(255,255,255,0.08)' }}>
-          <div
-            className="h-full rounded-l-full transition-all duration-700"
-            style={{
-              width: `${p1Pct}%`,
-              background: p1Leading || p1Wins
-                ? 'linear-gradient(90deg, #FF6B35, #F7931E)'
-                : 'rgba(255,255,255,0.15)',
-            }}
-          />
-          <div
-            className="h-full rounded-r-full transition-all duration-700"
-            style={{
-              width: `${p2Pct}%`,
-              background: p2Leading || p2Wins
-                ? 'linear-gradient(90deg, #F7931E, #FF6B35)'
-                : 'rgba(255,255,255,0.15)',
-            }}
-          />
+        {/* Tug-of-war bar: fills from center toward the leader */}
+        <div className="h-2.5 rounded-full overflow-hidden relative" style={{ backgroundColor: 'rgba(255,255,255,0.08)' }}>
+          {/* Center divider */}
+          <div className="absolute top-0 bottom-0 w-px" style={{ left: 'calc(50% - 0.5px)', backgroundColor: 'rgba(255,255,255,0.25)' }} />
+          {/* Fill — grows from center toward the leading side */}
+          {tugWidth > 0 && (
+            <div
+              className="absolute top-0 h-full transition-all duration-700"
+              style={{
+                width: `${tugWidth}%`,
+                ...(p1Leading || p1Wins
+                  ? { right: '50%', borderRadius: '9999px 0 0 9999px', background: 'linear-gradient(90deg, #FF6B35, #F7931E)' }
+                  : { left: '50%',  borderRadius: '0 9999px 9999px 0', background: 'linear-gradient(90deg, #F7931E, #FF6B35)' }
+                ),
+              }}
+            />
+          )}
         </div>
       </div>
     </div>
