@@ -232,19 +232,14 @@ export default function FAQContent() {
               unit="weeks with photos"
             />
             <BadgeRow
-              emoji="⚽" name="Pitch Perfect"
-              bronze="30" silver="60" gold="100"
-              unit="soccer minutes / session"
-            />
-            <BadgeRow
-              emoji="🎾" name="Net Gain"
-              bronze="1" silver="2" gold="4"
-              unit="distinct racquet sports"
-            />
-            <BadgeRow
               emoji="🕺" name="Rhythm Engine"
               bronze="60" silver="240" gold="600"
               unit="total dance minutes"
+            />
+            <BadgeRow
+              emoji="🏅" name="Decathlon"
+              bronze="2" silver="4" gold="6"
+              unit="distinct qualifying sports"
             />
           </div>
 

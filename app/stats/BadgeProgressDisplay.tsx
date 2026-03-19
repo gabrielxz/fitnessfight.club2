@@ -16,6 +16,7 @@ interface BadgeCriteria {
   min_elapsed_time?: number
   min_habits?: number
   min_activities?: number
+  min_hours?: number
 }
 
 interface Badge {
@@ -236,7 +237,7 @@ function BadgeProgressItem({ progress }: { progress: BadgeProgress }) {
 }
 
 function getCriteriaDescription(criteria: BadgeCriteria): string {
-  const { type, condition, bronze, silver, gold, metric, activity_type, activity_types, reset_period, sports_list, min_elapsed_time, min_habits, min_activities } = criteria
+  const { type, condition, bronze, silver, gold, metric, activity_type, activity_types, reset_period, sports_list, min_elapsed_time, min_habits, min_activities, min_hours } = criteria
 
   let base = ''
 
@@ -274,11 +275,16 @@ function getCriteriaDescription(criteria: BadgeCriteria): string {
   } else if (type === 'weekly_count' && condition === 'photo_count > 0') {
     base = 'Weeks with photo attachments'
   } else if (type === 'unique_sports') {
+    const minTimeStr = min_elapsed_time ? ` (min ${min_elapsed_time / 60} min each)` : ''
     if (sports_list && sports_list.length > 0) {
-      base = `Play distinct racquet sports (${sports_list.join(', ')})`
+      base = sports_list.length <= 6
+        ? `Log distinct sports: ${sports_list.join(', ')}${minTimeStr}`
+        : `Log distinct qualifying sports${minTimeStr}`
     } else {
       base = 'Try different sport types'
     }
+  } else if (type === 'qualifying_weeks') {
+    base = `Weeks where you log ${min_hours ?? 12}+ hours of exercise`
   } else if (type === 'habit_weeks') {
     const minHabitsText = min_habits ? ` (first ${min_habits} habits)` : ''
     base = `Complete weeks with 100% habit completion${minHabitsText}`

@@ -32,6 +32,7 @@ interface BadgeCriteria {
   min_elapsed_time?: number;
   min_habits?: number;
   min_activities?: number;
+  min_hours?: number;
 }
 
 interface Badge {
@@ -352,6 +353,9 @@ export class BadgeCalculator {
       case 'activity_weeks':
         await this.handleActivityWeeksBadge(badge, activity, currentProgress, timezone)
         break
+      case 'qualifying_weeks':
+        await this.handleQualifyingWeeksBadge(badge, activity, currentProgress, timezone)
+        break
     }
   }
 
@@ -546,14 +550,20 @@ export class BadgeCalculator {
   private async handleVarietyBadge(badge: Badge, activity: Activity, progress: BadgeProgress, _timezone: string) {
     const { criteria } = badge
     
-    // Check if this badge is looking for specific sports (Net Gain badge)
+    // Check if this badge is looking for specific sports (Decathlon, Net Gain, etc.)
     if (criteria.sports_list && criteria.sports_list.length > 0) {
-      const { data: activities } = await this.supabase
+      let sportQuery = this.supabase
         .from('strava_activities')
         .select('sport_type')
         .eq('user_id', activity.user_id)
         .in('sport_type', criteria.sports_list)
         .is('deleted_at', null)
+
+      if (criteria.min_elapsed_time) {
+        sportQuery = sportQuery.gte('elapsed_time', criteria.min_elapsed_time)
+      }
+
+      const { data: activities } = await sportQuery
       
       if (!activities) return
       
@@ -756,6 +766,43 @@ export class BadgeCalculator {
 
         await this.supabase.from('badge_progress').upsert({ ...progress })
       }
+    }
+  }
+
+  private async handleQualifyingWeeksBadge(badge: Badge, activity: Activity, progress: BadgeProgress, timezone: string) {
+    const { criteria } = badge
+    const minHours = criteria.min_hours ?? 12
+
+    const period = await this.getCurrentPeriod('weekly', activity.start_date_local, timezone)
+    if (!period.start) return
+
+    // Check if this week has hit the hours threshold in weekly_exercise_tracking
+    const { data: weekRow } = await this.supabase
+      .from('weekly_exercise_tracking')
+      .select('hours_logged')
+      .eq('user_id', activity.user_id)
+      .eq('week_start', period.start)
+      .single()
+
+    if (!weekRow || (weekRow.hours_logged || 0) < minHours) return
+
+    // Week qualifies — count it once
+    const weekKey = period.start
+    const metadata = progress.metadata || {}
+    const countedWeeks: string[] = metadata.counted_weeks || []
+
+    if (!countedWeeks.includes(weekKey)) {
+      countedWeeks.push(weekKey)
+      progress.current_value = countedWeeks.length
+      progress.metadata = { ...metadata, counted_weeks: countedWeeks }
+
+      const tierAchieved = this.checkTierProgress(progress.current_value, criteria, progress)
+
+      if (tierAchieved) {
+        await this.awardBadge(badge, activity, tierAchieved, progress.current_value)
+      }
+
+      await this.supabase.from('badge_progress').upsert({ ...progress })
     }
   }
 
