@@ -217,6 +217,8 @@ async function fetchAndStoreActivity(
         // photo_count only counts Strava-uploaded photos
         photo_count: activity.total_photo_count || activity.photo_count || 0,
         map_summary_polyline: activity.map?.summary_polyline,
+        start_lat: activity.start_latlng?.[0] ?? null,
+        start_lng: activity.start_latlng?.[1] ?? null,
         trainer: activity.trainer,
         commute: activity.commute,
         manual: activity.manual,

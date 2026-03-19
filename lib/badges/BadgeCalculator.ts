@@ -2,6 +2,16 @@
 import { SupabaseClient } from '@supabase/supabase-js'
 import { getWeekBoundaries } from '@/lib/date-helpers'
 
+// Haversine distance between two lat/lng points, in miles
+function haversineDistanceMiles(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 3958.8
+  const dLat = (lat2 - lat1) * Math.PI / 180
+  const dLng = (lng2 - lng1) * Math.PI / 180
+  const a = Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+}
+
 // Maps Strava sport_type to a Renaissance category
 const ACTIVITY_CATEGORIES: Record<string, string> = {
   // Run
@@ -67,6 +77,7 @@ interface BadgeCriteria {
   min_activities?: number;
   min_hours?: number;
   min_categories?: number;
+  min_distance_miles?: number;
 }
 
 interface Badge {
@@ -392,6 +403,9 @@ export class BadgeCalculator {
         break
       case 'variety_weeks':
         await this.handleVarietyWeeksBadge(badge, activity, currentProgress, timezone)
+        break
+      case 'away_hours':
+        await this.handleAwayHoursBadge(badge, activity, currentProgress, timezone)
         break
     }
   }
@@ -841,6 +855,48 @@ export class BadgeCalculator {
 
       await this.supabase.from('badge_progress').upsert({ ...progress })
     }
+  }
+
+  private async handleAwayHoursBadge(badge: Badge, activity: Activity, progress: BadgeProgress, _timezone: string) {
+    const { criteria } = badge
+    const minMiles = criteria.min_distance_miles ?? 100
+
+    // Requires home location set on the user's profile
+    const { data: profile } = await this.supabase
+      .from('user_profiles')
+      .select('home_lat, home_lng')
+      .eq('id', activity.user_id)
+      .single()
+
+    if (!profile?.home_lat || !profile?.home_lng) return
+
+    // Recalculate from all GPS activities to avoid double-counting on re-sync
+    const { data: allActivities } = await this.supabase
+      .from('strava_activities')
+      .select('start_lat, start_lng, moving_time')
+      .eq('user_id', activity.user_id)
+      .not('start_lat', 'is', null)
+      .not('start_lng', 'is', null)
+      .is('deleted_at', null)
+
+    if (!allActivities) return
+
+    let totalHours = 0
+    for (const act of allActivities) {
+      const dist = haversineDistanceMiles(profile.home_lat, profile.home_lng, act.start_lat!, act.start_lng!)
+      if (dist >= minMiles) {
+        totalHours += (act.moving_time || 0) / 3600
+      }
+    }
+
+    progress.current_value = totalHours
+    const tierAchieved = this.checkTierProgress(totalHours, criteria, progress)
+
+    if (tierAchieved) {
+      await this.awardBadge(badge, activity, tierAchieved, totalHours)
+    }
+
+    await this.supabase.from('badge_progress').upsert({ ...progress })
   }
 
   private async handleVarietyWeeksBadge(badge: Badge, activity: Activity, progress: BadgeProgress, timezone: string) {

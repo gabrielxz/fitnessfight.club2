@@ -272,6 +272,11 @@ export default function FAQContent() {
               bronze="1" silver="4" gold="12"
               unit="weeks with 4+ activity categories"
             />
+            <BadgeRow
+              emoji="🧭" name="Out of Bounds"
+              bronze="3" silver="10" gold="20"
+              unit="hours exercised 100+ miles from home"
+            />
           </div>
 
           {/* ── General ── */}

@@ -93,11 +93,13 @@ A web application that syncs with Strava to track exercise data and create custo
 2. **strava_activities** - All Strava activity data
    - RLS: **DISABLED** (webhooks need to insert without auth)
    - Soft delete via `deleted_at`
+   - `start_lat`, `start_lng` — activity start coordinates (REAL); saved from Strava `start_latlng`; backfilled from polylines for existing data
 
 3. **strava_webhook_events** - Webhook event log for debugging
 
 4. **user_profiles** - User metadata and cumulative scores
    - `email`, `full_name`, `avatar_url`, `timezone`
+   - `home_lat`, `home_lng` — stored home location (REAL); set via admin script; used by Out of Bounds badge
    - `cumulative_exercise_points` - Exercise points (1 pt/hr, max 9/week)
    - `cumulative_habit_points` - Habit completion points (0.5 pts per weekly target met)
    - `cumulative_badge_points` - Badge achievement points (3/6/15 for bronze/silver/gold)
@@ -172,16 +174,44 @@ A web application that syncs with Strava to track exercise data and create custo
 - **Badges**: 3 pts (bronze) / 6 pts (silver) / 15 pts (gold), awarded once per tier
 - **Kill marks**: ×(1 + kills × 0.01) multiplier on total, applied at display/ranking time
 
-### Badge System (7 active badge types)
-1. 🥵 **Tryhard** — Relative Effort (suffer score) in one week (600/350/150)
-2. 🏔 **Everester** — Cumulative elevation gain in meters (4424/2212/600)
-3. 🐂 **Iron Calves** — Bike miles in a week (90/50/10)
-4. 🧘 **Zen Master** — Yoga hours in a week (10/4/1)
-5. 📸 **Belfie** — Weeks with photo attachments (12/6/1)
-6. ⚽ **Pitch Perfect** — Soccer minutes in single session (100/60/30)
-7. 🎾 **Net Gain** — Distinct racquet sports played (4/2/1)
+### Badge System (11 active badge types — Season 4)
 
 Badge point values: Gold 15 pts / Silver 6 pts / Bronze 3 pts
+
+| Emoji | Name | Type | Criteria | Tiers (B/S/G) |
+|---|---|---|---|---|
+| 🥵 | Tryhard | weekly_cumulative | Relative Effort/week | 150/350/600 |
+| 🏔 | Everester | cumulative | Elevation gain (meters, all-time) | 600/2212/4424 |
+| 🐂 | Iron Calves | weekly_cumulative | Bike miles/week | 10/50/90 |
+| 🧘 | Zen Master | weekly_cumulative | Yoga hours/week | 1/4/10 |
+| 📸 | Belfie | weekly_count | Weeks with photo attachments | 1/6/12 |
+| 🪨 | Rock Solid | habit_weeks | Weeks with 100% habit completion | 1/4/12 |
+| 🛑 | No Chill | qualifying_weeks | Weeks with 12+ hours of exercise | 1/6/12 |
+| 🕺 | Rhythm Engine | cumulative | Total Dance minutes (all-time) | 60/240/600 |
+| 🏅 | Decathlon | unique_sports | Distinct qualifying sports (15 min min, 17-sport list) | 2/4/6 |
+| 🎨 | Renaissance | variety_weeks | Weeks with 4+ distinct activity categories | 1/4/12 |
+| 🧭 | Out of Bounds | away_hours | Hours exercised 100+ miles from home | 3/10/20 |
+
+**Deactivated** (preserved for history): Stridezilla, Pitch Perfect, Net Gain, Pack Animal
+
+**Home location**: stored in `user_profiles.home_lat` / `home_lng` (REAL). Set once via admin script — no UI for editing. Required for Out of Bounds badge.
+
+**Activity categories** (used by Renaissance badge — 12 categories):
+- Run, Walk/Hike, Ride, Strength, Yoga/Flexibility, Water, Winter, Racket Sports, Team/Court Sports, Dance, Cardio/Machine, Adventure
+
+**Badge criteria types**:
+- `cumulative` — recalculates total from all activities on each sync
+- `weekly_cumulative` — recalculates weekly total each sync; resets each week
+- `weekly_count` — counts qualifying weeks (e.g. weeks with photos)
+- `weekly_streak` — consecutive weeks with activity
+- `qualifying_weeks` — counts weeks meeting a threshold (e.g. 12+ hrs)
+- `activity_weeks` — counts weeks with N+ activities of specific types
+- `habit_weeks` — counts weeks with 100% habit completion
+- `unique_sports` — distinct Strava sport_types logged (optionally from a list, with min time)
+- `variety_weeks` — counts weeks with N+ distinct activity categories (mapped via ACTIVITY_CATEGORIES)
+- `away_hours` — cumulative hours of activities starting 100+ miles from user's stored home location
+- `single_activity` — best value from a single activity
+- `count` — count of activities meeting a condition
 
 ### Habit Tracker (`/habits`)
 - Add habits with name and target frequency (1-7 days/week)
@@ -353,6 +383,11 @@ WHERE id = 'matchup-uuid'::uuid;
 | 025 | create_summary_participants.sql | WhatsApp summary participants |
 | 026 | create_rivalries.sql | Rivalry periods + matchups (Season 4) |
 | 029 | update_rivalry_metrics.sql | Expand metric CHECK to 9 types; add player1_score/player2_score; set Season 4 period schedule |
+| 030 | rhythm_engine_badge.sql | Deactivate Stridezilla; add Rhythm Engine (cumulative Dance minutes) |
+| 031 | badge_season4_updates.sql | Deactivate Pitch Perfect + Net Gain; rework No Chill → qualifying_weeks; add Decathlon (unique_sports) |
+| 032 | renaissance_badge.sql | Deactivate Pack Animal; add Renaissance (variety_weeks, 4+ categories/week) |
+| 033 | add_home_location.sql | Add home_lat/home_lng to user_profiles |
+| 034 | out_of_bounds_badge.sql | Add start_lat/start_lng to strava_activities; add Out of Bounds badge (away_hours) |
 
 ---
 
@@ -444,6 +479,37 @@ Requires `SUPABASE_SERVICE_ROLE_KEY`. Deletes from: auth.users, strava_activitie
 ---
 
 ## Agent Update Log
+
+### Claude Sonnet 4.6 (2026-03-19): Badge System Overhaul + Out of Bounds
+
+**Objective**: Season 4 badge updates — retire old badges, add 4 new ones, implement home-location infrastructure.
+
+**New badge types implemented in `BadgeCalculator.ts`**:
+- `qualifying_weeks` — counts weeks where `weekly_exercise_tracking.hours_logged >= min_hours`; uses `counted_weeks` metadata to avoid double-counting
+- `variety_weeks` — counts weeks with N+ distinct activity categories (12-category map `ACTIVITY_CATEGORIES` hardcoded in BadgeCalculator)
+- `away_hours` — cumulative moving_time (hrs) for activities starting ≥ `min_distance_miles` from user's `home_lat/home_lng`; uses haversine distance
+
+**New badges added**:
+- 🛑 No Chill — reworked from weekly_cumulative to qualifying_weeks (12+ hrs/week; 1/6/12 weeks)
+- 🕺 Rhythm Engine — cumulative Dance minutes (60/240/600)
+- 🏅 Decathlon — unique_sports from 17-sport list, min 15 min each (2/4/6 sports)
+- 🎨 Renaissance — variety_weeks, 4+ categories/week (1/4/12 weeks)
+- 🧭 Out of Bounds — away_hours, 100+ miles from home (3/10/20 hrs)
+
+**Deactivated**: Stridezilla, Pitch Perfect, Net Gain, Pack Animal
+
+**Home location infrastructure**:
+- Migration 033: `home_lat/home_lng REAL` added to `user_profiles`
+- Migration 034: `start_lat/start_lng REAL` added to `strava_activities`
+- Both sync routes (webhook + manual) now save `activity.start_latlng[0/1]`
+- `backfill_start_latlng.js`: one-off script to populate existing activities from polylines
+- `suggest_home_locations.js`: clusters last-50-activity start points per user; reverse-geocodes via Nominatim
+- `set_home_location.js`: sets home_lat/home_lng for a user by name or email
+- Home locations set for 17 users (2026-03-19)
+
+**Other**:
+- `app/stats/BadgeProgressDisplay.tsx`: descriptions added for all new criteria types
+- `app/faq/FAQContent.tsx`: updated badge table (removed retired badges; added Rhythm Engine, Decathlon, Renaissance, Out of Bounds); added Renaissance category accordion
 
 ### Claude Sonnet 4.6 (2026-03-04): Rivalry System — Pairing, Close-out, Metrics
 
