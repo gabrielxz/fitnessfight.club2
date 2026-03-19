@@ -7,7 +7,6 @@ import { revalidatePath } from 'next/cache'
 /**
  * Ensures a user has all the necessary database entries:
  * - user_profiles entry
- * - user_divisions entry (assigns to Noodle if none exists)
  *
  * This is useful for users who may have signed up before certain
  * features were implemented or after a reset.
@@ -61,44 +60,6 @@ export async function ensureUserDataConsistency(userId: string) {
       console.log('✓ user_profiles entry already exists')
     }
 
-    // 2. Ensure user_divisions entry exists (assign to Noodle if none)
-    const { data: existingDivision } = await adminClient
-      .from('user_divisions')
-      .select('user_id')
-      .eq('user_id', userId)
-      .maybeSingle()
-
-    if (!existingDivision) {
-      console.log(`Assigning user to Noodle division: ${userId}`)
-
-      // Find Noodle division (level 1)
-      const { data: noodleDivision, error: divError } = await adminClient
-        .from('divisions')
-        .select('id')
-        .eq('level', 1)
-        .single()
-
-      if (divError || !noodleDivision) {
-        throw new Error('Could not find Noodle division')
-      }
-
-      const { error: insertError } = await adminClient
-        .from('user_divisions')
-        .insert({
-          user_id: userId,
-          division_id: noodleDivision.id,
-          joined_division_at: new Date().toISOString()
-        })
-
-      if (insertError) {
-        console.error('Error assigning to division:', insertError)
-        throw new Error(`Failed to assign division: ${insertError.message}`)
-      }
-      console.log('✓ Assigned to Noodle division')
-    } else {
-      console.log('✓ user_divisions entry already exists')
-    }
-
     revalidatePath('/admin')
 
     return {
@@ -130,12 +91,10 @@ export async function getUserDataDiagnostics(userId: string) {
     const [
       { data: authUser },
       { data: profile },
-      { data: division },
       { data: stravaConnection }
     ] = await Promise.all([
       adminClient.auth.admin.getUserById(userId),
       adminClient.from('user_profiles').select('*').eq('id', userId).maybeSingle(),
-      adminClient.from('user_divisions').select('*, divisions(*)').eq('user_id', userId).maybeSingle(),
       adminClient.from('strava_connections').select('*').eq('user_id', userId).maybeSingle()
     ])
 
@@ -145,8 +104,6 @@ export async function getUserDataDiagnostics(userId: string) {
       authUserEmail: authUser?.user?.email,
       hasProfile: !!profile,
       profileData: profile,
-      hasDivision: !!division,
-      divisionData: division,
       hasStravaConnection: !!stravaConnection,
       stravaData: stravaConnection
     }

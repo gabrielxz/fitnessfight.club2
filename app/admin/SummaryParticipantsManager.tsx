@@ -14,7 +14,6 @@ interface User {
   display_name: string
   strava_id: string
   has_strava: boolean
-  has_division: boolean
   created_at: string
 }
 

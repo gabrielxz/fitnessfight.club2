@@ -8,7 +8,6 @@ interface User {
   email: string
   display_name: string
   has_strava: boolean
-  has_division: boolean
 }
 
 interface Props {
@@ -24,15 +23,10 @@ export default function UserDiagnosticsSection({ users }: Props) {
     authUserEmail?: string
     hasProfile: boolean
     profileData: Record<string, unknown> | null
-    hasDivision: boolean
-    divisionData: Record<string, unknown> | null
     hasStravaConnection: boolean
     stravaData: Record<string, unknown> | null
   } | null>(null)
   const [message, setMessage] = useState('')
-
-  // Find users who might have issues
-  const usersWithIssues = users.filter(u => u.has_strava && !u.has_division)
 
   const handleDiagnostics = async () => {
     if (!selectedUserId) return
@@ -74,19 +68,8 @@ export default function UserDiagnosticsSection({ users }: Props) {
       <div>
         <h3 className="text-lg font-semibold mb-2">User Data Diagnostics & Repair</h3>
         <p className="text-sm text-gray-400 mb-4">
-          Use this tool to diagnose and fix users who aren&apos;t showing up correctly (e.g., have Strava but no division).
+          Use this tool to diagnose and fix users who aren&apos;t showing up correctly (e.g., missing profile entry).
         </p>
-
-        {usersWithIssues.length > 0 && (
-          <div className="p-3 bg-yellow-900/30 border border-yellow-500 rounded mb-4">
-            <p className="text-yellow-300 font-semibold">⚠️ {usersWithIssues.length} user(s) with potential issues:</p>
-            <ul className="text-yellow-200 text-sm mt-2 space-y-1">
-              {usersWithIssues.map(u => (
-                <li key={u.user_id}>• {u.display_name} ({u.email}) - Has Strava but no division</li>
-              ))}
-            </ul>
-          </div>
-        )}
 
         <div className="flex gap-2 mb-4">
           <select
@@ -102,7 +85,7 @@ export default function UserDiagnosticsSection({ users }: Props) {
             <option value="">Select a user to diagnose...</option>
             {users.map((user) => (
               <option key={user.user_id} value={user.user_id}>
-                {user.display_name} ({user.email}) {!user.has_division ? '⚠️ NO DIVISION' : ''}
+                {user.display_name} ({user.email})
               </option>
             ))}
           </select>
@@ -149,15 +132,6 @@ export default function UserDiagnosticsSection({ users }: Props) {
               </div>
 
               <div className="flex items-center gap-2">
-                <span className={diagnostics.hasDivision ? 'text-green-400' : 'text-red-400'}>
-                  {diagnostics.hasDivision ? '✓' : '✗'}
-                </span>
-                <span className="text-gray-300">
-                  Division Assignment: {diagnostics.hasDivision ? 'Yes' : 'Missing'}
-                </span>
-              </div>
-
-              <div className="flex items-center gap-2">
                 <span className={diagnostics.hasStravaConnection ? 'text-green-400' : 'text-gray-500'}>
                   {diagnostics.hasStravaConnection ? '✓' : '○'}
                 </span>
@@ -167,7 +141,7 @@ export default function UserDiagnosticsSection({ users }: Props) {
               </div>
             </div>
 
-            {(!diagnostics.hasProfile || !diagnostics.hasDivision) && (
+            {!diagnostics.hasProfile && (
               <div className="pt-3 border-t border-white/10">
                 <button
                   onClick={handleFix}
@@ -177,7 +151,7 @@ export default function UserDiagnosticsSection({ users }: Props) {
                   {loading ? 'Fixing...' : '🔧 Fix Missing Data'}
                 </button>
                 <p className="text-xs text-gray-400 mt-2">
-                  This will create missing user_profiles and assign to Noodle division if needed.
+                  This will create the missing user_profiles entry.
                 </p>
               </div>
             )}
