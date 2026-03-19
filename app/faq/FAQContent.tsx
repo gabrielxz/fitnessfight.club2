@@ -202,6 +202,32 @@ export default function FAQContent() {
             <AccordionItem question="Can I lose a badge?">
               <p>No. Once you earn a badge tier, it's yours forever. Even if your stats drop below the threshold later, the badge stays on your profile.</p>
             </AccordionItem>
+
+            <AccordionItem question="How does the 🎨 Renaissance badge work?">
+              <p>Renaissance rewards <strong>weekly variety</strong>. Log activities in <strong>4 or more distinct categories</strong> in a single week to earn a qualifying week. Rack up enough qualifying weeks to hit each tier.</p>
+              <p className="mt-2 font-semibold text-gray-200">The 12 activity categories:</p>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-2">
+                {[
+                  ['Run', 'Run, Trail Run, Virtual Run'],
+                  ['Walk / Hike', 'Walk, Hike'],
+                  ['Ride', 'Ride, E-Bike, MTB, Gravel, Virtual Ride'],
+                  ['Strength', 'Weight Training, Crossfit, Workout, HIIT'],
+                  ['Yoga / Flexibility', 'Yoga, Pilates'],
+                  ['Water', 'Swim, Row, Kayak, SUP, Surf, Sail…'],
+                  ['Winter', 'Alpine/Nordic Ski, Snowboard, Ice Skate…'],
+                  ['Racket Sports', 'Tennis, Badminton, Squash, Pickleball, Padel…'],
+                  ['Team / Court', 'Soccer, Basketball, Volleyball, Cricket'],
+                  ['Dance', 'Dance'],
+                  ['Cardio / Machine', 'Elliptical, Stair Stepper, Inline Skate…'],
+                  ['Adventure', 'Golf, Rock Climb, Skateboard'],
+                ].map(([cat, sports]) => (
+                  <div key={cat}>
+                    <span className="font-semibold text-gray-200">{cat}:</span>{' '}
+                    <span className="text-gray-400">{sports}</span>
+                  </div>
+                ))}
+              </div>
+            </AccordionItem>
           </div>
 
           {/* Badge showcase */}
@@ -240,6 +266,11 @@ export default function FAQContent() {
               emoji="🏅" name="Decathlon"
               bronze="2" silver="4" gold="6"
               unit="distinct qualifying sports"
+            />
+            <BadgeRow
+              emoji="🎨" name="Renaissance"
+              bronze="1" silver="4" gold="12"
+              unit="weeks with 4+ activity categories"
             />
           </div>
 

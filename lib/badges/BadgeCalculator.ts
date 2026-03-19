@@ -2,6 +2,39 @@
 import { SupabaseClient } from '@supabase/supabase-js'
 import { getWeekBoundaries } from '@/lib/date-helpers'
 
+// Maps Strava sport_type to a Renaissance category
+const ACTIVITY_CATEGORIES: Record<string, string> = {
+  // Run
+  Run: 'run', TrailRun: 'run', VirtualRun: 'run',
+  // Walk / Hike
+  Walk: 'walk_hike', Hike: 'walk_hike',
+  // Ride
+  Ride: 'ride', EBikeRide: 'ride', EMountainBikeRide: 'ride',
+  MountainBikeRide: 'ride', GravelRide: 'ride', VirtualRide: 'ride',
+  // Strength
+  WeightTraining: 'strength', Crossfit: 'strength', Workout: 'strength', HIIT: 'strength',
+  // Yoga / Flexibility
+  Yoga: 'yoga_flexibility', Pilates: 'yoga_flexibility',
+  // Water
+  Swim: 'water', Rowing: 'water', Kayaking: 'water', Canoeing: 'water',
+  StandUpPaddling: 'water', Surfing: 'water', Kitesurf: 'water', Windsurf: 'water', Sailing: 'water',
+  // Winter
+  AlpineSki: 'winter', BackcountrySki: 'winter', NordicSki: 'winter',
+  Snowboard: 'winter', IceSkate: 'winter', Snowshoe: 'winter',
+  // Racket Sports
+  Tennis: 'racket', Badminton: 'racket', Squash: 'racket',
+  Racquetball: 'racket', Pickleball: 'racket', TableTennis: 'racket', Padel: 'racket',
+  // Team / Court Sports
+  Soccer: 'team_sports', Basketball: 'team_sports', Volleyball: 'team_sports', Cricket: 'team_sports',
+  // Dance
+  Dance: 'dance',
+  // Cardio / Machine
+  Elliptical: 'cardio_machine', StairStepper: 'cardio_machine',
+  InlineSkate: 'cardio_machine', RollerSki: 'cardio_machine',
+  // Other / Adventure
+  Golf: 'adventure', RockClimbing: 'adventure', Skateboard: 'adventure',
+}
+
 interface Activity {
   strava_activity_id: number
   user_id: string
@@ -33,6 +66,7 @@ interface BadgeCriteria {
   min_habits?: number;
   min_activities?: number;
   min_hours?: number;
+  min_categories?: number;
 }
 
 interface Badge {
@@ -355,6 +389,9 @@ export class BadgeCalculator {
         break
       case 'qualifying_weeks':
         await this.handleQualifyingWeeksBadge(badge, activity, currentProgress, timezone)
+        break
+      case 'variety_weeks':
+        await this.handleVarietyWeeksBadge(badge, activity, currentProgress, timezone)
         break
     }
   }
@@ -785,6 +822,51 @@ export class BadgeCalculator {
       .single()
 
     if (!weekRow || (weekRow.hours_logged || 0) < minHours) return
+
+    // Week qualifies — count it once
+    const weekKey = period.start
+    const metadata = progress.metadata || {}
+    const countedWeeks: string[] = metadata.counted_weeks || []
+
+    if (!countedWeeks.includes(weekKey)) {
+      countedWeeks.push(weekKey)
+      progress.current_value = countedWeeks.length
+      progress.metadata = { ...metadata, counted_weeks: countedWeeks }
+
+      const tierAchieved = this.checkTierProgress(progress.current_value, criteria, progress)
+
+      if (tierAchieved) {
+        await this.awardBadge(badge, activity, tierAchieved, progress.current_value)
+      }
+
+      await this.supabase.from('badge_progress').upsert({ ...progress })
+    }
+  }
+
+  private async handleVarietyWeeksBadge(badge: Badge, activity: Activity, progress: BadgeProgress, timezone: string) {
+    const { criteria } = badge
+    const minCategories = criteria.min_categories ?? 4
+
+    const period = await this.getCurrentPeriod('weekly', activity.start_date_local, timezone)
+    if (!period.start) return
+
+    // Fetch all activities this week
+    const { data: weekActivities } = await this.supabase
+      .from('strava_activities')
+      .select('sport_type')
+      .eq('user_id', activity.user_id)
+      .gte('start_date_local', period.start)
+      .lte('start_date_local', period.end + 'T23:59:59')
+      .is('deleted_at', null)
+
+    if (!weekActivities) return
+
+    // Map to categories and count distinct
+    const categories = new Set(
+      weekActivities.map(a => ACTIVITY_CATEGORIES[a.sport_type]).filter(Boolean)
+    )
+
+    if (categories.size < minCategories) return
 
     // Week qualifies — count it once
     const weekKey = period.start

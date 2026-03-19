@@ -17,6 +17,7 @@ interface BadgeCriteria {
   min_habits?: number
   min_activities?: number
   min_hours?: number
+  min_categories?: number
 }
 
 interface Badge {
@@ -285,6 +286,8 @@ function getCriteriaDescription(criteria: BadgeCriteria): string {
     }
   } else if (type === 'qualifying_weeks') {
     base = `Weeks where you log ${min_hours ?? 12}+ hours of exercise`
+  } else if (type === 'variety_weeks') {
+    base = `Weeks with ${criteria.min_categories ?? 4}+ distinct activity categories`
   } else if (type === 'habit_weeks') {
     const minHabitsText = min_habits ? ` (first ${min_habits} habits)` : ''
     base = `Complete weeks with 100% habit completion${minHabitsText}`
