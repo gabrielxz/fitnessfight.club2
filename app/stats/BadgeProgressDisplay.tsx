@@ -254,6 +254,8 @@ function getCriteriaDescription(criteria: BadgeCriteria): string {
     }
   } else if (type === 'cumulative' && metric === 'elevation_gain') {
     base = 'Total elevation gain'
+  } else if (type === 'cumulative' && metric === 'moving_time_minutes') {
+    base = activity_type ? `Total ${activity_type} minutes` : 'Total activity minutes'
   } else if (type === 'single_activity' && metric === 'calories_per_hour') {
     base = 'Burn calories per hour in a single activity'
   } else if (type === 'single_activity' && metric === 'average_speed_kmh') {

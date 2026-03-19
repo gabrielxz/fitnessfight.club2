@@ -431,6 +431,9 @@ export class BadgeCalculator {
         case 'elevation_gain':
           totalValue += act.total_elevation_gain || 0
           break
+        case 'moving_time_minutes':
+          totalValue += (act.moving_time || 0) / 60
+          break
       }
     }
     

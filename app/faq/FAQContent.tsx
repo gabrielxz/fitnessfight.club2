@@ -241,6 +241,11 @@ export default function FAQContent() {
               bronze="1" silver="2" gold="4"
               unit="distinct racquet sports"
             />
+            <BadgeRow
+              emoji="🕺" name="Rhythm Engine"
+              bronze="60" silver="240" gold="600"
+              unit="total dance minutes"
+            />
           </div>
 
           {/* ── General ── */}
