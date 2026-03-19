@@ -7,6 +7,7 @@ interface CompetitionStats {
   badgeCount: number
   activityCount: number
   habitEntryCount: number
+  matchupCount: number
   usersWithPoints: number
   totalPoints: number
 }
@@ -97,15 +98,16 @@ export default function CompetitionResetSection() {
           <div className="p-4 bg-yellow-900/30 border border-yellow-500 rounded mb-4">
             <p className="text-yellow-300 font-semibold mb-2">⚠️ WARNING: This action will permanently delete:</p>
             <ul className="text-yellow-200 text-sm space-y-1 ml-4">
-              <li>• All earned badges from all users</li>
-              <li>• All points (exercise, habit, and badge points)</li>
+              <li>• All earned badges and badge progress</li>
+              <li>• All points (exercise, habit, and badge)</li>
               <li>• All Strava activity records</li>
               <li>• All habit success/failure records</li>
+              <li>• All rivalry matchups and kill marks (💀 skulls reset to 0)</li>
+              <li>• All rivalry periods (new season schedule must be re-created)</li>
             </ul>
             <p className="text-green-300 font-semibold mt-3">✓ This will keep:</p>
             <ul className="text-green-200 text-sm space-y-1 ml-4">
               <li>• User accounts and profiles</li>
-              <li>• Current division assignments</li>
               <li>• Habit definitions (but not their history)</li>
               <li>• Strava connections</li>
             </ul>
@@ -129,7 +131,8 @@ export default function CompetitionResetSection() {
                 <li>• {stats.badgeCount} earned badges</li>
                 <li>• {stats.activityCount} Strava activities</li>
                 <li>• {stats.habitEntryCount} habit tracking entries</li>
-                <li>• {stats.totalPoints} total points from {stats.usersWithPoints} users</li>
+                <li>• {stats.matchupCount} rivalry matchups (all kill marks)</li>
+                <li>• {stats.totalPoints.toLocaleString()} total points from {stats.usersWithPoints} users</li>
               </ul>
             </div>
           ) : (
