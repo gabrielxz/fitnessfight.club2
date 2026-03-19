@@ -57,8 +57,9 @@ async function main() {
     }
 
     process.stdout.write(`\r  Updated: ${updated}  Skipped: ${skipped}  Errors: ${errors}`)
+    // Don't increment offset — updated rows drop out of the IS NULL filter,
+    // so we always query from 0 until nothing is left.
     if (rows.length < PAGE) break
-    offset += PAGE
   }
 
   console.log(`\n\nDone. Updated: ${updated}, Skipped (no/bad polyline): ${skipped}, Errors: ${errors}`)
