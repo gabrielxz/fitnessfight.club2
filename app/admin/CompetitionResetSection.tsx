@@ -103,13 +103,13 @@ export default function CompetitionResetSection() {
               <li>• All Strava activity records</li>
               <li>• All habit success/failure records</li>
               <li>• All rivalry matchups and kill marks (💀 skulls reset to 0)</li>
-              <li>• All rivalry periods (new season schedule must be re-created)</li>
             </ul>
             <p className="text-green-300 font-semibold mt-3">✓ This will keep:</p>
             <ul className="text-green-200 text-sm space-y-1 ml-4">
               <li>• User accounts and profiles</li>
               <li>• Habit definitions (but not their history)</li>
               <li>• Strava connections</li>
+              <li>• Rivalry period schedule</li>
             </ul>
           </div>
           <button

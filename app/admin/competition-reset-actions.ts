@@ -68,15 +68,7 @@ export async function resetCompetition(confirmationText: string) {
     if (matchupsError) throw new Error(`Failed to delete rivalry matchups: ${matchupsError.message}`)
     console.log('✓ Deleted all rivalry matchups (kill marks reset to 0)')
 
-    // 7. Delete all rivalry periods (new season will have a new schedule)
-    const { error: periodsError } = await supabase
-      .from('rivalry_periods')
-      .delete()
-      .neq('id', '00000000-0000-0000-0000-000000000000')
-    if (periodsError) throw new Error(`Failed to delete rivalry periods: ${periodsError.message}`)
-    console.log('✓ Deleted all rivalry periods')
-
-    // 8. Reset all cumulative points to 0
+    // 7. Reset all cumulative points to 0
     const { data: profiles, error: fetchError } = await supabase
       .from('user_profiles')
       .select('id')
