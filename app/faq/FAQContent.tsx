@@ -102,28 +102,28 @@ export default function FAQContent() {
           <div className="space-y-3">
             <AccordionItem question="How do I earn exercise points?">
               <p>You earn <strong>1 point per hour of exercise</strong>, capped at <strong>9 hours per week</strong> (9 points max).</p>
-              <p>Points are calculated automatically from your Strava activities. Connect your Strava account on the Profile page and your workouts will sync instantly — no manual logging needed.</p>
+              <p>Points are calculated automatically from your Strava activities. Connect your Strava account on the Profile page and your workouts will sync instantly. No manual logging needed.</p>
             </AccordionItem>
 
             <AccordionItem question="What counts as exercise?">
-              <p>Any activity you record on Strava counts: runs, rides, walks, swims, gym sessions, yoga, soccer — all of it. The clock starts when you hit record and stops when you finish.</p>
-              <p>The only thing that matters is moving time, not elapsed time. So a 1-hour ride with a 10-minute coffee stop counts as 1 hour, not 1h 10m.</p>
+              <p>Any activity you record on Strava counts: runs, rides, walks, swims, gym sessions, yoga, soccer, all of it. The clock starts when you hit record and stops when you finish.</p>
+              <p>The only thing that matters is moving time, not elapsed time. A 1-hour ride with a 10-minute coffee stop counts as 1 hour, not 1h 10m.</p>
             </AccordionItem>
 
             <AccordionItem question="How do habit points work?">
               <p>You can set up personal habits (like "meditate daily" or "stretch every morning") on the Habits page.</p>
-              <p>Each habit has a <strong>weekly target</strong> (e.g. 3×/week). If you hit your target by Sunday, you earn <strong>0.5 points</strong> for that habit.</p>
-              <p>Only your first 5 habits count toward points — so choose wisely!</p>
+              <p>Each habit has a <strong>weekly target</strong> (e.g. 3x/week). If you hit your target by Sunday, you earn <strong>0.5 points</strong> for that habit.</p>
+              <p>Only your first 5 habits count toward points, so choose wisely!</p>
             </AccordionItem>
 
             <AccordionItem question="How do badge points work?">
               <p>Earning a badge awards bonus points on top of your exercise and habit points:</p>
               <ul className="list-disc list-inside space-y-1 mt-1">
-                <li>🥉 Bronze — 3 points</li>
-                <li>🥈 Silver — 6 points</li>
-                <li>🥇 Gold — 15 points</li>
+                <li>🥉 Bronze: 3 points</li>
+                <li>🥈 Silver: 6 points</li>
+                <li>🥇 Gold: 15 points</li>
               </ul>
-              <p>Badge points are <strong>permanent</strong> — they don't reset at the end of the week.</p>
+              <p>Badge points are <strong>permanent</strong> and do not reset at the end of the week.</p>
             </AccordionItem>
 
             <AccordionItem question="Do points ever reset?">
@@ -137,12 +137,12 @@ export default function FAQContent() {
 
           <div className="space-y-3">
             <AccordionItem question="How is the leaderboard ranked?">
-              <p>Everyone is on a single leaderboard, ranked by <strong>total cumulative points</strong>. The more you exercise, the more habits you keep, and the more badges you earn — the higher you climb.</p>
+              <p>Everyone is on a single leaderboard, ranked by <strong>total cumulative points</strong>. The more you exercise, the more habits you keep, and the more badges you earn, the higher you climb.</p>
               <p>There are no divisions this season. One leaderboard. One competition.</p>
             </AccordionItem>
 
             <AccordionItem question="What are the 💀 kill marks?">
-              <p>Those are <strong>rivalry kill marks</strong> — one 💀 for each bi-weekly rivalry you've won over the course of the season.</p>
+              <p>Those are <strong>rivalry kill marks</strong>. You earn one 💀 for each bi-weekly rivalry you've won over the course of the season.</p>
               <p>They also boost your score: each kill mark adds 1% to your total points. Win enough and the multiplier starts to matter.</p>
             </AccordionItem>
           </div>
@@ -152,7 +152,7 @@ export default function FAQContent() {
 
           <div className="space-y-3">
             <AccordionItem question="What are Rivalries?">
-              <p>Every two weeks, you're paired with another player near your rank for a head-to-head competition on a <strong>specific metric</strong> — distance, time, elevation, or relative effort.</p>
+              <p>Every two weeks, you're paired with another player near your rank for a head-to-head competition on a <strong>specific metric</strong> such as distance, time, elevation, or active days.</p>
               <p>Whoever scores higher on that metric over the two-week period wins. The winner earns a 💀 kill mark on their profile. If it's a tie, nobody gets the kill mark.</p>
             </AccordionItem>
 
@@ -178,7 +178,7 @@ export default function FAQContent() {
             </AccordionItem>
 
             <AccordionItem question="Do rivalry wins affect my points total?">
-              <p>Yes. Each 💀 kill mark adds <strong>1% to your total score</strong>. Win 5 rivalries and your score is multiplied by 1.05. Win 10 and it's ×1.10. The multiplier applies to your full cumulative score, so it compounds meaningfully over a long season.</p>
+              <p>Yes. Each 💀 kill mark adds <strong>1% to your total score</strong>. Win 5 rivalries and your score is multiplied by 1.05. Win 10 and it's x1.10. The multiplier applies to your full cumulative score, so it compounds meaningfully over a long season.</p>
             </AccordionItem>
           </div>
 
@@ -187,73 +187,65 @@ export default function FAQContent() {
 
           <div className="space-y-3">
             <AccordionItem question="How do badges work?">
-              <p>Badges are earned automatically when you hit certain milestones — no manual claiming needed. Each badge has three tiers: Bronze, Silver, and Gold. Earning a higher tier replaces the lower one, and you always keep the best tier you've reached.</p>
-              <p>Badges are calculated whenever a Strava activity syncs or during the weekly Sunday cron. Badge points are <strong>permanent</strong> and stack on top of your exercise and habit points.</p>
+              <p>Badges are earned automatically when you hit certain milestones. No manual claiming needed. Each badge has three tiers: Bronze, Silver, and Gold. Earning a higher tier replaces the lower one, and you always keep the best tier you've reached.</p>
+              <p>Badges are calculated whenever a Strava activity syncs or during the automatic end-of-week cleanup on Sunday night. Badge points are <strong>permanent</strong> and stack on top of your exercise and habit points.</p>
               <ul className="list-disc list-inside space-y-1 mt-1">
-                <li>🥉 Bronze — 3 points</li>
-                <li>🥈 Silver — 6 points</li>
-                <li>🥇 Gold — 15 points</li>
+                <li>🥉 Bronze: 3 points</li>
+                <li>🥈 Silver: 6 points</li>
+                <li>🥇 Gold: 15 points</li>
               </ul>
-              <p className="mt-2">There are currently <strong>11 active badges</strong> this season. Details for each one are below.</p>
-            </AccordionItem>
-
-            <AccordionItem question="🥵  Tryhard">
-              <p>The Tryhard badge rewards <strong>workout intensity</strong>. It's based on Strava's <em>Relative Effort</em> score — a heart-rate-derived measure of how hard you pushed during a workout. Higher intensity and longer duration both contribute to a higher Relative Effort score.</p>
-              <p>This is a <strong>weekly badge</strong>: your Relative Effort accumulates from Monday to Sunday, then resets. To qualify for a tier, you must hit the threshold in a single week. The tiers are:</p>
-              <BadgeTiers bronze="150" silver="350" gold="600" unit="Relative Effort / week" />
-              <p>Note: Relative Effort requires heart rate data from your device. Activities logged without a heart rate monitor won't contribute to this badge. Riding hard, running fast, and HIIT-style workouts tend to generate the highest scores.</p>
+              <p className="mt-2">There are currently <strong>10 active badges</strong> this season. Details for each one are below.</p>
             </AccordionItem>
 
             <AccordionItem question="🏔  Everester">
-              <p>The Everester badge is a <strong>cumulative all-time elevation challenge</strong>. Every meter you climb on every Strava activity counts — runs, rides, hikes, ski days, anything. The total accumulates across the entire season, never resets.</p>
-              <p>The tiers are named after milestones in the world of climbing:</p>
+              <p>The Everester badge is a <strong>cumulative all-time elevation challenge</strong>. Every meter you climb on every Strava activity counts: runs, rides, hikes, ski days, anything. The total accumulates across the entire season and never resets.</p>
               <BadgeTiers bronze="600" silver="2,212" gold="4,424" unit="meters elevation (all-time)" />
-              <p>If you're a cyclist or hiker, you'll rack this up quickly. Even flat-terrain runners will eventually accumulate enough to hit Bronze. Gold requires serious vertical — roughly equivalent to climbing the height of Mont Blanc twice over.</p>
+              <p>If you're a cyclist or hiker, you'll rack this up quickly. Even flat-terrain runners will eventually accumulate enough to hit Bronze. Gold requires serious vertical.</p>
             </AccordionItem>
 
             <AccordionItem question="🐂  Iron Calves">
-              <p>Iron Calves is a <strong>weekly cycling challenge</strong>. It counts total bike miles across all cycling activity types logged in a single week (Ride, E-Bike Ride, Mountain Bike, Gravel Ride, Virtual Ride).</p>
-              <p>This is a <strong>weekly badge</strong>: your bike miles reset every Monday. You need to hit the threshold within a single week to qualify for the tier.</p>
+              <p>Iron Calves is a <strong>weekly cycling challenge</strong>. It counts total bike miles across all cycling activity types logged in a single week: Ride, E-Bike Ride, Mountain Bike Ride, Gravel Ride, and Virtual Ride.</p>
+              <p>This is a <strong>weekly badge</strong>. Your bike miles reset every Monday, and you need to hit the threshold within a single week to qualify for the tier.</p>
               <BadgeTiers bronze="10" silver="50" gold="90" unit="bike miles / week" />
-              <p>Bronze is very achievable with just a couple of casual rides. Silver (~50 miles) is a solid weekly cycling goal. Gold at 90 miles is serious — that's multiple multi-hour rides in a week.</p>
+              <p>Bronze is achievable with a couple of casual rides. Silver is a solid weekly cycling goal. Gold at 90 miles requires multiple long rides in a week.</p>
             </AccordionItem>
 
             <AccordionItem question="🧘  Zen Master">
-              <p>Zen Master rewards <strong>dedicated time on the mat</strong>. It counts the total moving time logged in Yoga and Pilates activities during a single week.</p>
-              <p>This is a <strong>weekly badge</strong>: your yoga hours reset every Monday. Hit the threshold in any given week to qualify.</p>
+              <p>Zen Master rewards <strong>dedicated time on the mat</strong>. It counts the total moving time logged in Yoga and Pilates activities during a single week. What matters is total time, not number of sessions.</p>
+              <p>This is a <strong>weekly badge</strong>. Your yoga hours reset every Monday, and you need to reach the threshold within a single week.</p>
               <BadgeTiers bronze="1" silver="4" gold="10" unit="yoga hours / week" />
-              <p>Bronze is just one session. Silver requires four hours — roughly four 60-minute classes in a week. Gold at 10 hours is a genuine yoga retreat pace. Log your practices consistently on Strava as "Yoga" or "Pilates" to have them counted.</p>
+              <p>Log your practices on Strava as "Yoga" or "Pilates" to have them counted. Gold at 10 hours in a week is a genuine yoga retreat pace.</p>
             </AccordionItem>
 
             <AccordionItem question="📸  Belfie">
-              <p>A "belfie" is a workout selfie — and this badge rewards you for documenting your fitness journey with photos. A week qualifies when at least one of your Strava activities that week has a <strong>photo attached</strong>.</p>
-              <p>This badge counts <strong>qualifying weeks</strong> over time. You don't need photos every activity — just one photo on one activity during the week is enough.</p>
+              <p>A "belfie" is a workout selfie, and this badge rewards you for documenting your fitness journey with photos. A week qualifies when at least one of your Strava activities that week has a <strong>photo attached</strong>.</p>
+              <p>This badge counts <strong>qualifying weeks</strong> over time. You don't need a photo on every activity. One photo on one activity during the week is enough to qualify.</p>
               <BadgeTiers bronze="1" silver="6" gold="12" unit="weeks with a photo" />
-              <p>To attach a photo, add it to your Strava activity before or after uploading. Gold requires 12 weeks of documented workouts — roughly a quarter of the season. Get your phone out!</p>
+              <p>Add photos to your Strava activity before or after uploading. Gold requires 12 weeks of documented workouts. Get your phone out!</p>
             </AccordionItem>
 
             <AccordionItem question="🪨  Rock Solid">
-              <p>Rock Solid is the <strong>habit discipline badge</strong>. It rewards weeks where you achieve <strong>100% completion on all of your first 5 habits</strong>. Every habit must hit its weekly target — not just most of them, all of them.</p>
-              <p>This badge counts <strong>qualifying weeks</strong> over the season. Habits are evaluated on Sunday night by the weekly cron.</p>
+              <p>Rock Solid is the <strong>habit discipline badge</strong>. It rewards weeks where you achieve <strong>100% completion on all of your first 5 habits</strong>. Every habit must hit its weekly target. Not just most of them, all of them.</p>
+              <p>This badge counts <strong>qualifying weeks</strong> over the season. Habits are evaluated during the automatic end-of-week cleanup on Sunday night.</p>
               <BadgeTiers bronze="1" silver="4" gold="12" unit="perfect habit weeks" />
-              <p>If you have fewer than 5 habits set up, all of your habits must be completed. If you have more than 5, only the first 5 (by creation date) count toward this badge. Gold at 12 weeks means staying truly rock solid for a quarter of the season — a serious commitment to your goals.</p>
+              <p>If you have fewer than 5 habits set up, all of your habits must be completed. If you have more than 5, only the first 5 (by creation date) count toward this badge. Gold at 12 weeks means staying rock solid for a full quarter of the season.</p>
             </AccordionItem>
 
             <AccordionItem question="🛑  No Chill">
-              <p>No Chill rewards <strong>absolute volume weeks</strong> — logging a massive amount of exercise. A week qualifies when your total moving time across all activities reaches <strong>12 or more hours</strong>.</p>
-              <p>Note: the regular exercise cap for points is 9 hours per week, but No Chill counts beyond that. There's no ceiling — if you log it, it counts.</p>
+              <p>No Chill rewards <strong>high-volume weeks</strong>. A week qualifies when your total moving time across all activities reaches <strong>12 or more hours</strong>.</p>
+              <p>Note: the regular exercise cap for points is 9 hours per week, but No Chill counts beyond that. There's no ceiling.</p>
               <BadgeTiers bronze="1" silver="6" gold="12" unit="weeks with 12+ hrs of exercise" />
-              <p>Hitting 12 hours in a single week is legitimately hard — that's nearly two hours of exercise every day, or a mix of longer endurance sessions and multiple daily workouts. Bronze is a one-time proof of commitment. Gold means doing this 12 times over the season. Truly no chill.</p>
+              <p>Hitting 12 hours in a single week is hard. It means long endurance sessions, multiple daily workouts, or both. Gold means doing this 12 times over the season. Truly no chill.</p>
             </AccordionItem>
 
             <AccordionItem question="🕺  Rhythm Engine">
-              <p>Rhythm Engine is a <strong>cumulative all-time dance challenge</strong>. It counts the total moving time across all "Dance" activities you log on Strava — forever, no weekly reset.</p>
+              <p>Rhythm Engine is a <strong>cumulative all-time dance challenge</strong>. It counts the total moving time across all "Dance" activities you log on Strava. No weekly reset; every minute accumulates forever.</p>
               <BadgeTiers bronze="60" silver="240" gold="600" unit="total dance minutes" />
-              <p>That's 1 hour for Bronze, 4 hours for Silver, and 10 hours for Gold. Log your Zumba, dance fitness classes, or freestyle sessions on Strava as "Dance" and every minute counts toward this badge. Gold is a lot of dancing — but if you're a regular, you'll get there.</p>
+              <p>Log your Zumba classes, dance fitness sessions, or freestyle workouts on Strava as "Dance" and every minute counts. Gold is a lot of dancing, but if you're a regular, you'll get there.</p>
             </AccordionItem>
 
             <AccordionItem question="🏅  Decathlon">
-              <p>Decathlon rewards <strong>athletic variety</strong> by challenging you to try a specific list of less-common sports. Each sport on the qualifying list counts only once (no matter how many times you do it), and each session must be <strong>at least 15 minutes</strong> long to count.</p>
+              <p>Decathlon rewards <strong>athletic variety</strong> by challenging you to try a specific list of less-common sports. Each sport on the qualifying list counts only once regardless of how many times you do it, and each session must be <strong>at least 15 minutes</strong> long to count.</p>
               <BadgeTiers bronze="2" silver="4" gold="6" unit="distinct qualifying sports" />
               <p className="font-semibold text-gray-200 mt-2">The 17 qualifying sports:</p>
               <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-1">
@@ -266,11 +258,11 @@ export default function FAQContent() {
                   <div key={sport} className="text-gray-400">• {sport}</div>
                 ))}
               </div>
-              <p className="mt-2">Your regular runs and rides don't count here — it's specifically designed to push you outside your comfort zone. Gold requires trying 6 different sports from the list, each for at least 15 minutes.</p>
+              <p className="mt-2">Your regular runs and rides don't count here. This badge is specifically designed to push you outside your comfort zone. Gold requires trying 6 different sports from the list.</p>
             </AccordionItem>
 
             <AccordionItem question="🎨  Renaissance">
-              <p>Renaissance rewards <strong>weekly variety across all activity types</strong>. A week qualifies when you log activities in <strong>4 or more distinct categories</strong> during that Monday–Sunday window. Categories are broader buckets — not individual sport types.</p>
+              <p>Renaissance rewards <strong>weekly variety across all activity types</strong>. A week qualifies when you log activities in <strong>4 or more distinct categories</strong> during that Monday through Sunday window. Categories are broader buckets, not individual sport types.</p>
               <BadgeTiers bronze="1" silver="4" gold="12" unit="weeks with 4+ categories" />
               <p className="font-semibold text-gray-200 mt-2">The 12 activity categories:</p>
               <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-1">
@@ -280,12 +272,12 @@ export default function FAQContent() {
                   ['Ride', 'Ride, E-Bike, MTB, Gravel, Virtual Ride'],
                   ['Strength', 'Weight Training, Crossfit, Workout, HIIT'],
                   ['Yoga / Flexibility', 'Yoga, Pilates'],
-                  ['Water', 'Swim, Row, Kayak, SUP, Surf, Sail…'],
-                  ['Winter', 'Alpine/Nordic Ski, Snowboard, Ice Skate…'],
-                  ['Racket Sports', 'Tennis, Badminton, Squash, Pickleball, Padel…'],
+                  ['Water', 'Swim, Row, Kayak, SUP, Surf, Sail...'],
+                  ['Winter', 'Alpine/Nordic Ski, Snowboard, Ice Skate...'],
+                  ['Racket Sports', 'Tennis, Badminton, Squash, Pickleball, Padel...'],
                   ['Team / Court', 'Soccer, Basketball, Volleyball, Cricket'],
                   ['Dance', 'Dance'],
-                  ['Cardio / Machine', 'Elliptical, Stair Stepper, Inline Skate…'],
+                  ['Cardio / Machine', 'Elliptical, Stair Stepper, Inline Skate...'],
                   ['Adventure', 'Golf, Rock Climb, Skateboard'],
                 ].map(([cat, sports]) => (
                   <div key={cat}>
@@ -294,14 +286,14 @@ export default function FAQContent() {
                   </div>
                 ))}
               </div>
-              <p className="mt-2">For example: a week with a run, a yoga session, a strength workout, and a bike ride hits 4 categories and qualifies. Gold requires 12 qualifying weeks — a full season of well-rounded training.</p>
+              <p className="mt-2">For example: a week with a run, a yoga session, a strength workout, and a bike ride hits 4 categories and qualifies. Gold requires 12 qualifying weeks, a full season of well-rounded training.</p>
             </AccordionItem>
 
             <AccordionItem question="🧭  Out of Bounds">
-              <p>Out of Bounds rewards <strong>exercising far from home</strong>. It tracks the total hours you spend working out at locations <strong>100 or more miles from your home</strong>. This could be a vacation run, a trail race in another city, a ski trip — any activity recorded via GPS that starts at least 100 miles from your registered home location.</p>
-              <p>This is a <strong>cumulative all-time badge</strong> — your away hours accumulate over the whole season, no weekly reset. Distance is calculated using GPS coordinates from your Strava activity's start point.</p>
+              <p>Out of Bounds rewards <strong>exercising far from home</strong>. It tracks the total hours you spend working out at locations <strong>100 or more miles from your home</strong>. A vacation run, a trail race in another city, a ski trip: any activity recorded via GPS that starts at least 100 miles from your registered home location counts.</p>
+              <p>This is a <strong>cumulative all-time badge</strong>. Your away hours accumulate over the whole season with no weekly reset. Distance is calculated using GPS coordinates from your Strava activity's start point.</p>
               <BadgeTiers bronze="3" silver="10" gold="20" unit="hours exercised 100+ mi from home" />
-              <p>Your home location is set once by the admin based on your activity history. If you travel regularly for fitness — destination races, ski weekends, beach workouts — this badge will add up. Gold at 20 hours means a serious amount of fitness tourism.</p>
+              <p>Your home location is set once by the admin based on your activity history. If you travel regularly for fitness, destination races, ski weekends, beach workouts, this badge adds up over the season.</p>
             </AccordionItem>
           </div>
 
@@ -313,9 +305,14 @@ export default function FAQContent() {
               <p>Weeks run <strong>Monday through Sunday</strong>. The exercise cap resets at midnight Monday in your local timezone (defaulting to Eastern Time if you haven't set your timezone).</p>
             </AccordionItem>
 
-            <AccordionItem question="My activity didn't sync — what do I do?">
+            <AccordionItem question="My activity didn't sync. What do I do?">
               <p>Head to your <strong>Profile</strong> page and hit the <strong>"Sync Now"</strong> button. This pulls your last 30 Strava activities and recalculates your points.</p>
               <p>If activities are still missing, make sure your Strava account is connected and that the activity is public (or followers-only) on Strava.</p>
+            </AccordionItem>
+
+            <AccordionItem question="I updated an activity on Strava but the app didn't pick up the change">
+              <p>The Strava API doesn't always send an update notification when you edit an activity. The most reliable workaround is to <strong>change the title of the activity</strong> after making any important edits. Renaming the activity reliably triggers an update and causes this app to re-sync and recalculate.</p>
+              <p>This is especially important if you've added a photo for the Belfie badge, changed the activity type so it falls into a different badge category, or made any other edit you expect to affect your points or badge progress.</p>
             </AccordionItem>
 
             <AccordionItem question="Who built this?">
