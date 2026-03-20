@@ -20,7 +20,8 @@ A web application that syncs with Strava to track exercise data and create custo
 │   │   ├── page.tsx                      # Admin dashboard page
 │   │   ├── AdminDashboard.tsx            # Admin UI component
 │   │   ├── actions.ts                    # Server actions (deleteUser, assignBadge)
-│   │   ├── HabitSummaryGenerator.tsx     # WhatsApp summary generator
+│   │   ├── HabitSummaryGenerator.tsx     # WhatsApp habit summary generator
+│   │   ├── CompetitionUpdateGenerator.tsx# AI competition update generator
 │   │   ├── SummaryParticipantsManager.tsx
 │   │   ├── CompetitionResetSection.tsx   # Nuclear reset button
 │   │   ├── UserDiagnosticsSection.tsx    # Diagnose/fix missing DB entries
@@ -28,10 +29,11 @@ A web application that syncs with Strava to track exercise data and create custo
 │   │   ├── competition-reset-actions.ts
 │   │   └── user-fix-actions.ts
 │   ├── api/
-│   │   ├── admin/generate-habit-summary/ # Habit summary API
+│   │   ├── admin/generate-habit-summary/     # Habit summary API
+│   │   ├── admin/generate-competition-update/# AI competition update API
 │   │   ├── badges/progress/              # Badge progress API
 │   │   ├── cron/
-│   │   │   └── weekly-division-shuffle/  # Weekly habit badge eval + badge resets
+│   │   │   └── weekly-division-shuffle/  # Weekly cron: leaderboard snapshot, habit badges, badge resets, rivalry close-out + pairing
 │   │   ├── habits/                       # Habit CRUD + entries
 │   │   ├── leaderboard/                  # Unified leaderboard API (Season 4)
 │   │   ├── rivalries/                    # Rivalry periods + matchups API (Season 4)
@@ -72,6 +74,8 @@ A web application that syncs with Strava to track exercise data and create custo
 │   ├── rivalries/
 │   │   ├── pairing.ts                    # Greedy rank-adjacent pairing algorithm
 │   │   └── metrics.ts                    # Shared metric computation (9 types)
+│   ├── weekly-update/
+│   │   └── generator.ts                  # AI competition update: data fetch + Claude Sonnet call
 │   └── supabase/
 │       ├── client.ts                     # Browser client
 │       ├── server.ts                     # Server client
@@ -137,8 +141,15 @@ A web application that syncs with Strava to track exercise data and create custo
     - Each player appears at most once per period
     - RLS: public read, admin write only
 
+### Season 4: Weekly Snapshots
+16. **leaderboard_snapshots** - Weekly rank + points snapshot per user
+    - `user_id`, `week_start` (DATE), `rank` (INTEGER), `total_points` (REAL)
+    - Captured at the start of the Sunday cron before any processing
+    - Used by the AI competition update generator for rank-change tracking
+    - RLS: public read, service role write
+
 ### Admin
-16. **summary_participants** - WhatsApp summary participant list
+17. **summary_participants** - WhatsApp summary participant list
 
 ---
 
@@ -174,13 +185,12 @@ A web application that syncs with Strava to track exercise data and create custo
 - **Badges**: 3 pts (bronze) / 6 pts (silver) / 15 pts (gold), awarded once per tier
 - **Kill marks**: ×(1 + kills × 0.01) multiplier on total, applied at display/ranking time
 
-### Badge System (11 active badge types — Season 4)
+### Badge System (10 active badge types — Season 4)
 
 Badge point values: Gold 15 pts / Silver 6 pts / Bronze 3 pts
 
 | Emoji | Name | Type | Criteria | Tiers (B/S/G) |
 |---|---|---|---|---|
-| 🥵 | Tryhard | weekly_cumulative | Relative Effort/week | 150/350/600 |
 | 🏔 | Everester | cumulative | Elevation gain (meters, all-time) | 600/2212/4424 |
 | 🐂 | Iron Calves | weekly_cumulative | Bike miles/week | 10/50/90 |
 | 🧘 | Zen Master | weekly_cumulative | Yoga hours/week | 1/4/10 |
@@ -192,9 +202,9 @@ Badge point values: Gold 15 pts / Silver 6 pts / Bronze 3 pts
 | 🎨 | Renaissance | variety_weeks | Weeks with 4+ distinct activity categories | 1/4/12 |
 | 🧭 | Out of Bounds | away_hours | Hours exercised 100+ miles from home | 3/10/20 |
 
-**Deactivated** (preserved for history): Stridezilla, Pitch Perfect, Net Gain, Pack Animal
+**Deactivated** (preserved for history): Tryhard, Stridezilla, Pitch Perfect, Net Gain, Pack Animal
 
-**Home location**: stored in `user_profiles.home_lat` / `home_lng` (REAL). Set once via admin script — no UI for editing. Required for Out of Bounds badge.
+**Home location**: stored in `user_profiles.home_lat` / `home_lng` (REAL). Set once via admin script; no UI for editing. Required for Out of Bounds badge.
 
 **Activity categories** (used by Renaissance badge — 12 categories):
 - Run, Walk/Hike, Ride, Strength, Yoga/Flexibility, Water, Winter, Racket Sports, Team/Court Sports, Dance, Cardio/Machine, Adventure
@@ -235,9 +245,10 @@ Badge point values: Gold 15 pts / Silver 6 pts / Bronze 3 pts
 ### Admin Dashboard (`/admin` — Gabriel Beal only)
 - **User Management**: View all users; delete; diagnose/repair missing DB entries
 - **Badge Management**: Manually assign/remove bronze/silver/gold badges
-- **WhatsApp Summary Generator**: Generate weekly habit summaries for group chat
-- **Competition Reset**: 4-step nuclear reset (clears points, badges, activities, habits)
-- Note: Division management UI still present but divisions are not used in Season 4 leaderboard
+- **WhatsApp Competition Update**: AI-generated weekly recap (leaderboard, rank changes, badges, rivalry results, top exercisers) via Claude Sonnet; copy-to-clipboard for WhatsApp paste
+- **WhatsApp Habit Summary**: Generate weekly habit completion summaries for group chat
+- **Manage Summary Participants**: Control which users appear in the habit summary
+- **Competition Reset**: 4-step nuclear reset (clears points, badges, activities, habits, rivalry matchups/kill marks; preserves rivalry period schedule)
 
 ---
 
@@ -273,11 +284,17 @@ Badge point values: Gold 15 pts / Silver 6 pts / Bronze 3 pts
 
 ### Admin (Gabriel Beal only)
 - `GET /admin` — Admin dashboard
-- Server Actions: `deleteUser`, `assignBadge`, `removeBadge`, `changeDivision`
-- `POST /api/admin/generate-habit-summary` — Generate WhatsApp summary
+- Server Actions: `deleteUser`, `assignBadge`, `removeBadge`
+- `POST /api/admin/generate-habit-summary` — Generate WhatsApp habit summary
+- `POST /api/admin/generate-competition-update` — Generate AI competition update (requires `ANTHROPIC_API_KEY`)
 
 ### Cron (requires `CRON_SECRET`)
-- `GET /api/cron/weekly-division-shuffle` — Sunday 11:59 PM UTC: evaluates habit badges, resets weekly badge progress, closes out ended rivalry periods, generates pairings for upcoming rivalry periods
+- `GET /api/cron/weekly-division-shuffle` — Sunday 11:59 PM UTC (4 steps in order):
+  1. Capture leaderboard snapshot into `leaderboard_snapshots`
+  2. Evaluate habit badges for all users with active habits
+  3. Reset weekly badge progress for all weekly badge types
+  4. Close out ended rivalry periods (compute scores, set winner)
+  5. Generate pairings for any rivalry period starting within ±2 days
 
 ---
 
@@ -388,6 +405,7 @@ WHERE id = 'matchup-uuid'::uuid;
 | 032 | renaissance_badge.sql | Deactivate Pack Animal; add Renaissance (variety_weeks, 4+ categories/week) |
 | 033 | add_home_location.sql | Add home_lat/home_lng to user_profiles |
 | 034 | out_of_bounds_badge.sql | Add start_lat/start_lng to strava_activities; add Out of Bounds badge (away_hours) |
+| 035 | leaderboard_snapshots.sql | Create leaderboard_snapshots table for weekly rank-change tracking |
 
 ---
 
@@ -406,6 +424,9 @@ STRAVA_REDIRECT_BASE_URL=[production-url]   # e.g. https://fitnessfight.club
 
 # Cron Job Security
 CRON_SECRET=[secure-random-token]
+
+# AI (competition update generator)
+ANTHROPIC_API_KEY=[anthropic-api-key]
 ```
 
 ---
@@ -479,6 +500,42 @@ Requires `SUPABASE_SERVICE_ROLE_KEY`. Deletes from: auth.users, strava_activitie
 ---
 
 ## Agent Update Log
+
+### Claude Sonnet 4.6 (2026-03-20): AI Competition Update Generator + Badge/FAQ Cleanup
+
+**Objective**: Build a WhatsApp competition update generator using Claude Sonnet; fix badge list; clean up FAQ copy.
+
+**AI Competition Update Generator**:
+- `lib/weekly-update/generator.ts`: fetches current leaderboard (with rank changes vs. previous snapshot), badges earned last week, rivalry results + active matchups, top exercisers, then calls Claude Sonnet (`claude-sonnet-4-6`) to write an exciting WhatsApp-formatted prose update
+- `app/api/admin/generate-competition-update/route.ts`: admin-only API route
+- `app/admin/CompetitionUpdateGenerator.tsx`: button + preview + copy-to-clipboard UI (same pattern as HabitSummaryGenerator)
+- Wired into `AdminDashboard.tsx` above the habit summary section
+- `@anthropic-ai/sdk` added to dependencies
+- Requires `ANTHROPIC_API_KEY` in Vercel environment variables
+
+**Leaderboard Snapshots**:
+- Migration 035: `leaderboard_snapshots` table (`user_id`, `week_start`, `rank`, `total_points`)
+- Sunday cron now captures a snapshot at the very start of its run (before any processing) so the competition update generator can show rank changes week-over-week
+
+**Admin Dashboard: Division UI removed**:
+- Removed Division column from user table, "Change Division" section, and `changeDivision` server action
+- `AdminDashboard.tsx`, `admin/page.tsx`, `actions.ts`, `SummaryParticipantsManager.tsx`, `UserDiagnosticsSection.tsx`, `user-fix-actions.ts` all cleaned of has_division/division references
+
+**Competition Reset updated**:
+- Now also deletes all `rivalry_matchups` (resets kill marks to 0)
+- Does NOT delete `rivalry_periods` (season schedule preserved)
+- `getCompetitionStats()` now includes matchup count in the preview
+
+**Badge list corrected**:
+- Removed Tryhard badge (was listed in docs but not present in the database)
+- Active badge count: 11 -> 10
+- FAQ updated: Rock Solid and No Chill were missing; both added with full descriptions
+
+**FAQ overhaul** (`app/faq/FAQContent.tsx`):
+- Each badge is now its own AccordionItem with a full verbose explanation of how to qualify
+- Removed all em dashes from copy throughout the file
+- Replaced "cron" references with "automatic end-of-week cleanup on Sunday night"
+- Added new FAQ item: "I updated an activity on Strava but the app didn't pick up the change" explaining the title-change trick to force re-sync (important for Belfie photos, activity type changes, badge credit)
 
 ### Claude Sonnet 4.6 (2026-03-19): Badge System Overhaul + Out of Bounds
 
