@@ -26,6 +26,32 @@ export async function GET(request: NextRequest) {
     const now = new Date()
     const lastWeekStart = getLastWeekStart(now)
 
+    // ── Leaderboard snapshot ─────────────────────────────────────────────────
+    // Capture current standings before this week's processing so we can
+    // track rank changes week-over-week in the competition update generator.
+    const dayOfWeek = now.getUTCDay()
+    const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1
+    const thisWeekMonday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - daysToMonday))
+    const thisWeekStartStr = thisWeekMonday.toISOString().split('T')[0]
+
+    const { data: profilesForSnapshot } = await supabase
+      .from('user_profiles')
+      .select('id, total_cumulative_points')
+      .order('total_cumulative_points', { ascending: false })
+
+    if (profilesForSnapshot && profilesForSnapshot.length > 0) {
+      const snapshots = profilesForSnapshot.map((p, idx) => ({
+        user_id: p.id,
+        week_start: thisWeekStartStr,
+        rank: idx + 1,
+        total_points: p.total_cumulative_points ?? 0,
+      }))
+      await supabase
+        .from('leaderboard_snapshots')
+        .upsert(snapshots, { onConflict: 'user_id,week_start' })
+      console.log(`Captured leaderboard snapshot for ${snapshots.length} users (week ${thisWeekStartStr})`)
+    }
+
     // ── Habit badge evaluation ──────────────────────────────────────────────
     console.log('Evaluating habit badges for last week...')
     const badgeCalculator = new BadgeCalculator(supabase)

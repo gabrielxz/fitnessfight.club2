@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { deleteUser, assignBadge, removeBadge } from './actions'
 import HabitSummaryGenerator from './HabitSummaryGenerator'
+import CompetitionUpdateGenerator from './CompetitionUpdateGenerator'
 import SummaryParticipantsManager from './SummaryParticipantsManager'
 import CompetitionResetSection from './CompetitionResetSection'
 import UserDiagnosticsSection from './UserDiagnosticsSection'
@@ -278,6 +279,12 @@ export default function AdminDashboard({ users, badges, userBadges }: AdminDashb
               Assign Badge
             </button>
           </div>
+        </div>
+
+        {/* WhatsApp Competition Update Section */}
+        <div className="glass-card p-6 mb-8">
+          <h2 className="text-2xl font-bold text-white mb-6">WhatsApp Competition Update</h2>
+          <CompetitionUpdateGenerator />
         </div>
 
         {/* WhatsApp Habit Summary Section */}
