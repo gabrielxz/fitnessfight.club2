@@ -349,10 +349,10 @@ Shared helper used by both the cron close-out and the live `/api/rivalries` disp
 | 10 | Jun 29 – Jul 12 | Variety Week |
 | 11 | Jul 13 – Jul 26 | Yoga Week |
 | 12 | Jul 27 – Aug 9 | Dance Week |
-| 13 | Aug 10 – Aug 17 | Run & Walk Distance |
+| 13 | Aug 10 – Aug 23 | Run & Walk Distance |
 
 Period 4 (Apr 6) is the "real" start date. Periods 1–3 are pre-season warm-up.
-Period 13 is 8 days (not 14) — the season ends Aug 17.
+Period 13 runs Aug 10–Aug 23 (14 days). The season ends Aug 23.
 
 ### Rivalry Admin Operations (Manual SQL)
 

@@ -80,7 +80,7 @@ const RIVALRY_SCHEDULE = [
   { period: 10, label: 'Variety Week',          dates: 'Jun 29 – Jul 12', icon: '🎯' },
   { period: 11, label: 'Yoga Week',             dates: 'Jul 13 – Jul 26', icon: '🧘' },
   { period: 12, label: 'Dance Week',            dates: 'Jul 27 – Aug 9',  icon: '💃' },
-  { period: 13, label: 'Run & Walk Distance',   dates: 'Aug 10 – Aug 17', icon: '🏃' },
+  { period: 13, label: 'Run & Walk Distance',   dates: 'Aug 10 – Aug 23', icon: '🏃' },
 ]
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
