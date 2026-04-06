@@ -143,7 +143,7 @@ export default function FAQContent() {
 
             <AccordionItem question="What are the 💀 kill marks?">
               <p>Those are <strong>rivalry kill marks</strong>. You earn one 💀 for each bi-weekly rivalry you've won over the course of the season.</p>
-              <p>They also boost your score: each kill mark adds 1% to your total points. Win enough and the multiplier starts to matter.</p>
+              <p>They also boost your score: each kill mark adds 1.5% to your total points. Win enough and the multiplier starts to matter.</p>
             </AccordionItem>
           </div>
 
@@ -178,7 +178,7 @@ export default function FAQContent() {
             </AccordionItem>
 
             <AccordionItem question="Do rivalry wins affect my points total?">
-              <p>Yes. Each 💀 kill mark adds <strong>1% to your total score</strong>. Win 5 rivalries and your score is multiplied by 1.05. Win 10 and it's x1.10. The multiplier applies to your full cumulative score, so it compounds meaningfully over a long season.</p>
+              <p>Yes. Each 💀 kill mark adds <strong>1.5% to your total score</strong>. Win 5 rivalries and your score is multiplied by 1.075. Win 10 and it's x1.15. The multiplier applies to your full cumulative score, so it compounds meaningfully over a long season.</p>
             </AccordionItem>
           </div>
 

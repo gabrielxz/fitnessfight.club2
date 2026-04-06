@@ -161,8 +161,8 @@ A web application that syncs with Strava to track exercise data and create custo
 - Single ranked list — no divisions
 - Top 3 shown as a podium (1ST center, 2ND left, 3RD right)
 - Each entry shows: avatar, rank, name, rival name (⚔️ link), score, hours this week, kill marks, badge drawer
-- Kill marks (💀): awarded per rivalry win; each adds 1% to your score multiplier
-  - `adjusted_points = total_cumulative_points × (1 + kill_marks × 0.01)`
+- Kill marks (💀): awarded per rivalry win; each adds 1.5% to your score multiplier
+  - `adjusted_points = total_cumulative_points × (1 + kill_marks × 0.015)`
   - Kill mark multiplier affects ranking AND display
 - Clickable score → breakdown popout (exercise / habit / badge / kills / total)
 - Soft zone tinting for rows 4+: warm orange (top 30%), cool blue (bottom 30%)
@@ -183,7 +183,7 @@ A web application that syncs with Strava to track exercise data and create custo
 - **Exercise**: 1 pt/hour, capped at **9 hrs/week** (lowered from 10 in Season 4)
 - **Habits**: 0.5 pts per habit that meets its weekly target; first 5 habits only
 - **Badges**: 3 pts (bronze) / 6 pts (silver) / 15 pts (gold), awarded once per tier
-- **Kill marks**: ×(1 + kills × 0.01) multiplier on total, applied at display/ranking time
+- **Kill marks**: ×(1 + kills × 0.015) multiplier on total, applied at display/ranking time
 
 ### Badge System (10 active badge types — Season 4)
 
@@ -597,7 +597,7 @@ Requires `SUPABASE_SERVICE_ROLE_KEY`. Deletes from: auth.users, strava_activitie
 - Navigation updated: added Rivalries (⚔️) and FAQ (📖) links
 - Cron job (`weekly-division-shuffle`): removed all division logic; now only evaluates habit badges and resets weekly badge progress
 - Migration `026_create_rivalries.sql`: additive-only, safe for production
-- Kill marks: 💀 emoji, each adds 1% to score multiplier, affects ranking
+- Kill marks: 💀 emoji, each adds 1.5% to score multiplier, affects ranking
 - Score breakdown popout: click any score to see exercise/habit/badge/kills breakdown; solid dark background (`rgb(15,18,35)`)
 - Podium: top 3 displayed as 2nd|1st|3rd in grid; rank-specific ring/strip colors, pulsing ring + 👑 for 1st
 - Mobile podium fix: `grid items-start + marginTop=40` for 2nd/3rd; `truncate` on names/rivals in 2nd/3rd cards; `minHeight:300` on 1st to guarantee height difference

@@ -129,8 +129,8 @@ export async function GET() {
       const rivalUserId = rivalByUser.get(profile.id) ?? null
       const killMarks = killMarksByUser[profile.id] ?? 0
       const totalPoints = profile.total_cumulative_points ?? 0
-      // Each kill mark adds 1% — multiply, then round to 1 decimal
-      const adjustedPoints = Math.round(totalPoints * (1 + killMarks * 0.01) * 10) / 10
+      // Each kill mark adds 1.5% — multiply, then round to 1 decimal
+      const adjustedPoints = Math.round(totalPoints * (1 + killMarks * 0.015) * 10) / 10
 
       return {
         user_id: profile.id,

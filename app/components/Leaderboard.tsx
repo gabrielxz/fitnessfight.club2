@@ -272,7 +272,7 @@ function ScorePopout({ entry, size }: { entry: LeaderboardEntry; size: 'lg' | 's
             {hasMultiplier && (
               <div className="flex justify-between" style={{ color: '#eab308' }}>
                 <span>💀 {entry.kill_marks} {entry.kill_marks === 1 ? 'kill' : 'kills'}</span>
-                <span className="font-semibold">×{(1 + entry.kill_marks * 0.01).toFixed(2)}</span>
+                <span className="font-semibold">×{(1 + entry.kill_marks * 0.015).toFixed(2)}</span>
               </div>
             )}
             <div className="flex justify-between pt-1.5 font-bold text-orange-400" style={{ borderTop: '1px solid rgba(255,255,255,0.08)' }}>
