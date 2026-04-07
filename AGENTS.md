@@ -185,7 +185,7 @@ A web application that syncs with Strava to track exercise data and create custo
 - **Badges**: 3 pts (bronze) / 6 pts (silver) / 15 pts (gold), awarded once per tier
 - **Kill marks**: ×(1 + kills × 0.015) multiplier on total, applied at display/ranking time
 
-### Badge System (10 active badge types — Season 4)
+### Badge System (11 active badge types — Season 4)
 
 Badge point values: Gold 15 pts / Silver 6 pts / Bronze 3 pts
 
@@ -193,6 +193,7 @@ Badge point values: Gold 15 pts / Silver 6 pts / Bronze 3 pts
 |---|---|---|---|---|
 | 🏔 | Everester | cumulative | Elevation gain (meters, all-time) | 600/2212/4424 |
 | 🐂 | Iron Calves | weekly_cumulative | Bike miles/week | 10/50/90 |
+| 🏋️‍♀️ | Meathead | activity_weeks | Weeks with 3+ Weight Training or Crossfit sessions | 1/4/12 |
 | 🧘 | Zen Master | weekly_cumulative | Yoga hours/week | 1/4/10 |
 | 📸 | Belfie | weekly_count | Weeks with photo attachments | 1/6/12 |
 | 🪨 | Rock Solid | habit_weeks | Weeks with 100% habit completion | 1/4/12 |

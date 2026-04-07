@@ -194,7 +194,7 @@ export default function FAQContent() {
                 <li>🥈 Silver: 6 points</li>
                 <li>🥇 Gold: 15 points</li>
               </ul>
-              <p className="mt-2">There are currently <strong>10 active badges</strong> this season. Details for each one are below.</p>
+              <p className="mt-2">There are currently <strong>11 active badges</strong> this season. Details for each one are below.</p>
             </AccordionItem>
 
             <AccordionItem question="🏔  Everester">
@@ -208,6 +208,13 @@ export default function FAQContent() {
               <p>This is a <strong>weekly badge</strong>. Your bike miles reset every Monday, and you need to hit the threshold within a single week to qualify for the tier.</p>
               <BadgeTiers bronze="10" silver="50" gold="90" unit="bike miles / week" />
               <p>Bronze is achievable with a couple of casual rides. Silver is a solid weekly cycling goal. Gold at 90 miles requires multiple long rides in a week.</p>
+            </AccordionItem>
+
+            <AccordionItem question="🏋️‍♀️  Meathead">
+              <p>Meathead is a <strong>weekly strength training challenge</strong>. A week qualifies when you log <strong>3 or more Weight Training or Crossfit activities</strong> during that Monday through Sunday window.</p>
+              <p>This badge counts <strong>qualifying weeks</strong> over the season. Each session must be logged on Strava as "Weight Training" or "Crossfit" to count. Duration doesn't matter, just the number of sessions in the week.</p>
+              <BadgeTiers bronze="1" silver="4" gold="12" unit="weeks with 3+ strength sessions" />
+              <p>Three lifting sessions per week is a solid training cadence. Silver means sustaining that for a month of weeks. Gold at 12 weeks means being in the gym consistently for most of the season.</p>
             </AccordionItem>
 
             <AccordionItem question="🧘  Zen Master">
