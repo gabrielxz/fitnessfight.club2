@@ -451,7 +451,7 @@ export class BadgeCalculator {
 
     // Filter by activity type(s) if specified
     if (criteria.activity_type) {
-      query = query.eq('type', criteria.activity_type)
+      query = query.or(`type.eq.${criteria.activity_type},sport_type.eq.${criteria.activity_type}`)
     } else if (criteria.activity_types && criteria.activity_types.length > 0) {
       // Handle multiple activity types - check both type and sport_type fields
       const typeConditions = criteria.activity_types.map(t => `type.eq.${t}`).join(',')
