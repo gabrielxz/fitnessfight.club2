@@ -200,7 +200,10 @@ function BadgeDrawer({ badges }: { badges: Badge[] }) {
 
 function ScorePopout({ entry, size }: { entry: LeaderboardEntry; size: 'lg' | 'sm' }) {
   const [open, setOpen] = useState(false)
+  const [nudge, setNudge] = useState(0)      // horizontal correction in px
+  const [flipUp, setFlipUp] = useState(true) // true = above button, false = below
   const ref = useRef<HTMLDivElement>(null)
+  const popupRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!open) return
@@ -211,8 +214,40 @@ function ScorePopout({ entry, size }: { entry: LeaderboardEntry; size: 'lg' | 's
     return () => document.removeEventListener('mousedown', handleClick)
   }, [open])
 
+  // After the popup renders, measure it and clamp to viewport
+  useEffect(() => {
+    if (!open || !popupRef.current) return
+    const rect = popupRef.current.getBoundingClientRect()
+    const margin = 8
+    let dx = 0
+    if (rect.left < margin) dx = margin - rect.left
+    else if (rect.right > window.innerWidth - margin) dx = (window.innerWidth - margin) - rect.right
+    setNudge(dx)
+    setFlipUp(rect.top >= margin) // flip below if not enough room above
+  }, [open])
+
+  // Reset adjustments when closing so next open starts fresh
+  useEffect(() => {
+    if (!open) { setNudge(0); setFlipUp(true) }
+  }, [open])
+
   const hasMultiplier = entry.kill_marks > 0
   const fmt = (n: number) => n % 1 === 0 ? String(n) : n.toFixed(1)
+
+  const baseTransform = size === 'lg' ? 'translateX(-50%)' : 'none'
+  const popupStyle: React.CSSProperties = {
+    background: 'rgb(15, 18, 35)',
+    border: '1px solid rgba(251,146,60,0.4)',
+    width: 210,
+    ...(flipUp
+      ? { bottom: '100%', marginBottom: 8 }
+      : { top: '100%', marginTop: 8 }),
+    right: size === 'lg' ? 'auto' : 0,
+    left: size === 'lg' ? '50%' : 'auto',
+    transform: nudge !== 0
+      ? (size === 'lg' ? `translateX(calc(-50% + ${nudge}px))` : `translateX(${nudge}px)`)
+      : baseTransform,
+  }
 
   return (
     <div ref={ref} className="relative">
@@ -236,17 +271,9 @@ function ScorePopout({ entry, size }: { entry: LeaderboardEntry; size: 'lg' | 's
 
       {open && (
         <div
+          ref={popupRef}
           className="absolute z-50 p-3 shadow-2xl rounded-xl"
-          style={{
-            background: 'rgb(15, 18, 35)',
-            border: '1px solid rgba(251,146,60,0.4)',
-            width: 210,
-            bottom: '100%',
-            right: size === 'lg' ? 'auto' : 0,
-            left: size === 'lg' ? '50%' : 'auto',
-            transform: size === 'lg' ? 'translateX(-50%)' : 'none',
-            marginBottom: 8,
-          }}
+          style={popupStyle}
         >
           <div className="flex justify-between items-center mb-2">
             <span className="text-xs font-bold text-gray-300">Score Breakdown</span>
