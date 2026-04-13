@@ -4,12 +4,13 @@ import { getWeekBoundaries } from '@/lib/date-helpers'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createAdminClient } from '@/lib/supabase/admin'
 
-async function processHabitCompletion(
+async function processHabitPointsChange(
   supabase: SupabaseClient,
   userId: string,
   habitId: string,
   date: string,
-  timezone: string
+  timezone: string,
+  action: 'added_success' | 'removed_success'
 ) {
   const { data: habit, error: habitError } = await supabase
     .from('habits')
@@ -46,28 +47,34 @@ async function processHabitCompletion(
     return
   }
 
-  const totalSuccesses = successEntries.length
+  const currentSuccesses = successEntries.length
   const target = habit.target_frequency
 
-  if (totalSuccesses < target) {
-    return
-  }
-
-  const previousSuccessCount = successEntries.filter(e => e.date !== date).length
-
-  if (previousSuccessCount < target) {
-    console.log(`[Habit Points] Habit ${habitId} completed for week ${weekStartStr}. Awarding points.`)
-    
-    const { error: rpcError } = await supabase.rpc('increment_habit_points', {
-      p_user_id: userId,
-      p_points_to_add: 0.5,
-    })
-
-    if (rpcError) {
-      console.error(`[Habit Points] Error incrementing habit points:`, rpcError)
+  if (action === 'added_success') {
+    // Award 0.5 only if this entry just crossed the threshold
+    if (currentSuccesses >= target) {
+      const previousCount = successEntries.filter(e => e.date !== date).length
+      if (previousCount < target) {
+        console.log(`[Habit Points] Habit ${habitId} completed for week ${weekStartStr}. Awarding 0.5 points.`)
+        const { error: rpcError } = await supabase.rpc('increment_habit_points', {
+          p_user_id: userId,
+          p_points_to_add: 0.5,
+        })
+        if (rpcError) console.error(`[Habit Points] Error incrementing:`, rpcError)
+      }
     }
   } else {
-    console.log(`[Habit Points] Habit ${habitId} was already completed for week ${weekStartStr}. No points to award.`)
+    // removed_success: deduct 0.5 only if we just dropped below the threshold
+    // Before this change there was one more success (the one just removed/overwritten)
+    const previousCount = currentSuccesses + 1
+    if (previousCount >= target && currentSuccesses < target) {
+      console.log(`[Habit Points] Habit ${habitId} dropped below target for week ${weekStartStr}. Deducting 0.5 points.`)
+      const { error: rpcError } = await supabase.rpc('increment_habit_points', {
+        p_user_id: userId,
+        p_points_to_add: -0.5,
+      })
+      if (rpcError) console.error(`[Habit Points] Error decrementing:`, rpcError)
+    }
   }
 }
 
@@ -118,6 +125,16 @@ export async function POST(
   const dateInUserTZ = new Date(date + 'T12:00:00') // Use noon to avoid DST edge cases
   const weekStartDate = getWeekBoundaries(dateInUserTZ, userTimezone).weekStart.toISOString().split('T')[0]
 
+  // Check if there was a previous SUCCESS entry for this date (needed for deduction logic)
+  const { data: previousEntry } = await supabase
+    .from('habit_entries')
+    .select('status')
+    .eq('habit_id', habitId)
+    .eq('date', date)
+    .single()
+
+  const wasPreviouslySuccess = previousEntry?.status === 'SUCCESS'
+
   if (status === 'NEUTRAL') {
     const { error } = await supabase
       .from('habit_entries')
@@ -152,19 +169,16 @@ export async function POST(
     entry = data
   }
 
-  // Process habit completion asynchronously (non-blocking)
-  // This means we return to the client immediately while points are calculated in background
-  if (status === 'SUCCESS') {
-    const adminSupabase = createAdminClient()
-    processHabitCompletion(
-      adminSupabase,
-      user.id,
-      habitId,
-      date,
-      userTimezone
-    ).catch(error => {
-      console.error('[Habit Points] Background processing failed:', error)
-    })
+  // Process habit points change asynchronously (non-blocking)
+  const adminSupabase = createAdminClient()
+  if (status === 'SUCCESS' && !wasPreviouslySuccess) {
+    // A new success was added — check if this crosses the threshold
+    processHabitPointsChange(adminSupabase, user.id, habitId, date, userTimezone, 'added_success')
+      .catch(error => console.error('[Habit Points] Background processing failed:', error))
+  } else if (status !== 'SUCCESS' && wasPreviouslySuccess) {
+    // A success was removed — check if this drops below the threshold
+    processHabitPointsChange(adminSupabase, user.id, habitId, date, userTimezone, 'removed_success')
+      .catch(error => console.error('[Habit Points] Background processing failed:', error))
   }
 
   // Return minimal response for speed
