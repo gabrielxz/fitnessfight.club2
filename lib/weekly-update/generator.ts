@@ -38,7 +38,7 @@ interface ActiveMatchup {
   periodNumber: number
 }
 
-function getWeekBounds(weeksAgo: number = 1): { start: string; end: string; label: string } {
+function getWeekBounds(weeksAgo: number = 0): { start: string; end: string; label: string } {
   const now = new Date()
   const day = now.getUTCDay()
   const daysToMonday = day === 0 ? 6 : day - 1
@@ -64,7 +64,10 @@ function getDisplayName(profile: { full_name: string | null; email: string | nul
 export async function generateCompetitionUpdate(): Promise<string> {
   const supabase = createAdminClient()
   const now = new Date()
-  const lastWeek = getWeekBounds(1)
+  // On Monday, the current week has almost no data yet — recap last week instead.
+  // Every other day (Tue–Sun) report on the current in-progress / just-ending week.
+  const weeksAgo = now.getUTCDay() === 1 ? 1 : 0
+  const lastWeek = getWeekBounds(weeksAgo)
   const todayStr = now.toISOString().split('T')[0]
 
   // ── 1. Current leaderboard ─────────────────────────────────────────────
