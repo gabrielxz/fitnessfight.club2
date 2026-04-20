@@ -144,7 +144,7 @@ A web application that syncs with Strava to track exercise data and create custo
 ### Season 4: Weekly Snapshots
 16. **leaderboard_snapshots** - Weekly rank + points snapshot per user
     - `user_id`, `week_start` (DATE), `rank` (INTEGER), `total_points` (REAL)
-    - Captured at the start of the Sunday cron before any processing
+    - Captured at the start of the Monday cron before any processing
     - Used by the AI competition update generator for rank-change tracking
     - RLS: public read, service role write
 
@@ -290,20 +290,33 @@ Badge point values: Gold 15 pts / Silver 6 pts / Bronze 3 pts
 - `POST /api/admin/generate-competition-update` — Generate AI competition update (requires `ANTHROPIC_API_KEY`)
 
 ### Cron (requires `CRON_SECRET`)
-- `GET /api/cron/weekly-division-shuffle` — Sunday 11:59 PM UTC (4 steps in order):
+- `GET /api/cron/weekly-division-shuffle` — Monday 07:05 UTC (12:05 AM PDT / 3:05 AM EDT) (5 steps in order):
   1. Capture leaderboard snapshot into `leaderboard_snapshots`
   2. Evaluate habit badges for all users with active habits
   3. Reset weekly badge progress for all weekly badge types
-  4. Close out ended rivalry periods (compute scores, set winner)
-  5. Generate pairings for any rivalry period starting within ±2 days
+  4. Generate pairings for any rivalry period starting within ±2 days of rivalry-today
+  5. Close out ended rivalry periods (compute scores, set winner)
+
+  Pairing runs before close-out so the UI never shows the newly-current period with zero matchups during cron execution.
 
 ---
 
 ## Rivalry System
 
+### Week Boundary (`lib/rivalries/time-window.ts`)
+
+All rivalry date comparisons are anchored to **midnight Pacific Time** (07:00 UTC during PDT), not UTC. This keeps the competition aligned with the continental US — ET users get their full Sunday, PT users get theirs, and the UI flip matches cron execution.
+
+Three helpers centralize the offset:
+- `rivalryTodayStr(now)` — today's date in PT (YYYY-MM-DD). Use everywhere you'd reach for `new Date().toISOString().split('T')[0]` in rivalry code.
+- `periodStartUTC(startDate)` → `"${startDate}T07:00:00Z"` — lower bound for activity queries.
+- `periodEndUTC(endDate)` → midnight PT on the day AFTER end_date. Upper bound; use with `.lt`, never `.lte`, so Period N's end abuts Period N+1's start cleanly.
+
+Season 4 (Apr 6 – Aug 23, 2026) falls entirely within PDT, so the offset is hardcoded at 7h. Revisit if the season extends into PST.
+
 ### Pairing Algorithm (`lib/rivalries/pairing.ts`)
 
-The `computePairings` function runs automatically in the weekly cron job when a `rivalry_period.start_date` falls within ±2 days of today. It uses a greedy rank-adjacent algorithm:
+The `computePairings` function runs automatically in the weekly cron job when a `rivalry_period.start_date` falls within ±2 days of rivalry-today (PT). It uses a greedy rank-adjacent algorithm:
 
 - **Parameters**: K0=4 (initial window), DELTA=3 (expansion), KMAX=10 (max window), RECENT_AVOIDANCE=2 periods
 - **Bye**: If player count is odd, lowest-ranked player sits out (no bye history tracking)
@@ -314,12 +327,14 @@ The `computePairings` function runs automatically in the weekly cron job when a 
 
 ### Close-out (`app/api/cron/weekly-division-shuffle/route.ts`)
 
-Runs before pairing, every Sunday night. Finds periods where `end_date <= today` with `player1_score IS NULL` (unresolved). For each:
-1. Fetches Strava activities in `[period.start_date T00:00:00Z, period.end_date T23:59:59Z]`
+Runs **after** pairing, every Monday just after midnight PT. Finds periods where `end_date < rivalryToday` with `player1_score IS NULL` (unresolved). For each:
+1. Fetches Strava activities in `[periodStartUTC(start_date), periodEndUTC(end_date))` — i.e. midnight PT on start_date to midnight PT on the day after end_date.
 2. Computes scores via `computeMetricScores` → display units
 3. Sets `player1_score`, `player2_score`, `winner_id` (NULL for any tie, including 0-0)
 
 `player1_score IS NOT NULL` = matchup is resolved. This distinguishes ties from pending matchups.
+
+Uses `lt` (not `lte`) because a period with `end_date = rivalryToday` is still in progress in PT terms — it doesn't fully end until rivalryToday *passes* it.
 
 ### Rivalry Metrics (`lib/rivalries/metrics.ts`)
 
@@ -341,19 +356,18 @@ Shared helper used by both the cron close-out and the live `/api/rivalries` disp
 
 | Period | Dates | Metric |
 |---|---|---|
-| 1–4 | Feb 23 – Apr 19 | All-Purpose Distance (pre-season + first real) |
-| 5 | Apr 20 – May 3 | Run & Walk Distance |
-| 6 | May 4 – May 17 | Strength Sessions |
-| 7 | May 18 – May 31 | Hours Exercised |
-| 8 | Jun 1 – Jun 14 | Active Days |
-| 9 | Jun 15 – Jun 28 | Elevation Climbed |
-| 10 | Jun 29 – Jul 12 | Variety Week |
-| 11 | Jul 13 – Jul 26 | Yoga Week |
-| 12 | Jul 27 – Aug 9 | Dance Week |
-| 13 | Aug 10 – Aug 23 | Run & Walk Distance |
+| 1 | Apr 6 – Apr 19 | All-Purpose Distance |
+| 2 | Apr 20 – May 3 | Run & Walk Distance |
+| 3 | May 4 – May 17 | Strength Sessions |
+| 4 | May 18 – May 31 | Hours Exercised |
+| 5 | Jun 1 – Jun 14 | Active Days |
+| 6 | Jun 15 – Jun 28 | Elevation Climbed |
+| 7 | Jun 29 – Jul 12 | Variety Week |
+| 8 | Jul 13 – Jul 26 | Yoga Week |
+| 9 | Jul 27 – Aug 9 | Dance Week |
+| 10 | Aug 10 – Aug 23 | Run & Walk Distance |
 
-Period 4 (Apr 6) is the "real" start date. Periods 1–3 are pre-season warm-up.
-Period 13 runs Aug 10–Aug 23 (14 days). The season ends Aug 23.
+Season starts Apr 6 (Period 1). Ends Aug 23 (Period 10). Three pre-season test periods (Feb 23 – Apr 5) were deleted and remaining periods renumbered 4→1, 5→2, etc. — see commit history around Apr 19, 2026. Dates are Monday–Sunday in Pacific Time; see Week Boundary section above for the exact UTC cutoffs.
 
 ### Rivalry Admin Operations (Manual SQL)
 
@@ -437,7 +451,7 @@ ANTHROPIC_API_KEY=[anthropic-api-key]
 ### Vercel
 - Auto-deploys from GitHub `main` branch
 - Environment variables set in Vercel dashboard
-- **Cron Jobs**: Weekly habit badge evaluation runs Sundays at 11:59 PM UTC
+- **Cron Jobs**: Weekly cron (habit badges, weekly badge reset, rivalry pairing + close-out) runs Mondays at 07:05 UTC (12:05 AM PDT)
 
 ### Strava Webhook Setup
 ```bash
@@ -501,6 +515,22 @@ Requires `SUPABASE_SERVICE_ROLE_KEY`. Deletes from: auth.users, strava_activitie
 ---
 
 ## Agent Update Log
+
+### Claude Opus 4.7 (2026-04-20): Rivalry Week Boundary Anchored to Midnight PT
+
+**Objective**: Eliminate 10-hour empty-rivalry-page window between UTC midnight and weekly cron; give all continental US users their full Sunday to contribute.
+
+**Changes**:
+- New `lib/rivalries/time-window.ts`: `rivalryTodayStr()`, `periodStartUTC()`, `periodEndUTC()` — PT-anchored helpers (07:00 UTC during PDT).
+- Cron schedule (`vercel.json`): Monday 07:05 UTC (was Monday 10:00 UTC) — fires 5 min after midnight PT.
+- Cron step order (`weekly-division-shuffle`): pairing now runs *before* close-out, so the UI never shows the newly-current period with zero matchups during cron execution.
+- Close-out detection changed from `end_date <= today_UTC` to `end_date < rivalryToday` — a period on its `end_date` is still live in PT terms.
+- Activity filters in cron close-out and `/api/rivalries`: use `[periodStartUTC, periodEndUTC)` range instead of `T00:00:00Z`/`T23:59:59Z`.
+- `/api/rivalries`, `/api/leaderboard`, `/lib/weekly-update/generator.ts`: `currentPeriod` lookup uses `rivalryTodayStr()` so the UI flips at midnight PT, not UTC.
+
+**Pre-season period cleanup**: the 3 pre-season test periods (Feb 23 – Apr 5) were deleted and remaining periods renumbered 4→1, 5→2, …, 13→10. SQL ran in Supabase cloud editor with a `DO` block that aborts if any matchups exist in pre-season periods.
+
+**Transition wart**: Period 1 (Apr 6 – Apr 19) was already closed out under old UTC rules before the boundary change. Activities in `[Apr 19 23:59:59 UTC, Apr 20 07:00 UTC]` are orphaned (7 hours, Sun 8PM ET – Mon 3AM ET). User declined a backfill script because matchups were blowouts and nobody complained. All future periods abut cleanly.
 
 ### Claude Sonnet 4.6 (2026-03-20): AI Competition Update Generator + Badge/FAQ Cleanup
 
