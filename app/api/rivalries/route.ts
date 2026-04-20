@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { computeMetricScores, type MetricKey, type ActivityRow } from '@/lib/rivalries/metrics'
+import { rivalryTodayStr, periodStartUTC, periodEndUTC } from '@/lib/rivalries/time-window'
 
 interface MatchupWithStats {
   id: string
@@ -29,8 +30,8 @@ export async function GET() {
       })
     }
 
-    // Find current active period
-    const today = new Date().toISOString().split('T')[0]
+    // Find current active period (using PT-anchored "today")
+    const today = rivalryTodayStr()
     const currentPeriod = allPeriods.find(
       p => p.start_date <= today && p.end_date >= today
     ) ?? null
@@ -90,8 +91,8 @@ export async function GET() {
       .from('strava_activities')
       .select('user_id, sport_type, distance, moving_time, total_elevation_gain, start_date')
       .in('user_id', involvedIds)
-      .gte('start_date', `${currentPeriod.start_date}T00:00:00Z`)
-      .lte('start_date', `${currentPeriod.end_date}T23:59:59Z`)
+      .gte('start_date', periodStartUTC(currentPeriod.start_date))
+      .lt('start_date', periodEndUTC(currentPeriod.end_date))
       .is('deleted_at', null)
 
     const metricByUser = computeMetricScores((activities ?? []) as ActivityRow[], metric)

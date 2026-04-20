@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { rivalryTodayStr } from '@/lib/rivalries/time-window'
 
 interface LeaderboardEntry {
   userId: string
@@ -68,7 +69,9 @@ export async function generateCompetitionUpdate(): Promise<string> {
   // Every other day (Tue–Sun) report on the current in-progress / just-ending week.
   const weeksAgo = now.getUTCDay() === 1 ? 1 : 0
   const lastWeek = getWeekBounds(weeksAgo)
-  const todayStr = now.toISOString().split('T')[0]
+  // Rivalry period lookups use PT-anchored "today" — a period with start_date
+  // Apr 20 hasn't "started" until midnight PT Apr 20 (07:00 UTC).
+  const todayStr = rivalryTodayStr(now)
 
   // ── 1. Current leaderboard ─────────────────────────────────────────────
   const { data: profiles } = await supabase

@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { BadgeCalculator } from '@/lib/badges/BadgeCalculator'
 import { computePairings, type RankedPlayer, type HistoricalMatchup } from '@/lib/rivalries/pairing'
 import { computeMetricScores, type MetricKey, type ActivityRow } from '@/lib/rivalries/metrics'
+import { rivalryTodayStr, periodStartUTC, periodEndUTC } from '@/lib/rivalries/time-window'
 
 // Helper to get the start of the *previous* week (Monday)
 function getLastWeekStart(date: Date): Date {
@@ -86,58 +87,22 @@ export async function GET(request: NextRequest) {
       console.log(`Reset progress for ${weeklyBadges.length} weekly badges`)
     }
 
-    // ── Rivalry close-out ────────────────────────────────────────────────────
-    // Find all periods that have ended (end_date <= today) with unresolved matchups.
-    // A matchup is unresolved when player1_score IS NULL (set to NULL at creation,
-    // gets a value — even 0 — when closed out, so ties are distinguishable).
-    const todayStr = now.toISOString().split('T')[0]
-
-    const { data: endedPeriods } = await supabase
-      .from('rivalry_periods')
-      .select('id, period_number, metric, start_date, end_date')
-      .lte('end_date', todayStr)
-
-    for (const period of endedPeriods ?? []) {
-      const { data: unresolvedMatchups } = await supabase
-        .from('rivalry_matchups')
-        .select('id, player1_id, player2_id')
-        .eq('period_id', period.id)
-        .is('player1_score', null)
-
-      if (!unresolvedMatchups || unresolvedMatchups.length === 0) continue
-
-      const allIds = [...new Set(unresolvedMatchups.flatMap(m => [m.player1_id, m.player2_id]))]
-
-      const { data: activities } = await supabase
-        .from('strava_activities')
-        .select('user_id, sport_type, distance, moving_time, total_elevation_gain, start_date')
-        .in('user_id', allIds)
-        .gte('start_date', `${period.start_date}T00:00:00Z`)
-        .lte('start_date', `${period.end_date}T23:59:59Z`)
-        .is('deleted_at', null)
-
-      const scores = computeMetricScores((activities ?? []) as ActivityRow[], period.metric as MetricKey)
-
-      for (const matchup of unresolvedMatchups) {
-        const s1 = Math.round((scores[matchup.player1_id] ?? 0) * 100) / 100
-        const s2 = Math.round((scores[matchup.player2_id] ?? 0) * 100) / 100
-        const winner_id = s1 > s2 ? matchup.player1_id : s2 > s1 ? matchup.player2_id : null
-
-        await supabase
-          .from('rivalry_matchups')
-          .update({ player1_score: s1, player2_score: s2, winner_id })
-          .eq('id', matchup.id)
-      }
-
-      console.log(`Rivalry period ${period.period_number} closed out: ${unresolvedMatchups.length} matchups resolved.`)
-    }
+    // Rivalry "today" in PT terms — drives both close-out detection (which
+    // periods have ended) and pairing window (which period is starting).
+    const rivalryToday = rivalryTodayStr(now)
 
     // ── Rivalry pairing ─────────────────────────────────────────────────────
-    // Look for a rivalry period whose start_date falls within ±2 days of now.
-    // This tolerates late/early cron runs, server clock drift, and timezone edge
-    // cases. The idempotency guard below prevents double-insertion.
-    const windowStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - 2))
-    const windowEnd   = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 2))
+    // Runs BEFORE close-out so that the upcoming period's matchups exist the
+    // moment the UI flips to it at midnight PT. Otherwise the page would show
+    // the newly-current period with zero matchups for the duration of this
+    // cron invocation.
+    //
+    // Look for a rivalry period whose start_date falls within ±2 days of
+    // rivalry-today. The window tolerates cron clock drift; the idempotency
+    // guard below prevents double-insertion.
+    const rivalryTodayDate = new Date(`${rivalryToday}T00:00:00Z`)
+    const windowStart = new Date(rivalryTodayDate); windowStart.setUTCDate(rivalryTodayDate.getUTCDate() - 2)
+    const windowEnd   = new Date(rivalryTodayDate); windowEnd.setUTCDate(rivalryTodayDate.getUTCDate() + 2)
     const windowStartStr = windowStart.toISOString().split('T')[0]
     const windowEndStr   = windowEnd.toISOString().split('T')[0]
 
@@ -225,6 +190,50 @@ export async function GET(request: NextRequest) {
       }
     } else {
       console.log('No rivalry period starts tomorrow, skipping pairing.')
+    }
+
+    // ── Rivalry close-out ────────────────────────────────────────────────────
+    // Runs AFTER pairing so the next period's matchups are already in place.
+    // A matchup is unresolved when player1_score IS NULL (set to NULL at creation,
+    // gets a value — even 0 — when closed out, so ties are distinguishable).
+    const { data: endedPeriods } = await supabase
+      .from('rivalry_periods')
+      .select('id, period_number, metric, start_date, end_date')
+      .lt('end_date', rivalryToday)
+
+    for (const period of endedPeriods ?? []) {
+      const { data: unresolvedMatchups } = await supabase
+        .from('rivalry_matchups')
+        .select('id, player1_id, player2_id')
+        .eq('period_id', period.id)
+        .is('player1_score', null)
+
+      if (!unresolvedMatchups || unresolvedMatchups.length === 0) continue
+
+      const allIds = [...new Set(unresolvedMatchups.flatMap(m => [m.player1_id, m.player2_id]))]
+
+      const { data: activities } = await supabase
+        .from('strava_activities')
+        .select('user_id, sport_type, distance, moving_time, total_elevation_gain, start_date')
+        .in('user_id', allIds)
+        .gte('start_date', periodStartUTC(period.start_date))
+        .lt('start_date', periodEndUTC(period.end_date))
+        .is('deleted_at', null)
+
+      const scores = computeMetricScores((activities ?? []) as ActivityRow[], period.metric as MetricKey)
+
+      for (const matchup of unresolvedMatchups) {
+        const s1 = Math.round((scores[matchup.player1_id] ?? 0) * 100) / 100
+        const s2 = Math.round((scores[matchup.player2_id] ?? 0) * 100) / 100
+        const winner_id = s1 > s2 ? matchup.player1_id : s2 > s1 ? matchup.player2_id : null
+
+        await supabase
+          .from('rivalry_matchups')
+          .update({ player1_score: s1, player2_score: s2, winner_id })
+          .eq('id', matchup.id)
+      }
+
+      console.log(`Rivalry period ${period.period_number} closed out: ${unresolvedMatchups.length} matchups resolved.`)
     }
 
     console.log('Weekly cron job completed.')

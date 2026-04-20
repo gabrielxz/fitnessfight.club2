@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getWeekBoundaries } from '@/lib/date-helpers'
+import { rivalryTodayStr } from '@/lib/rivalries/time-window'
 
 export async function GET() {
   try {
@@ -63,7 +64,9 @@ export async function GET() {
     let killMarksByUser: Record<string, number> = {}
 
     try {
-      const today = now.toISOString().split('T')[0]
+      // Use PT-anchored "today" so the leaderboard's rivalry section flips
+      // at midnight PT along with the rest of the rivalry system.
+      const today = rivalryTodayStr(now)
 
       const { data: period } = await supabase
         .from('rivalry_periods')
