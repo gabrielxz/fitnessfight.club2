@@ -138,8 +138,9 @@ A web application that syncs with Strava to track exercise data and create custo
     - `period_id`, `player1_id`, `player2_id`
     - `winner_id` — NULL means tie or still in progress; resolved matchups are identified by `player1_score IS NOT NULL`
     - `player1_score`, `player2_score` — scores in display units (km/hrs/m/count); NULL until period closes out
+    - `player1_viewed_at`, `player2_viewed_at` — TIMESTAMPTZ stamped when that player dismisses the result celebration modal; NULL = unacknowledged. Added in migration 036 with backfill for already-closed matchups.
     - Each player appears at most once per period
-    - RLS: public read, admin write only
+    - RLS: public read, admin write only (acknowledge endpoint uses the admin client after verifying the caller is a participant)
 
 ### Season 4: Weekly Snapshots
 16. **leaderboard_snapshots** - Weekly rank + points snapshot per user
@@ -171,7 +172,10 @@ A web application that syncs with Strava to track exercise data and create custo
 **Rivalries** (`/api/rivalries`, `/rivalries`):
 - Bi-weekly 1v1 matchups on a rotating metric (9 types — see Rivalry Metrics section)
 - Periods run Monday–Sunday; cron closes out the ending period then generates pairings for the next
-- VS hero layout: large avatars, live metric progress bar, winner crown, kill marks
+- Current/History tabs on `/rivalries`:
+  - Current: VS hero layout, large avatars, live metric progress bar, winner crown, kill marks
+  - History: W/L/T summary counters + per-matchup cards for every closed matchup the user played
+- Celebration modal fires on first load after a period closes: W/L/T visual treatments (gold win / muted loss / neutral tie), score recap, and for wins an embedded skull-mark tick-up animation showing the new 💀 popping in with a glow. Dismissing POSTs to `/api/rivalries/acknowledge` to stamp `viewed_at` so it never fires twice.
 - `SeasonSchedule` shows all periods with NOW indicator
 - Tie (including 0-0) = no kill mark for either player; `winner_id` stays NULL
 
@@ -266,7 +270,8 @@ Badge point values: Gold 15 pts / Silver 6 pts / Bronze 3 pts
 
 ### Protected (requires auth)
 - `GET /api/leaderboard` — Unified leaderboard with kill marks, rivals, badges
-- `GET /api/rivalries` — All rivalry periods + matchups with live stats
+- `GET /api/rivalries` — All rivalry periods + current matchups with live stats; also returns `my_history[]` (closed matchups for the logged-in user, newest first) and `unacknowledged_result` (most recent closed matchup where the user hasn't yet seen the celebration modal)
+- `POST /api/rivalries/acknowledge` — Body `{ matchup_id }`; stamps `player{1,2}_viewed_at` for the caller after verifying they're a participant (uses admin client to bypass RLS on writes)
 - `GET /api/badges` — User's earned badges
 - `GET /api/badges/progress` — Badge progress for current user
 - `GET /api/habits` — User's habits + current week
@@ -421,6 +426,7 @@ WHERE id = 'matchup-uuid'::uuid;
 | 033 | add_home_location.sql | Add home_lat/home_lng to user_profiles |
 | 034 | out_of_bounds_badge.sql | Add start_lat/start_lng to strava_activities; add Out of Bounds badge (away_hours) |
 | 035 | leaderboard_snapshots.sql | Create leaderboard_snapshots table for weekly rank-change tracking |
+| 036 | rivalry_result_acknowledgement.sql | Add `player1_viewed_at`/`player2_viewed_at` to `rivalry_matchups` for celebration-modal deduping; backfills existing closed matchups as viewed |
 
 ---
 
@@ -515,6 +521,23 @@ Requires `SUPABASE_SERVICE_ROLE_KEY`. Deletes from: auth.users, strava_activitie
 ---
 
 ## Agent Update Log
+
+### Claude Opus 4.7 (2026-04-21): Rivalry Results UI — History Tab + Celebration Modal
+
+**Objective**: Give users a clear "you won/lost your matchup" moment when a period closes, plus a persistent history view, so wins and losses don't disappear into the void the morning after close-out.
+
+**Changes**:
+- Migration `036_rivalry_result_acknowledgement.sql`: adds nullable `player1_viewed_at` / `player2_viewed_at` TIMESTAMPTZ columns to `rivalry_matchups`; backfills `NOW()` on every already-closed matchup (`player1_score IS NOT NULL`) so existing users don't get blasted with a backlog of modals the first time this ships.
+- `/api/rivalries` (`app/api/rivalries/route.ts`): now returns two additional fields for the logged-in user — `my_history[]` (every closed matchup they played, newest first, with opponent identity, scores, outcome, and a `kill_marks_at_close` that reflects the chronological count *after* that win) and `unacknowledged_result` (the most recent closed matchup where the caller's `viewed_at` is still NULL). Profile/strava-connection lookups are reused across current + past matchup participants in a single pass.
+- `POST /api/rivalries/acknowledge` (`app/api/rivalries/acknowledge/route.ts`): new endpoint. Reads `matchup_id`, verifies the caller is a participant, then stamps the correct `player{1,2}_viewed_at` via `createAdminClient()` (RLS only permits SELECT on rivalry_matchups).
+- `app/rivalries/RivalriesView.tsx`:
+  - Added Current / History tab strip at the top of the page.
+  - `HistoryList` / `HistoryRow` components: W/L/T summary counters, per-row opponent avatar, outcome badge, score line, period metadata.
+  - `CelebrationModal`: full-screen dialog with distinct styling per outcome — gold "VICTORY" with glowing ring and skull tick-up, muted "DEFEAT", neutral "DRAW". Win animation: existing 💀 row renders statically, then after ~900 ms the new skull pops in with a glow and a "+1 — N total" caption. Close button → POST `/api/rivalries/acknowledge` then hides the modal.
+  - Modal fires once on page load when the API response carries `unacknowledged_result`; the acknowledgement write makes it sticky across reloads.
+- `AGENTS.md`: updated rivalry_matchups schema, API endpoint list, features section, migration table.
+
+**Open follow-ups**: none. Built on `feature/rivalry-results-ui` locally then merged to `main`; user ran migration 036 in Supabase cloud editor.
 
 ### Claude Opus 4.7 (2026-04-20): Rivalry Week Boundary Anchored to Midnight PT
 
