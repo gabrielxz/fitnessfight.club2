@@ -152,7 +152,7 @@ export async function GET() {
       const metric = currentPeriod.metric as MetricKey
       const { data: activities } = await supabase
         .from('strava_activities')
-        .select('user_id, sport_type, distance, moving_time, total_elevation_gain, start_date')
+        .select('user_id, sport_type, distance, moving_time, total_elevation_gain, start_date, start_date_local')
         .in('user_id', Array.from(new Set(rawMatchups.flatMap(m => [m.player1_id, m.player2_id]))))
         .gte('start_date', periodStartUTC(currentPeriod.start_date))
         .lt('start_date', periodEndUTC(currentPeriod.end_date))

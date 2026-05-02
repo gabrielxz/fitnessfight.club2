@@ -68,19 +68,16 @@ function BadgeTiers({ bronze, silver, gold, unit }: {
 // ─── Rivalry Schedule ─────────────────────────────────────────────────────────
 
 const RIVALRY_SCHEDULE = [
-  { period: 1,  label: 'All-Purpose Distance',  dates: 'Feb 23 – Mar 8',  icon: '🗺️' },
-  { period: 2,  label: 'All-Purpose Distance',  dates: 'Mar 9 – Mar 22',  icon: '🗺️' },
-  { period: 3,  label: 'All-Purpose Distance',  dates: 'Mar 23 – Apr 5',  icon: '🗺️' },
-  { period: 4,  label: 'All-Purpose Distance',  dates: 'Apr 6 – Apr 19',  icon: '🗺️' },
-  { period: 5,  label: 'Run & Walk Distance',   dates: 'Apr 20 – May 3',  icon: '🏃' },
-  { period: 6,  label: 'Strength Sessions',     dates: 'May 4 – May 17',  icon: '💪' },
-  { period: 7,  label: 'Hours Exercised',       dates: 'May 18 – May 31', icon: '⏱️' },
-  { period: 8,  label: 'Active Days',           dates: 'Jun 1 – Jun 14',  icon: '📅' },
-  { period: 9,  label: 'Elevation Climbed',     dates: 'Jun 15 – Jun 28', icon: '⛰️' },
-  { period: 10, label: 'Variety Week',          dates: 'Jun 29 – Jul 12', icon: '🎯' },
-  { period: 11, label: 'Yoga Week',             dates: 'Jul 13 – Jul 26', icon: '🧘' },
-  { period: 12, label: 'Dance Week',            dates: 'Jul 27 – Aug 9',  icon: '💃' },
-  { period: 13, label: 'Run & Walk Distance',   dates: 'Aug 10 – Aug 23', icon: '🏃' },
+  { period: 1,  label: 'All-Purpose Distance',  dates: 'Apr 6 – Apr 19',  icon: '🗺️' },
+  { period: 2,  label: 'Run & Walk Distance',   dates: 'Apr 20 – May 3',  icon: '🏃' },
+  { period: 3,  label: 'Strength Days',         dates: 'May 4 – May 17',  icon: '💪' },
+  { period: 4,  label: 'Hours Exercised',       dates: 'May 18 – May 31', icon: '⏱️' },
+  { period: 5,  label: 'Active Days',           dates: 'Jun 1 – Jun 14',  icon: '📅' },
+  { period: 6,  label: 'Elevation Climbed',     dates: 'Jun 15 – Jun 28', icon: '⛰️' },
+  { period: 7,  label: 'Variety Week',          dates: 'Jun 29 – Jul 12', icon: '🎯' },
+  { period: 8,  label: 'Yoga Week',             dates: 'Jul 13 – Jul 26', icon: '🧘' },
+  { period: 9,  label: 'Dance Week',            dates: 'Jul 27 – Aug 9',  icon: '💃' },
+  { period: 10, label: 'Run & Walk Distance',   dates: 'Aug 10 – Aug 23', icon: '🏃' },
 ]
 
 // ─── Page ─────────────────────────────────────────────────────────────────────

@@ -11,6 +11,7 @@
 
 const RUN_WALK_TYPES = new Set(['Run', 'VirtualRun', 'TrailRun', 'Walk', 'Hike', 'Snowshoe'])
 const STRENGTH_TYPES = new Set(['WeightTraining', 'Workout', 'Crossfit', 'HIIT', 'Pilates'])
+const STRENGTH_DAY_MIN_SECONDS = 15 * 60
 
 export type MetricKey =
   | 'total_distance'
@@ -18,7 +19,7 @@ export type MetricKey =
   | 'moving_time'
   | 'elevation_gain'
   | 'unique_activity_types'
-  | 'strength_count'
+  | 'strength_days'
   | 'active_days'
   | 'yoga_time'
   | 'dance_time'
@@ -29,7 +30,8 @@ export interface ActivityRow {
   distance: number | null
   moving_time: number | null
   total_elevation_gain: number | null
-  start_date: string // ISO timestamp string
+  start_date: string // ISO timestamp string (UTC) — used for window filtering upstream
+  start_date_local: string // ISO timestamp string in the activity's local time — used for day grouping
 }
 
 /**
@@ -40,15 +42,25 @@ export function computeMetricScores(
   activities: ActivityRow[],
   metric: MetricKey
 ): Record<string, number> {
-  // Set-based metrics — need to accumulate unique values per user first
-  if (metric === 'unique_activity_types' || metric === 'active_days') {
+  // Set-based metrics — accumulate unique values per user first.
+  // Day-based metrics use start_date_local so a "day" is the activity's local
+  // calendar day, not a UTC slice.
+  if (metric === 'unique_activity_types' || metric === 'active_days' || metric === 'strength_days') {
     const setsByUser: Record<string, Set<string>> = {}
     for (const act of activities) {
       if (!setsByUser[act.user_id]) setsByUser[act.user_id] = new Set()
       if (metric === 'unique_activity_types' && act.sport_type) {
         setsByUser[act.user_id].add(act.sport_type)
       } else if (metric === 'active_days') {
-        setsByUser[act.user_id].add(act.start_date.slice(0, 10))
+        setsByUser[act.user_id].add(act.start_date_local.slice(0, 10))
+      } else if (metric === 'strength_days') {
+        if (
+          act.sport_type &&
+          STRENGTH_TYPES.has(act.sport_type) &&
+          (act.moving_time ?? 0) >= STRENGTH_DAY_MIN_SECONDS
+        ) {
+          setsByUser[act.user_id].add(act.start_date_local.slice(0, 10))
+        }
       }
     }
     const result: Record<string, number> = {}
@@ -73,9 +85,6 @@ export function computeMetricScores(
         break
       case 'elevation_gain':
         val = act.total_elevation_gain ?? 0
-        break
-      case 'strength_count':
-        if (act.sport_type && STRENGTH_TYPES.has(act.sport_type)) val = 1
         break
       case 'yoga_time':
         if (act.sport_type === 'Yoga') val = (act.moving_time ?? 0) / 3600

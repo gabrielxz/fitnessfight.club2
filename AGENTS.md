@@ -352,8 +352,8 @@ Shared helper used by both the cron close-out and the live `/api/rivalries` disp
 | `moving_time` | Hours Exercised | SUM(moving_time) | hrs | All |
 | `elevation_gain` | Elevation Climbed | SUM(total_elevation_gain) | m | All |
 | `unique_activity_types` | Variety Week | COUNT(DISTINCT sport_type) | types | All |
-| `strength_count` | Strength Sessions | COUNT(*) | sessions | WeightTraining, Workout, Crossfit, HIIT, Pilates |
-| `active_days` | Active Days | COUNT(DISTINCT date) | days | All |
+| `strength_days` | Strength Days | COUNT(DISTINCT local date) where moving_time ≥ 15 min | days | WeightTraining, Workout, Crossfit, HIIT, Pilates |
+| `active_days` | Active Days | COUNT(DISTINCT local date) | days | All |
 | `yoga_time` | Yoga Week | SUM(moving_time) | hrs | Yoga |
 | `dance_time` | Dance Week | SUM(moving_time) | hrs | Dance |
 
@@ -363,7 +363,7 @@ Shared helper used by both the cron close-out and the live `/api/rivalries` disp
 |---|---|---|
 | 1 | Apr 6 – Apr 19 | All-Purpose Distance |
 | 2 | Apr 20 – May 3 | Run & Walk Distance |
-| 3 | May 4 – May 17 | Strength Sessions |
+| 3 | May 4 – May 17 | Strength Days |
 | 4 | May 18 – May 31 | Hours Exercised |
 | 5 | Jun 1 – Jun 14 | Active Days |
 | 6 | Jun 15 – Jun 28 | Elevation Climbed |

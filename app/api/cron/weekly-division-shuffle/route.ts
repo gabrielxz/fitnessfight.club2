@@ -214,7 +214,7 @@ export async function GET(request: NextRequest) {
 
       const { data: activities } = await supabase
         .from('strava_activities')
-        .select('user_id, sport_type, distance, moving_time, total_elevation_gain, start_date')
+        .select('user_id, sport_type, distance, moving_time, total_elevation_gain, start_date, start_date_local')
         .in('user_id', allIds)
         .gte('start_date', periodStartUTC(period.start_date))
         .lt('start_date', periodEndUTC(period.end_date))
