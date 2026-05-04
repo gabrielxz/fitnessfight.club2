@@ -352,7 +352,7 @@ Shared helper used by both the cron close-out and the live `/api/rivalries` disp
 | `moving_time` | Hours Exercised | SUM(moving_time) | hrs | All |
 | `elevation_gain` | Elevation Climbed | SUM(total_elevation_gain) | m | All |
 | `unique_activity_types` | Variety Week | COUNT(DISTINCT sport_type) | types | All |
-| `strength_days` | Strength Days | COUNT(DISTINCT local date) where moving_time ≥ 15 min | days | WeightTraining, Workout, Crossfit, HIIT, Pilates |
+| `strength_days` | Strength Days | COUNT(DISTINCT local date) where moving_time ≥ 15 min | days | WeightTraining, Workout, Crossfit, HighIntensityIntervalTraining, Pilates |
 | `active_days` | Active Days | COUNT(DISTINCT local date) | days | All |
 | `yoga_time` | Yoga Week | SUM(moving_time) | hrs | Yoga |
 | `dance_time` | Dance Week | SUM(moving_time) | hrs | Dance |

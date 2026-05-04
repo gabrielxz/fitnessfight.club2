@@ -10,7 +10,7 @@
  */
 
 const RUN_WALK_TYPES = new Set(['Run', 'VirtualRun', 'TrailRun', 'Walk', 'Hike', 'Snowshoe'])
-const STRENGTH_TYPES = new Set(['WeightTraining', 'Workout', 'Crossfit', 'HIIT', 'Pilates'])
+const STRENGTH_TYPES = new Set(['WeightTraining', 'Workout', 'Crossfit', 'HighIntensityIntervalTraining', 'Pilates'])
 const STRENGTH_DAY_MIN_SECONDS = 15 * 60
 
 export type MetricKey =
