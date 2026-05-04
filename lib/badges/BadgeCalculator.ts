@@ -22,12 +22,12 @@ const ACTIVITY_CATEGORIES: Record<string, string> = {
   Ride: 'ride', EBikeRide: 'ride', EMountainBikeRide: 'ride',
   MountainBikeRide: 'ride', GravelRide: 'ride', VirtualRide: 'ride',
   // Strength
-  WeightTraining: 'strength', Crossfit: 'strength', Workout: 'strength', HIIT: 'strength',
+  WeightTraining: 'strength', Crossfit: 'strength', Workout: 'strength', HighIntensityIntervalTraining: 'strength',
   // Yoga / Flexibility
   Yoga: 'yoga_flexibility', Pilates: 'yoga_flexibility',
   // Water
   Swim: 'water', Rowing: 'water', Kayaking: 'water', Canoeing: 'water',
-  StandUpPaddling: 'water', Surfing: 'water', Kitesurf: 'water', Windsurf: 'water', Sailing: 'water',
+  StandUpPaddling: 'water', Surfing: 'water', Kitesurf: 'water', Windsurf: 'water', Sail: 'water',
   // Winter
   AlpineSki: 'winter', BackcountrySki: 'winter', NordicSki: 'winter',
   Snowboard: 'winter', IceSkate: 'winter', Snowshoe: 'winter',
