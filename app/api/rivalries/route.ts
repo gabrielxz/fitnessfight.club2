@@ -8,6 +8,7 @@ interface MatchupWithStats {
   player1: { user_id: string; name: string; avatar: string | null; kill_marks: number; metric_value: number }
   player2: { user_id: string; name: string; avatar: string | null; kill_marks: number; metric_value: number }
   winner_id: string | null
+  tie_credit: boolean
 }
 
 interface HistoryEntry {
@@ -35,6 +36,7 @@ interface HistoryEntry {
   }
   winner_id: string | null
   outcome: 'win' | 'loss' | 'tie'
+  tie_credit: boolean
   kill_marks_at_close: number
 }
 
@@ -70,9 +72,9 @@ export async function GET() {
     const { data: rawMatchups } = currentPeriod
       ? await supabase
           .from('rivalry_matchups')
-          .select('id, player1_id, player2_id, winner_id')
+          .select('id, player1_id, player2_id, winner_id, tie_credit')
           .eq('period_id', currentPeriod.id)
-      : { data: [] as { id: string; player1_id: string; player2_id: string; winner_id: string | null }[] }
+      : { data: [] as { id: string; player1_id: string; player2_id: string; winner_id: string | null; tie_credit: boolean }[] }
 
     // User's past matchups (closed periods where the user was a participant).
     // Include viewed_at so we can surface an unacknowledged result.
@@ -84,6 +86,7 @@ export async function GET() {
       player1_score: number | null
       player2_score: number | null
       winner_id: string | null
+      tie_credit: boolean
       player1_viewed_at: string | null
       player2_viewed_at: string | null
     }[] = []
@@ -91,7 +94,7 @@ export async function GET() {
     if (user) {
       const { data: closed } = await supabase
         .from('rivalry_matchups')
-        .select('id, period_id, player1_id, player2_id, player1_score, player2_score, winner_id, player1_viewed_at, player2_viewed_at')
+        .select('id, period_id, player1_id, player2_id, player1_score, player2_score, winner_id, tie_credit, player1_viewed_at, player2_viewed_at')
         .or(`player1_id.eq.${user.id},player2_id.eq.${user.id}`)
         .not('player1_score', 'is', null)
 
@@ -133,7 +136,7 @@ export async function GET() {
       return { name, avatar: conn?.strava_profile ?? null }
     }
 
-    // Kill marks per involved player (all-time wins)
+    // Kill marks per involved player (all-time wins + credited ties)
     let killMarksByUser: Record<string, number> = {}
     if (involvedIdsArr.length) {
       const { data: allWins } = await supabase
@@ -143,6 +146,21 @@ export async function GET() {
 
       for (const row of allWins || []) {
         if (row.winner_id) killMarksByUser[row.winner_id] = (killMarksByUser[row.winner_id] || 0) + 1
+      }
+
+      const { data: creditedTies } = await supabase
+        .from('rivalry_matchups')
+        .select('player1_id, player2_id')
+        .eq('tie_credit', true)
+        .or(
+          `player1_id.in.(${involvedIdsArr.join(',')}),player2_id.in.(${involvedIdsArr.join(',')})`
+        )
+
+      for (const row of creditedTies || []) {
+        if (involvedIds.has(row.player1_id))
+          killMarksByUser[row.player1_id] = (killMarksByUser[row.player1_id] || 0) + 1
+        if (involvedIds.has(row.player2_id))
+          killMarksByUser[row.player2_id] = (killMarksByUser[row.player2_id] || 0) + 1
       }
     }
 
@@ -177,6 +195,7 @@ export async function GET() {
         player1: buildPlayer(m.player1_id),
         player2: buildPlayer(m.player2_id),
         winner_id: m.winner_id,
+        tie_credit: m.tie_credit ?? false,
       }))
 
       // Sort: current user's matchup first
@@ -197,10 +216,11 @@ export async function GET() {
 
     if (user) {
       // Compute chronological kill-mark counts so the modal can say
-      // "You're now at N kill marks." Order wins by period end_date, then by
-      // created_at as a secondary key if two periods share an end_date.
-      const sortedWins = [...myClosedMatchups]
-        .filter(m => m.winner_id === user.id)
+      // "You're now at N kill marks." Includes wins AND credited ties (both
+      // grant a skull to the user). Ordered by period end_date, then matchup id
+      // as a secondary key if two periods share an end_date.
+      const sortedSkullEarners = [...myClosedMatchups]
+        .filter(m => m.winner_id === user.id || m.tie_credit === true)
         .sort((a, b) => {
           const pa = periodById.get(a.period_id)
           const pb = periodById.get(b.period_id)
@@ -210,7 +230,7 @@ export async function GET() {
         })
 
       const killMarksAfterMatchup = new Map<string, number>()
-      sortedWins.forEach((m, i) => killMarksAfterMatchup.set(m.id, i + 1))
+      sortedSkullEarners.forEach((m, i) => killMarksAfterMatchup.set(m.id, i + 1))
 
       for (const m of myClosedMatchups) {
         const period = periodById.get(m.period_id)
@@ -226,6 +246,8 @@ export async function GET() {
         if (m.winner_id === null) outcome = 'tie'
         else if (m.winner_id === user.id) outcome = 'win'
         else outcome = 'loss'
+
+        const earnedSkull = outcome === 'win' || m.tie_credit === true
 
         const myIdentity = resolveIdentity(user.id)
         const oppIdentity = resolveIdentity(oppId)
@@ -255,7 +277,8 @@ export async function GET() {
           },
           winner_id: m.winner_id,
           outcome,
-          kill_marks_at_close: outcome === 'win' ? killMarksAfterMatchup.get(m.id) ?? 0 : killMarksByUser[user.id] ?? 0,
+          tie_credit: m.tie_credit ?? false,
+          kill_marks_at_close: earnedSkull ? killMarksAfterMatchup.get(m.id) ?? 0 : killMarksByUser[user.id] ?? 0,
           endDate: period.end_date,
         }
 

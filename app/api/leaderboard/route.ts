@@ -86,7 +86,8 @@ export async function GET() {
         currentMatchups = matchups || []
       }
 
-      // Kill marks: total wins ever (excluding ties)
+      // Kill marks: total wins ever, plus credited (non-zero) ties which grant
+      // a skull to both players.
       const { data: allWins } = await supabase
         .from('rivalry_matchups')
         .select('winner_id')
@@ -96,6 +97,16 @@ export async function GET() {
         if (row.winner_id) {
           killMarksByUser[row.winner_id] = (killMarksByUser[row.winner_id] || 0) + 1
         }
+      }
+
+      const { data: creditedTies } = await supabase
+        .from('rivalry_matchups')
+        .select('player1_id, player2_id')
+        .eq('tie_credit', true)
+
+      for (const row of creditedTies || []) {
+        killMarksByUser[row.player1_id] = (killMarksByUser[row.player1_id] || 0) + 1
+        killMarksByUser[row.player2_id] = (killMarksByUser[row.player2_id] || 0) + 1
       }
     } catch {
       // Rivalry tables not yet migrated — degrade gracefully

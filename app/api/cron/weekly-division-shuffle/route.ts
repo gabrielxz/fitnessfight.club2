@@ -226,10 +226,13 @@ export async function GET(request: NextRequest) {
         const s1 = Math.round((scores[matchup.player1_id] ?? 0) * 100) / 100
         const s2 = Math.round((scores[matchup.player2_id] ?? 0) * 100) / 100
         const winner_id = s1 > s2 ? matchup.player1_id : s2 > s1 ? matchup.player2_id : null
+        // Non-zero tie: both players posted real effort and tied. Award a skull
+        // to each. Zero-zero ties remain uncredited.
+        const tie_credit = winner_id === null && s1 > 0
 
         await supabase
           .from('rivalry_matchups')
-          .update({ player1_score: s1, player2_score: s2, winner_id })
+          .update({ player1_score: s1, player2_score: s2, winner_id, tie_credit })
           .eq('id', matchup.id)
       }
 

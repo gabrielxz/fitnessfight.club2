@@ -27,6 +27,7 @@ interface Matchup {
   player1: Player
   player2: Player
   winner_id: string | null
+  tie_credit: boolean
 }
 
 interface Period {
@@ -46,6 +47,7 @@ interface HistoryEntry {
   opponent: { user_id: string; name: string; avatar: string | null; score: number }
   winner_id: string | null
   outcome: 'win' | 'loss' | 'tie'
+  tie_credit: boolean
   kill_marks_at_close: number
 }
 
@@ -314,12 +316,14 @@ function SeasonSchedule({ periods }: { periods: Period[] }) {
 
 // ─── History list ─────────────────────────────────────────────────────────────
 
-function OutcomeBadge({ outcome }: { outcome: 'win' | 'loss' | 'tie' }) {
-  const config = {
-    win:  { label: 'WON',  bg: 'rgba(234,179,8,0.15)',  fg: '#FCD34D' },
-    loss: { label: 'LOST', bg: 'rgba(148,163,184,0.12)', fg: 'rgba(203,213,225,0.75)' },
-    tie:  { label: 'TIE',  bg: 'rgba(251,146,60,0.12)',  fg: 'rgba(251,146,60,0.9)' },
-  }[outcome]
+function OutcomeBadge({ outcome, tieCredit }: { outcome: 'win' | 'loss' | 'tie'; tieCredit?: boolean }) {
+  const config = outcome === 'tie' && tieCredit
+    ? { label: 'TIE 💀', bg: 'rgba(234,179,8,0.15)', fg: '#FCD34D' }
+    : ({
+        win:  { label: 'WON',  bg: 'rgba(234,179,8,0.15)',  fg: '#FCD34D' },
+        loss: { label: 'LOST', bg: 'rgba(148,163,184,0.12)', fg: 'rgba(203,213,225,0.75)' },
+        tie:  { label: 'TIE',  bg: 'rgba(251,146,60,0.12)',  fg: 'rgba(251,146,60,0.9)' },
+      })[outcome]
   return (
     <span
       className="text-xs font-black tracking-widest px-2 py-1 rounded-full"
@@ -333,14 +337,16 @@ function OutcomeBadge({ outcome }: { outcome: 'win' | 'loss' | 'tie' }) {
 function HistoryRow({ entry }: { entry: HistoryEntry }) {
   const youWon = entry.outcome === 'win'
   const youLost = entry.outcome === 'loss'
+  const creditedTie = entry.outcome === 'tie' && entry.tie_credit
+  const skullEarned = youWon || creditedTie
   const metricLine = `${formatMetricValue(entry.you.score, entry.period.metric, entry.period.metric_unit)} – ${formatMetricValue(entry.opponent.score, entry.period.metric, entry.period.metric_unit)}`
 
   return (
     <div
       className="glass-card p-4"
       style={{
-        borderColor: youWon ? 'rgba(234,179,8,0.25)' : 'rgba(255,255,255,0.06)',
-        background: youWon
+        borderColor: skullEarned ? 'rgba(234,179,8,0.25)' : 'rgba(255,255,255,0.06)',
+        background: skullEarned
           ? 'linear-gradient(135deg, rgba(234,179,8,0.05) 0%, rgba(255,255,255,0.02) 100%)'
           : undefined,
         opacity: youLost ? 0.85 : 1,
@@ -356,7 +362,7 @@ function HistoryRow({ entry }: { entry: HistoryEntry }) {
           <span>·</span>
           <span>{formatDate(entry.period.start_date)} – {formatDate(entry.period.end_date)}</span>
         </div>
-        <OutcomeBadge outcome={entry.outcome} />
+        <OutcomeBadge outcome={entry.outcome} tieCredit={entry.tie_credit} />
       </div>
 
       <div className="flex items-center gap-3 mt-3">
@@ -364,7 +370,7 @@ function HistoryRow({ entry }: { entry: HistoryEntry }) {
           src={entry.opponent.avatar}
           name={entry.opponent.name}
           size={44}
-          ringColor={youWon ? 'rgba(255,255,255,0.1)' : youLost ? 'rgba(234,179,8,0.6)' : 'rgba(251,146,60,0.5)'}
+          ringColor={skullEarned ? 'rgba(255,255,255,0.1)' : youLost ? 'rgba(234,179,8,0.6)' : 'rgba(251,146,60,0.5)'}
         />
         <div className="flex-1 min-w-0">
           <div className="font-bold truncate">vs {entry.opponent.name}</div>
@@ -474,9 +480,11 @@ function CelebrationModal({ entry, onClose }: { entry: HistoryEntry; onClose: ()
   const youWon = outcome === 'win'
   const youLost = outcome === 'loss'
   const isTie = outcome === 'tie'
+  const creditedTie = isTie && entry.tie_credit
+  const earnedSkull = youWon || creditedTie
 
   const headline = youWon ? 'VICTORY' : youLost ? 'DEFEAT' : 'DRAW'
-  const headlineColor = youWon
+  const headlineColor = earnedSkull
     ? '#FCD34D'
     : youLost
       ? 'rgba(203,213,225,0.85)'
@@ -485,10 +493,12 @@ function CelebrationModal({ entry, onClose }: { entry: HistoryEntry; onClose: ()
     ? `You beat ${entry.opponent.name}`
     : youLost
       ? `${entry.opponent.name} beat you`
-      : `You and ${entry.opponent.name} tied`
+      : creditedTie
+        ? `You and ${entry.opponent.name} tied — both earn a 💀`
+        : `You and ${entry.opponent.name} tied`
   const closeLabel = youWon ? 'Nice!' : youLost ? 'Dang.' : 'OK'
 
-  const priorKillMarks = youWon ? Math.max(entry.kill_marks_at_close - 1, 0) : entry.kill_marks_at_close
+  const priorKillMarks = earnedSkull ? Math.max(entry.kill_marks_at_close - 1, 0) : entry.kill_marks_at_close
 
   function handleClose() {
     if (dismissing) return
@@ -515,15 +525,15 @@ function CelebrationModal({ entry, onClose }: { entry: HistoryEntry; onClose: ()
         className="glass-card relative w-full max-w-md p-8"
         onClick={e => e.stopPropagation()}
         style={{
-          borderColor: youWon
+          borderColor: earnedSkull
             ? 'rgba(234,179,8,0.5)'
             : youLost
               ? 'rgba(148,163,184,0.3)'
               : 'rgba(251,146,60,0.4)',
-          background: youWon
+          background: earnedSkull
             ? 'linear-gradient(135deg, rgba(234,179,8,0.08) 0%, rgba(0,0,0,0.4) 100%)'
             : 'linear-gradient(135deg, rgba(255,255,255,0.03) 0%, rgba(0,0,0,0.4) 100%)',
-          boxShadow: youWon ? '0 0 60px rgba(234,179,8,0.25)' : undefined,
+          boxShadow: earnedSkull ? '0 0 60px rgba(234,179,8,0.25)' : undefined,
           animation: 'scaleIn 350ms cubic-bezier(0.34, 1.56, 0.64, 1)',
         }}
       >
@@ -535,7 +545,7 @@ function CelebrationModal({ entry, onClose }: { entry: HistoryEntry; onClose: ()
             className="font-black text-5xl tracking-wider"
             style={{
               color: headlineColor,
-              textShadow: youWon ? '0 0 30px rgba(234,179,8,0.6)' : undefined,
+              textShadow: earnedSkull ? '0 0 30px rgba(234,179,8,0.6)' : undefined,
             }}
           >
             {headline}
@@ -549,7 +559,7 @@ function CelebrationModal({ entry, onClose }: { entry: HistoryEntry; onClose: ()
               src={entry.you.avatar}
               name={entry.you.name}
               size={80}
-              ringColor={youWon ? 'rgba(234,179,8,0.8)' : youLost ? 'rgba(148,163,184,0.35)' : 'rgba(251,146,60,0.6)'}
+              ringColor={earnedSkull ? 'rgba(234,179,8,0.8)' : youLost ? 'rgba(148,163,184,0.35)' : 'rgba(251,146,60,0.6)'}
             />
             <div className="text-xs text-gray-400 font-bold">You</div>
             <div className="text-lg font-black font-mono">
@@ -564,7 +574,7 @@ function CelebrationModal({ entry, onClose }: { entry: HistoryEntry; onClose: ()
               src={entry.opponent.avatar}
               name={entry.opponent.name}
               size={80}
-              ringColor={youLost ? 'rgba(234,179,8,0.8)' : 'rgba(255,255,255,0.12)'}
+              ringColor={youLost ? 'rgba(234,179,8,0.8)' : creditedTie ? 'rgba(234,179,8,0.6)' : 'rgba(255,255,255,0.12)'}
             />
             <div className="text-xs text-gray-400 font-bold truncate max-w-[120px]">
               {entry.opponent.name}
@@ -575,12 +585,12 @@ function CelebrationModal({ entry, onClose }: { entry: HistoryEntry; onClose: ()
           </div>
         </div>
 
-        {!isTie && (priorKillMarks > 0 || youWon) && (
+        {(earnedSkull || priorKillMarks > 0) && (
           <div className="border-t pt-5 mb-5" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
             <SkullTickUp
               priorCount={priorKillMarks}
               finalCount={entry.kill_marks_at_close}
-              animate={youWon}
+              animate={earnedSkull}
             />
           </div>
         )}
@@ -591,11 +601,11 @@ function CelebrationModal({ entry, onClose }: { entry: HistoryEntry; onClose: ()
           disabled={dismissing}
           className="w-full py-3 rounded-xl font-black text-base tracking-wide transition-all disabled:opacity-60"
           style={{
-            background: youWon
+            background: earnedSkull
               ? 'linear-gradient(135deg, #EAB308, #CA8A04)'
               : 'linear-gradient(135deg, rgba(255,255,255,0.1), rgba(255,255,255,0.05))',
-            color: youWon ? '#000' : 'rgba(255,255,255,0.9)',
-            boxShadow: youWon ? '0 0 24px rgba(234,179,8,0.4)' : undefined,
+            color: earnedSkull ? '#000' : 'rgba(255,255,255,0.9)',
+            boxShadow: earnedSkull ? '0 0 24px rgba(234,179,8,0.4)' : undefined,
           }}
         >
           {closeLabel}

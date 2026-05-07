@@ -137,6 +137,7 @@ A web application that syncs with Strava to track exercise data and create custo
 15. **rivalry_matchups** - Player pairings per period
     - `period_id`, `player1_id`, `player2_id`
     - `winner_id` — NULL means tie or still in progress; resolved matchups are identified by `player1_score IS NOT NULL`
+    - `tie_credit` (BOOLEAN, NOT NULL DEFAULT FALSE) — set TRUE on close-out for non-zero ties (winner_id IS NULL AND s1 > 0). Counts as a kill mark for both players. Added in migration 038. 0–0 ties leave it FALSE.
     - `player1_score`, `player2_score` — scores in display units (km/hrs/m/count); NULL until period closes out
     - `player1_viewed_at`, `player2_viewed_at` — TIMESTAMPTZ stamped when that player dismisses the result celebration modal; NULL = unacknowledged. Added in migration 036 with backfill for already-closed matchups.
     - Each player appears at most once per period
@@ -162,7 +163,7 @@ A web application that syncs with Strava to track exercise data and create custo
 - Single ranked list — no divisions
 - Top 3 shown as a podium (1ST center, 2ND left, 3RD right)
 - Each entry shows: avatar, rank, name, rival name (⚔️ link), score, hours this week, kill marks, badge drawer
-- Kill marks (💀): awarded per rivalry win; each adds 1.5% to your score multiplier
+- Kill marks (💀): awarded per rivalry win, plus credited (non-zero) ties (both players earn one); each adds 1.5% to your score multiplier
   - `adjusted_points = total_cumulative_points × (1 + kill_marks × 0.015)`
   - Kill mark multiplier affects ranking AND display
 - Clickable score → breakdown popout (exercise / habit / badge / kills / total)
@@ -175,9 +176,9 @@ A web application that syncs with Strava to track exercise data and create custo
 - Current/History tabs on `/rivalries`:
   - Current: VS hero layout, large avatars, live metric progress bar, winner crown, kill marks
   - History: W/L/T summary counters + per-matchup cards for every closed matchup the user played
-- Celebration modal fires on first load after a period closes: W/L/T visual treatments (gold win / muted loss / neutral tie), score recap, and for wins an embedded skull-mark tick-up animation showing the new 💀 popping in with a glow. Dismissing POSTs to `/api/rivalries/acknowledge` to stamp `viewed_at` so it never fires twice.
+- Celebration modal fires on first load after a period closes: W/L/T visual treatments (gold win / muted loss / neutral tie), score recap, and for wins or credited ties an embedded skull-mark tick-up animation showing the new 💀 popping in with a glow. Dismissing POSTs to `/api/rivalries/acknowledge` to stamp `viewed_at` so it never fires twice.
 - `SeasonSchedule` shows all periods with NOW indicator
-- Tie (including 0-0) = no kill mark for either player; `winner_id` stays NULL
+- Tie semantics: `winner_id` stays NULL on any tie. If both players posted a non-zero score, `tie_credit=TRUE` and both earn a 💀; a 0–0 tie leaves `tie_credit=FALSE` and awards nothing.
 
 **FAQ** (`/faq`):
 - Accordion sections: Points, Leaderboard, Rivalries, Badges, General
@@ -335,7 +336,7 @@ The `computePairings` function runs automatically in the weekly cron job when a 
 Runs **after** pairing, every Monday just after midnight PT. Finds periods where `end_date < rivalryToday` with `player1_score IS NULL` (unresolved). For each:
 1. Fetches Strava activities in `[periodStartUTC(start_date), periodEndUTC(end_date))` — i.e. midnight PT on start_date to midnight PT on the day after end_date.
 2. Computes scores via `computeMetricScores` → display units
-3. Sets `player1_score`, `player2_score`, `winner_id` (NULL for any tie, including 0-0)
+3. Sets `player1_score`, `player2_score`, `winner_id` (NULL on any tie), and `tie_credit` (TRUE iff scores are tied AND > 0 — both players earn a 💀)
 
 `player1_score IS NOT NULL` = matchup is resolved. This distinguishes ties from pending matchups.
 
@@ -427,6 +428,8 @@ WHERE id = 'matchup-uuid'::uuid;
 | 034 | out_of_bounds_badge.sql | Add start_lat/start_lng to strava_activities; add Out of Bounds badge (away_hours) |
 | 035 | leaderboard_snapshots.sql | Create leaderboard_snapshots table for weekly rank-change tracking |
 | 036 | rivalry_result_acknowledgement.sql | Add `player1_viewed_at`/`player2_viewed_at` to `rivalry_matchups` for celebration-modal deduping; backfills existing closed matchups as viewed |
+| 037 | strength_days_metric.sql | Replace `strength_count` metric with `strength_days` (distinct local-day count of strength sessions, ≥15 min) |
+| 038 | rivalry_tie_credit.sql | Add `tie_credit` to `rivalry_matchups`; non-zero ties now grant a 💀 to both players |
 
 ---
 

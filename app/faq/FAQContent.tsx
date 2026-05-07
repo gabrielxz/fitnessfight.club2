@@ -139,7 +139,7 @@ export default function FAQContent() {
             </AccordionItem>
 
             <AccordionItem question="What are the 💀 kill marks?">
-              <p>Those are <strong>rivalry kill marks</strong>. You earn one 💀 for each bi-weekly rivalry you've won over the course of the season.</p>
+              <p>Those are <strong>rivalry kill marks</strong>. You earn one 💀 for each bi-weekly rivalry you've won. If a rivalry ends in a tie and both of you posted a non-zero score, you both earn one. (A 0–0 tie awards none.)</p>
               <p>They also boost your score: each kill mark adds 1.5% to your total points. Win enough and the multiplier starts to matter.</p>
             </AccordionItem>
           </div>
@@ -150,7 +150,7 @@ export default function FAQContent() {
           <div className="space-y-3">
             <AccordionItem question="What are Rivalries?">
               <p>Every two weeks, you're paired with another player near your rank for a head-to-head competition on a <strong>specific metric</strong> such as distance, time, elevation, or active days.</p>
-              <p>Whoever scores higher on that metric over the two-week period wins. The winner earns a 💀 kill mark on their profile. If it's a tie, nobody gets the kill mark.</p>
+              <p>Whoever scores higher on that metric over the two-week period wins. The winner earns a 💀 kill mark on their profile. If you tie and both posted a non-zero score, you each earn a 💀 — a 0–0 tie awards nothing.</p>
             </AccordionItem>
 
             <AccordionItem question="How are rivals chosen?">
