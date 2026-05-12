@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { rivalryTodayStr } from '@/lib/rivalries/time-window'
+import { rivalryTodayStr, periodStartUTC, periodEndUTC } from '@/lib/rivalries/time-window'
+import { computeMetricScores, type MetricKey, type ActivityRow } from '@/lib/rivalries/metrics'
 
 interface LeaderboardEntry {
   userId: string
@@ -28,15 +29,33 @@ interface RivalryMatchupResult {
   player1Score: number
   player2Score: number
   winnerName: string | null
-  metric: string
+  metricLabel: string
+  metricUnit: string
   periodNumber: number
 }
 
 interface ActiveMatchup {
   player1Name: string
   player2Name: string
-  metric: string
+  player1Score: number
+  player2Score: number
+  metricLabel: string
+  metricUnit: string
   periodNumber: number
+}
+
+const CLOSE_OUT_RECENCY_DAYS = 7
+
+function daysBetween(earlier: string, later: string): number {
+  const e = new Date(earlier + 'T00:00:00Z').getTime()
+  const l = new Date(later + 'T00:00:00Z').getTime()
+  return Math.floor((l - e) / 86400000)
+}
+
+function formatScore(value: number, unit: string): string {
+  const isInteger = unit === 'days' || unit === 'types'
+  if (isInteger) return `${Math.round(value)} ${unit}`
+  return `${(Math.round(value * 10) / 10).toFixed(1)} ${unit}`
 }
 
 function getWeekBounds(weeksAgo: number = 0): { start: string; end: string; label: string } {
@@ -62,7 +81,7 @@ function getDisplayName(profile: { full_name: string | null; email: string | nul
   return profile.full_name || profile.email?.split('@')[0] || 'Unknown'
 }
 
-export async function generateCompetitionUpdate(): Promise<string> {
+export async function generateCompetitionUpdate(priming?: string): Promise<string> {
   const supabase = createAdminClient()
   const now = new Date()
   // On Monday, the current week has almost no data yet — recap last week instead.
@@ -150,46 +169,82 @@ export async function generateCompetitionUpdate(): Promise<string> {
   })
 
   // ── 4. Rivalry results & active matchups ──────────────────────────────
+  // We distinguish two cases so the AI doesn't re-announce stale results:
+  //  - recently-closed period (end_date within the last CLOSE_OUT_RECENCY_DAYS) → show results
+  //  - active period (today between start_date and end_date) → show live scores
   const { data: recentPeriods } = await supabase
     .from('rivalry_periods')
-    .select('id, period_number, metric, start_date, end_date')
+    .select('id, period_number, metric, metric_label, metric_unit, start_date, end_date')
     .lte('start_date', todayStr)
     .order('start_date', { ascending: false })
     .limit(3)
 
-  const resolvedResults: RivalryMatchupResult[] = []
-  const activeMatchups: ActiveMatchup[] = []
+  const periods = recentPeriods ?? []
+  const activePeriod = periods.find(p => p.start_date <= todayStr && p.end_date >= todayStr) ?? null
+  const recentlyClosedPeriod = periods.find(p =>
+    p.end_date < todayStr && daysBetween(p.end_date, todayStr) <= CLOSE_OUT_RECENCY_DAYS
+  ) ?? null
 
-  for (const period of recentPeriods ?? []) {
+  const resolvedResults: RivalryMatchupResult[] = []
+  if (recentlyClosedPeriod) {
     const { data: matchups } = await supabase
       .from('rivalry_matchups')
       .select('player1_id, player2_id, player1_score, player2_score, winner_id')
-      .eq('period_id', period.id)
+      .eq('period_id', recentlyClosedPeriod.id)
 
     for (const m of matchups ?? []) {
+      if (m.player1_score === null) continue
       const p1Profile = profiles?.find(p => p.id === m.player1_id)
       const p2Profile = profiles?.find(p => p.id === m.player2_id)
       const p1Name = p1Profile ? getDisplayName(p1Profile, stravaMap.get(m.player1_id) ?? null) : 'Unknown'
       const p2Name = p2Profile ? getDisplayName(p2Profile, stravaMap.get(m.player2_id) ?? null) : 'Unknown'
+      const winnerProfile = m.winner_id ? profiles?.find(p => p.id === m.winner_id) : null
+      const winnerName = winnerProfile ? getDisplayName(winnerProfile, stravaMap.get(m.winner_id!) ?? null) : null
+      resolvedResults.push({
+        player1Name: p1Name,
+        player2Name: p2Name,
+        player1Score: m.player1_score,
+        player2Score: m.player2_score,
+        winnerName,
+        metricLabel: recentlyClosedPeriod.metric_label ?? recentlyClosedPeriod.metric,
+        metricUnit: recentlyClosedPeriod.metric_unit ?? '',
+        periodNumber: recentlyClosedPeriod.period_number,
+      })
+    }
+  }
 
-      if (m.player1_score !== null) {
-        const winnerProfile = m.winner_id ? profiles?.find(p => p.id === m.winner_id) : null
-        const winnerName = winnerProfile ? getDisplayName(winnerProfile, stravaMap.get(m.winner_id!) ?? null) : null
-        resolvedResults.push({
-          player1Name: p1Name,
-          player2Name: p2Name,
-          player1Score: m.player1_score,
-          player2Score: m.player2_score,
-          winnerName,
-          metric: period.metric,
-          periodNumber: period.period_number,
-        })
-      } else {
+  const activeMatchups: ActiveMatchup[] = []
+  if (activePeriod) {
+    const { data: matchups } = await supabase
+      .from('rivalry_matchups')
+      .select('player1_id, player2_id')
+      .eq('period_id', activePeriod.id)
+
+    if (matchups && matchups.length > 0) {
+      const userIds = Array.from(new Set(matchups.flatMap(m => [m.player1_id, m.player2_id])))
+      const { data: activities } = await supabase
+        .from('strava_activities')
+        .select('user_id, sport_type, distance, moving_time, total_elevation_gain, start_date, start_date_local')
+        .in('user_id', userIds)
+        .gte('start_date', periodStartUTC(activePeriod.start_date))
+        .lt('start_date', periodEndUTC(activePeriod.end_date))
+        .is('deleted_at', null)
+
+      const liveScores = computeMetricScores((activities ?? []) as ActivityRow[], activePeriod.metric as MetricKey)
+
+      for (const m of matchups) {
+        const p1Profile = profiles?.find(p => p.id === m.player1_id)
+        const p2Profile = profiles?.find(p => p.id === m.player2_id)
+        const p1Name = p1Profile ? getDisplayName(p1Profile, stravaMap.get(m.player1_id) ?? null) : 'Unknown'
+        const p2Name = p2Profile ? getDisplayName(p2Profile, stravaMap.get(m.player2_id) ?? null) : 'Unknown'
         activeMatchups.push({
           player1Name: p1Name,
           player2Name: p2Name,
-          metric: period.metric,
-          periodNumber: period.period_number,
+          player1Score: liveScores[m.player1_id] ?? 0,
+          player2Score: liveScores[m.player2_id] ?? 0,
+          metricLabel: activePeriod.metric_label ?? activePeriod.metric,
+          metricUnit: activePeriod.metric_unit ?? '',
+          periodNumber: activePeriod.period_number,
         })
       }
     }
@@ -251,22 +306,39 @@ export async function generateCompetitionUpdate(): Promise<string> {
     }
   }
 
+  // Rivalry status line — tells Claude whether to lead with results or focus mid-period
+  dataSummary += `\n=== RIVALRY STATUS ===\n`
+  if (recentlyClosedPeriod && activePeriod) {
+    dataSummary += `Period ${recentlyClosedPeriod.period_number} (${recentlyClosedPeriod.metric_label}) just concluded — results below. Period ${activePeriod.period_number} (${activePeriod.metric_label}, ${activePeriod.start_date} – ${activePeriod.end_date}) is now in progress.\n`
+  } else if (recentlyClosedPeriod) {
+    dataSummary += `Period ${recentlyClosedPeriod.period_number} (${recentlyClosedPeriod.metric_label}) just concluded — results below.\n`
+  } else if (activePeriod) {
+    const daysIn = daysBetween(activePeriod.start_date, todayStr)
+    const daysLeft = daysBetween(todayStr, activePeriod.end_date)
+    dataSummary += `Mid-period — Period ${activePeriod.period_number} (${activePeriod.metric_label}, ${activePeriod.start_date} – ${activePeriod.end_date}) in progress. Day ${daysIn + 1} of 14, ${daysLeft} day${daysLeft === 1 ? '' : 's'} remaining. No rivalry results to announce this week.\n`
+  } else {
+    dataSummary += `Between periods — no active rivalries.\n`
+  }
+
   if (resolvedResults.length > 0) {
-    // Only show the most recent period's results
-    const latestPeriod = Math.max(...resolvedResults.map(r => r.periodNumber))
-    const latestResults = resolvedResults.filter(r => r.periodNumber === latestPeriod)
-    dataSummary += `\n=== RIVALRY RESULTS (Period ${latestPeriod}) ===\n`
-    for (const r of latestResults) {
+    dataSummary += `\n=== RIVALRY RESULTS (Period ${resolvedResults[0].periodNumber}: ${resolvedResults[0].metricLabel}) ===\n`
+    for (const r of resolvedResults) {
       const tie = r.winnerName === null
-      dataSummary += `• ${r.player1Name} vs ${r.player2Name}: ${r.player1Score} – ${r.player2Score} (${tie ? 'TIE' : `Winner: ${r.winnerName}`}) [${r.metric}]\n`
+      const p1 = formatScore(r.player1Score, r.metricUnit)
+      const p2 = formatScore(r.player2Score, r.metricUnit)
+      dataSummary += `• ${r.player1Name} vs ${r.player2Name}: ${p1} – ${p2} (${tie ? 'TIE' : `Winner: ${r.winnerName}`})\n`
     }
   }
 
   if (activeMatchups.length > 0) {
-    const activePeriod = activeMatchups[0].periodNumber
-    dataSummary += `\n=== ACTIVE RIVALRY MATCHUPS (Period ${activePeriod}) ===\n`
+    dataSummary += `\n=== ACTIVE RIVALRY MATCHUPS (Period ${activeMatchups[0].periodNumber}: ${activeMatchups[0].metricLabel}) — live scores ===\n`
     for (const m of activeMatchups) {
-      dataSummary += `• ${m.player1Name} vs ${m.player2Name} [${m.metric}]\n`
+      const p1 = formatScore(m.player1Score, m.metricUnit)
+      const p2 = formatScore(m.player2Score, m.metricUnit)
+      const leader = m.player1Score > m.player2Score ? m.player1Name
+        : m.player2Score > m.player1Score ? m.player2Name
+        : 'tied'
+      dataSummary += `• ${m.player1Name} (${p1}) vs ${m.player2Name} (${p2}) — ${leader === 'tied' ? 'tied' : `${leader} leads`}\n`
     }
   }
 
@@ -277,7 +349,11 @@ export async function generateCompetitionUpdate(): Promise<string> {
 
 Write a weekly competition update message for the WhatsApp group. Use *bold* for names and key stats (WhatsApp markdown). Use _italic_ for flavor text. Use relevant fitness/sports emojis generously. Be exciting, specific, and call out notable moments. Mention rank changes (who's climbing, who's slipping), badge achievements, rivalry drama, and top workout performances. Keep it punchy and celebratory — around 200-350 words. Do not use headers or bullet points — write it as flowing prose paragraphs separated by blank lines.`
 
-  const userPrompt = `Here is this week's competition data. Write the WhatsApp update:\n\n${dataSummary}`
+  const trimmedPriming = priming?.trim()
+  const primingBlock = trimmedPriming
+    ? `\n\nADDITIONAL CONTEXT FROM ADMIN (incorporate this naturally into the update):\n${trimmedPriming}`
+    : ''
+  const userPrompt = `Here is this week's competition data. Write the WhatsApp update:\n\n${dataSummary}${primingBlock}`
 
   const message = await client.messages.create({
     model: 'claude-sonnet-4-6',

@@ -7,6 +7,7 @@ export default function CompetitionUpdateGenerator() {
   const [update, setUpdate] = useState('')
   const [showCopied, setShowCopied] = useState(false)
   const [error, setError] = useState('')
+  const [priming, setPriming] = useState('')
 
   const generateUpdate = async () => {
     setLoading(true)
@@ -16,6 +17,7 @@ export default function CompetitionUpdateGenerator() {
       const response = await fetch('/api/admin/generate-competition-update', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ priming: priming.trim() || undefined }),
       })
 
       if (!response.ok) {
@@ -61,7 +63,7 @@ export default function CompetitionUpdateGenerator() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-4">
         <div>
           <h3 className="text-lg font-semibold">Generate Competition Update</h3>
           <p className="text-sm text-gray-400">
@@ -71,10 +73,24 @@ export default function CompetitionUpdateGenerator() {
         <button
           onClick={generateUpdate}
           disabled={loading}
-          className="px-6 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-semibold rounded hover:from-purple-600 hover:to-pink-600 disabled:opacity-50 transition-all"
+          className="shrink-0 px-6 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-semibold rounded hover:from-purple-600 hover:to-pink-600 disabled:opacity-50 transition-all"
         >
           {loading ? 'Generating...' : '✨ Generate Update'}
         </button>
+      </div>
+
+      <div>
+        <label htmlFor="priming-input" className="block text-sm font-medium text-gray-300 mb-1">
+          Optional: extra context for the AI
+        </label>
+        <textarea
+          id="priming-input"
+          value={priming}
+          onChange={(e) => setPriming(e.target.value)}
+          placeholder="e.g. Don't forget to mention Amy this week, or call out the comeback story."
+          rows={2}
+          className="w-full px-3 py-2 bg-black/30 border border-white/20 rounded text-sm text-gray-100 placeholder:text-gray-500 focus:outline-none focus:border-purple-400"
+        />
       </div>
 
       {error && (

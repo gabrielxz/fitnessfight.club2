@@ -19,7 +19,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Admin access required' }, { status: 403 })
     }
 
-    const update = await generateCompetitionUpdate()
+    const body = await request.json().catch(() => ({}))
+    const priming = typeof body?.priming === 'string' ? body.priming : undefined
+
+    const update = await generateCompetitionUpdate(priming)
 
     return NextResponse.json({ success: true, update })
   } catch (error) {
