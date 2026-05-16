@@ -156,40 +156,62 @@ function KillMarks({ count }: { count: number }) {
 
 // ─── Badge Drawer ─────────────────────────────────────────────────────────────
 
+function BadgePillButton({ count, open, onClick }: {
+  count: number
+  open: boolean
+  onClick: (e: React.MouseEvent) => void
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className="flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold transition-colors"
+      style={{
+        backgroundColor: 'rgba(255,255,255,0.08)',
+        color: 'rgba(255,255,255,0.7)',
+        border: '1px solid rgba(255,255,255,0.12)',
+      }}
+    >
+      🏅 {count}
+      <span style={{ fontSize: 9, opacity: 0.6 }}>{open ? '▲' : '▼'}</span>
+    </button>
+  )
+}
+
+function BadgeGrid({ badges }: { badges: Badge[] }) {
+  return (
+    <div className="flex flex-wrap gap-2">
+      {badges.map((badge, i) => (
+        <div key={i} className="relative group" title={`${badge.name} (${badge.tier})`}>
+          <span className="text-xl transition-transform group-hover:scale-125 inline-block">
+            {badge.emoji}
+          </span>
+          <div className={`
+            absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border border-slate-900
+            ${badge.tier === 'gold' ? 'bg-yellow-400' : ''}
+            ${badge.tier === 'silver' ? 'bg-gray-400' : ''}
+            ${badge.tier === 'bronze' ? 'bg-amber-700' : ''}
+          `} />
+        </div>
+      ))}
+    </div>
+  )
+}
+
 function BadgeDrawer({ badges }: { badges: Badge[] }) {
   const [open, setOpen] = useState(false)
   if (badges.length === 0) return null
 
   return (
     <div>
-      <button
+      <BadgePillButton
+        count={badges.length}
+        open={open}
         onClick={(e) => { e.stopPropagation(); setOpen(o => !o) }}
-        className="flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold transition-colors"
-        style={{
-          backgroundColor: 'rgba(255,255,255,0.08)',
-          color: 'rgba(255,255,255,0.7)',
-          border: '1px solid rgba(255,255,255,0.12)',
-        }}
-      >
-        🏅 {badges.length}
-        <span style={{ fontSize: 9, opacity: 0.6 }}>{open ? '▲' : '▼'}</span>
-      </button>
+      />
 
       {open && (
-        <div className="flex flex-wrap gap-2 mt-2 pt-2" style={{ borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-          {badges.map((badge, i) => (
-            <div key={i} className="relative group" title={`${badge.name} (${badge.tier})`}>
-              <span className="text-xl transition-transform group-hover:scale-125 inline-block">
-                {badge.emoji}
-              </span>
-              <div className={`
-                absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border border-slate-900
-                ${badge.tier === 'gold' ? 'bg-yellow-400' : ''}
-                ${badge.tier === 'silver' ? 'bg-gray-400' : ''}
-                ${badge.tier === 'bronze' ? 'bg-amber-700' : ''}
-              `} />
-            </div>
-          ))}
+        <div className="mt-2 pt-2" style={{ borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+          <BadgeGrid badges={badges} />
         </div>
       )}
     </div>
@@ -449,54 +471,70 @@ function PodiumCard({ entry, isCurrentUser, marginTop }: {
 // ─── Athlete Row (rank 4+) ────────────────────────────────────────────────────
 
 function AthleteRow({ entry, isCurrentUser, total }: { entry: LeaderboardEntry; isCurrentUser: boolean; total: number }) {
+  const [badgesOpen, setBadgesOpen] = useState(false)
   const zoneStyle = getZoneStyle(entry.rank, total)
 
   return (
     <div
-      className="glass-card px-4 py-3 flex items-center gap-3 transition-all duration-200 hover:scale-[1.01]"
+      className="glass-card px-4 py-3 transition-all duration-200 hover:scale-[1.01]"
       style={{
         ...zoneStyle,
         ...(isCurrentUser ? { boxShadow: '0 0 0 2px rgba(251,146,60,0.5)' } : {}),
       }}
     >
-      {/* Rank */}
-      <div
-        className="text-sm font-black w-7 text-right shrink-0"
-        style={{ color: 'rgba(255,255,255,0.2)' }}
-      >
-        #{entry.rank}
-      </div>
-
-      {/* Avatar */}
-      <Avatar src={entry.avatar} name={entry.name} size={48} />
-
-      {/* Name + rival + kill marks */}
-      <div className="flex-1 min-w-0">
-        <div className="font-bold text-sm truncate">
-          {isCurrentUser ? 'You' : entry.name}
+      <div className="flex items-center gap-3">
+        {/* Rank */}
+        <div
+          className="text-sm font-black w-7 text-right shrink-0"
+          style={{ color: 'rgba(255,255,255,0.2)' }}
+        >
+          #{entry.rank}
         </div>
-        <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-          {entry.rival && (
-            <Link
-              href="/rivalries"
-              className="text-xs hover:text-orange-400 transition-colors shrink-0"
-              style={{ color: 'rgba(255,255,255,0.4)' }}
-            >
-              ⚔️ {entry.rival.name}
-            </Link>
+
+        {/* Avatar */}
+        <Avatar src={entry.avatar} name={entry.name} size={48} />
+
+        {/* Name + rival + kill marks */}
+        <div className="flex-1 min-w-0">
+          <div className="font-bold text-sm truncate">
+            {isCurrentUser ? 'You' : entry.name}
+          </div>
+          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+            {entry.rival && (
+              <Link
+                href="/rivalries"
+                className="text-xs hover:text-orange-400 transition-colors shrink-0"
+                style={{ color: 'rgba(255,255,255,0.4)' }}
+              >
+                ⚔️ {entry.rival.name}
+              </Link>
+            )}
+            <KillMarks count={entry.kill_marks} />
+          </div>
+        </div>
+
+        {/* Points + hours + badge pill (pill only; expanded grid renders below) */}
+        <div className="flex flex-col items-end gap-1 shrink-0">
+          <ScorePopout entry={entry} size="sm" />
+          <div className="text-xs" style={{ color: 'rgba(255,255,255,0.35)' }}>
+            {formatHours(entry.this_week_hours)} this wk
+          </div>
+          {entry.badges.length > 0 && (
+            <BadgePillButton
+              count={entry.badges.length}
+              open={badgesOpen}
+              onClick={(e) => { e.stopPropagation(); setBadgesOpen(o => !o) }}
+            />
           )}
-          <KillMarks count={entry.kill_marks} />
         </div>
       </div>
 
-      {/* Points + hours + badge drawer */}
-      <div className="flex flex-col items-end gap-1 shrink-0">
-        <ScorePopout entry={entry} size="sm" />
-        <div className="text-xs" style={{ color: 'rgba(255,255,255,0.35)' }}>
-          {formatHours(entry.this_week_hours)} this wk
+      {/* Expanded badge grid — full row width, wraps cleanly on mobile */}
+      {badgesOpen && entry.badges.length > 0 && (
+        <div className="mt-3 pt-3" style={{ borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+          <BadgeGrid badges={entry.badges} />
         </div>
-        <BadgeDrawer badges={entry.badges} />
-      </div>
+      )}
     </div>
   )
 }
