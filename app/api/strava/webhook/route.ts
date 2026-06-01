@@ -175,6 +175,7 @@ async function fetchAndStoreActivity(
 ) {
   try {
     console.log(`Fetching activity ${activityId} from Strava API...`)
+    // TODO(strava-api-v3-migration): swap base URL to https://www.api-v3.strava.com before 2027-06-01
     const response = await fetch(
       `https://www.strava.com/api/v3/activities/${activityId}`,
       {

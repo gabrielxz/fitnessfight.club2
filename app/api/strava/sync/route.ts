@@ -48,6 +48,7 @@ export async function POST() {
     }
 
     // Fetch activities from Strava (last 30 activities)
+    // TODO(strava-api-v3-migration): swap base URL to https://www.api-v3.strava.com before 2027-06-01
     const response = await fetch(
       'https://www.strava.com/api/v3/athlete/activities?per_page=30',
       {
