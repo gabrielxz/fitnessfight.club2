@@ -19,11 +19,11 @@ async function insertMileCollectorBadge() {
     name: 'Mile Collector',
     emoji: '🌍',
     category: 'distance',
-    description: 'Walk or Run total miles (cumulative over the whole contest)',
+    description: 'Walk, Run, or Hike total miles (cumulative over the whole contest)',
     criteria: {
       type: 'cumulative',
       metric: 'distance_miles',
-      activity_types: ['Walk', 'Run', 'TrailRun', 'VirtualRun', 'Treadmill'],
+      activity_types: ['Walk', 'Run', 'TrailRun', 'VirtualRun', 'Hike'],
       bronze: 50,
       silver: 100,
       gold: 200
