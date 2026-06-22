@@ -12,19 +12,29 @@ async function processHabitPointsChange(
   timezone: string,
   action: 'added_success' | 'removed_success'
 ) {
-  const { data: habit, error: habitError } = await supabase
+  // Eligibility is by RANK among the user's first 5 active habits (ordered by
+  // position, then created_at) — the same definition BadgeCalculator and the
+  // habits UI use. The raw `position` column can have gaps after deletions
+  // (positions are assigned max+1 and never recompacted), so `position >= 5` is
+  // NOT a reliable "is this beyond the first 5" check: it wrongly skips a
+  // legitimate first-5 habit whenever an earlier habit was deleted.
+  const { data: firstFive, error: habitError } = await supabase
     .from('habits')
-    .select('target_frequency, position')
-    .eq('id', habitId)
-    .single()
+    .select('id, target_frequency')
+    .eq('user_id', userId)
+    .is('archived_at', null)
+    .order('position', { ascending: true })
+    .order('created_at', { ascending: true })
+    .limit(5)
 
-  if (habitError || !habit) {
-    console.error(`[Habit Points] Could not find habit ${habitId}`)
+  if (habitError) {
+    console.error(`[Habit Points] Could not load active habits for user ${userId}`, habitError)
     return
   }
 
-  if (habit.position >= 5) {
-    console.log(`[Habit Points] Habit ${habitId} is not eligible for points (position ${habit.position})`)
+  const habit = firstFive?.find(h => h.id === habitId)
+  if (!habit) {
+    console.log(`[Habit Points] Habit ${habitId} is not among the user's first 5 active habits; not eligible for points`)
     return
   }
 
