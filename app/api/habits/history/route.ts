@@ -33,11 +33,15 @@ export async function GET(request: NextRequest) {
     const endWeek = new Date(currentWeekStart)
     endWeek.setDate(endWeek.getDate() - (7 * offset))
 
-    // Get user's habits
+    // Get user's habits. Exclude archived (deleted) habits so they don't
+    // reappear when scrolling into past weeks — matches the current-week view
+    // (GET /api/habits), the cron, and BadgeCalculator, all of which filter
+    // archived_at. Without this, a deleted habit "comes back" in history.
     const { data: habits, error: habitsError } = await supabase
       .from('habits')
       .select('*')
       .eq('user_id', user.id)
+      .is('archived_at', null)
       .order('position', { ascending: true })
       .order('created_at', { ascending: true })
 
