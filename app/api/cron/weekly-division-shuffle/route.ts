@@ -5,6 +5,7 @@ import { computePairings, type RankedPlayer, type HistoricalMatchup } from '@/li
 import { computeMetricScores, type MetricKey, type ActivityRow } from '@/lib/rivalries/metrics'
 import { rivalryTodayStr, periodStartUTC, periodEndUTC } from '@/lib/rivalries/time-window'
 import { reconcileAllHabitPoints } from '@/lib/habits/reconcile'
+import { reconcileAllExercisePoints } from '@/lib/points-helpers'
 
 // Helper to get the start of the *previous* week (Monday)
 function getLastWeekStart(date: Date): Date {
@@ -80,6 +81,15 @@ export async function GET(request: NextRequest) {
     console.log('Reconciling habit points...')
     const reconciledCount = await reconcileAllHabitPoints(supabase)
     console.log(`Reconciled habit points for ${reconciledCount} users`)
+
+    // ── Exercise points reconciliation ──────────────────────────────────────
+    // Recompute every user's exercise points from their weekly tracking rows.
+    // The per-week diff logic (recalculateAndApplyExercisePointsForWeek) can
+    // leave orphaned points when activities/tracking rows are removed out-of-band
+    // (e.g. Vani carried +27 from deleted pre-season weeks); this heals it.
+    console.log('Reconciling exercise points...')
+    const exerciseReconciled = await reconcileAllExercisePoints(supabase)
+    console.log(`Reconciled exercise points for ${exerciseReconciled} users`)
 
     // ── Weekly badge progress reset ─────────────────────────────────────────
     const { data: weeklyBadges } = await supabase
