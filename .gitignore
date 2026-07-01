@@ -39,3 +39,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Local DB backups from one-off scripts (user data — never commit)
+scripts/backups/

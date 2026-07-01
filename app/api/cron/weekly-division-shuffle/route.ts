@@ -4,6 +4,7 @@ import { BadgeCalculator } from '@/lib/badges/BadgeCalculator'
 import { computePairings, type RankedPlayer, type HistoricalMatchup } from '@/lib/rivalries/pairing'
 import { computeMetricScores, type MetricKey, type ActivityRow } from '@/lib/rivalries/metrics'
 import { rivalryTodayStr, periodStartUTC, periodEndUTC } from '@/lib/rivalries/time-window'
+import { reconcileAllHabitPoints } from '@/lib/habits/reconcile'
 
 // Helper to get the start of the *previous* week (Monday)
 function getLastWeekStart(date: Date): Date {
@@ -69,6 +70,16 @@ export async function GET(request: NextRequest) {
         await badgeCalculator.evaluateHabitBadgesForWeek(userId, lastWeekStart)
       }
     }
+
+    // ── Habit points reconciliation ─────────────────────────────────────────
+    // Recompute every user's habit points from their entries. The incremental
+    // +0.5/-0.5 award path (app/api/habits/[id]/entries) is fire-and-forget and
+    // can drift over time (lost/double-fired toggles, out-of-order edits); this
+    // weekly reconcile heals it, mirroring how exercise points self-correct on
+    // every Strava sync.
+    console.log('Reconciling habit points...')
+    const reconciledCount = await reconcileAllHabitPoints(supabase)
+    console.log(`Reconciled habit points for ${reconciledCount} users`)
 
     // ── Weekly badge progress reset ─────────────────────────────────────────
     const { data: weeklyBadges } = await supabase
