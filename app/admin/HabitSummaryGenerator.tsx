@@ -18,9 +18,7 @@ export default function HabitSummaryGenerator() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          weekOffset: 0 // 0 = last completed week
-        })
+        body: JSON.stringify({})
       })
 
       if (!response.ok) {
@@ -66,26 +64,13 @@ export default function HabitSummaryGenerator() {
     }
   }
 
-  const formatDate = () => {
-    const now = new Date()
-    const lastMonday = new Date(now)
-    const dayOfWeek = now.getUTCDay()
-    const daysToLastMonday = dayOfWeek === 0 ? 6 : dayOfWeek + 6
-    lastMonday.setDate(now.getDate() - daysToLastMonday)
-
-    const lastSunday = new Date(lastMonday)
-    lastSunday.setDate(lastMonday.getDate() + 6)
-
-    return `${lastMonday.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${lastSunday.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
-  }
-
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-lg font-semibold">Generate Habit Summary</h3>
+          <h3 className="text-lg font-semibold">Generate Habit Challenge Update</h3>
           <p className="text-sm text-gray-400">
-            Generate WhatsApp message for last week ({formatDate()})
+            WhatsApp message with overall standings since Sep 7, this week so far, and last week
           </p>
         </div>
         <button

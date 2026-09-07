@@ -20,7 +20,7 @@ A web application that syncs with Strava to track exercise data and create custo
 │   │   ├── page.tsx                      # Admin dashboard page
 │   │   ├── AdminDashboard.tsx            # Admin UI component
 │   │   ├── actions.ts                    # Server actions (deleteUser, assignBadge)
-│   │   ├── HabitSummaryGenerator.tsx     # WhatsApp habit summary generator
+│   │   ├── HabitSummaryGenerator.tsx     # WhatsApp habit challenge update generator
 │   │   ├── CompetitionUpdateGenerator.tsx# AI competition update generator
 │   │   ├── SummaryParticipantsManager.tsx
 │   │   ├── CompetitionResetSection.tsx   # Nuclear reset button
@@ -29,7 +29,7 @@ A web application that syncs with Strava to track exercise data and create custo
 │   │   ├── competition-reset-actions.ts
 │   │   └── user-fix-actions.ts
 │   ├── api/
-│   │   ├── admin/generate-habit-summary/     # Habit summary API
+│   │   ├── admin/generate-habit-summary/     # Habit challenge update API
 │   │   ├── admin/generate-competition-update/# AI competition update API
 │   │   ├── badges/progress/              # Badge progress API
 │   │   ├── cron/
@@ -237,6 +237,18 @@ Badge point values: Gold 15 pts / Silver 6 pts / Bronze 3 pts
 - Weekly cron evaluates habit badges for users with 100% completion
 - Soft delete preserves history
 
+### Habit Challenge (between seasons)
+
+A habits-only side competition that runs from `CHALLENGE_START` (2026-09-07, a Monday) with no fixed end date; it ends when the next season launches. Implemented entirely in `lib/habits/weekly-summary-generator.ts` (`generateHabitChallengeSummary`) and surfaced by the admin "Generate Habit Message" button.
+
+- Participants: `summary_participants` rows with `include_in_summary = true`, in `sort_order`.
+- Scoring: the app rule. 0.5 points per habit that meets its weekly target, first 5 habits only.
+- Points are computed from `habit_entries` with `week_start >= CHALLENGE_START`. `user_profiles.cumulative_habit_points` is not used because it still carries Season 4 totals.
+- Past weeks are locked. Each week is scored against the habits that existed during that week (`created_at` on or before the week's Sunday, `archived_at` null or on/after the week's Monday), ordered by `position` then `created_at`, capped at 5. Entries for soft-deleted habits stay in `habit_entries`, so deleting a habit later does not remove points it already earned. `position` is current-only, so reordering can change which five count for past weeks.
+- "Current week" is the Monday to Sunday week in `America/New_York`.
+- Message blocks: Overall Standings (ranked, ties share a rank), This Week So Far, Last Week (once one exists), Not Tracking Habits.
+- The generator takes an optional Supabase client and `now`, which makes it testable with a fake client.
+
 ### Authentication Flow
 1. Users sign up/login via Supabase Auth (email or Google)
 2. Protected routes redirect to `/login`
@@ -253,8 +265,8 @@ Badge point values: Gold 15 pts / Silver 6 pts / Bronze 3 pts
 - **User Management**: View all users; delete; diagnose/repair missing DB entries
 - **Badge Management**: Manually assign/remove bronze/silver/gold badges
 - **WhatsApp Competition Update**: AI-generated weekly recap (leaderboard, rank changes, badges, rivalry results, top exercisers) via Claude Sonnet; copy-to-clipboard for WhatsApp paste
-- **WhatsApp Habit Summary**: Generate weekly habit completion summaries for group chat
-- **Manage Summary Participants**: Control which users appear in the habit summary
+- **WhatsApp Habit Summary**: Generate the habit challenge update for group chat (overall standings since the challenge start, this week so far, last completed week). See Habit Challenge section.
+- **Manage Summary Participants**: Control which users appear in the habit challenge update
 - **Competition Reset**: 4-step nuclear reset (clears points, badges, activities, habits, rivalry matchups/kill marks; preserves rivalry period schedule)
 
 ---
@@ -293,7 +305,7 @@ Badge point values: Gold 15 pts / Silver 6 pts / Bronze 3 pts
 ### Admin (Gabriel Beal only)
 - `GET /admin` — Admin dashboard
 - Server Actions: `deleteUser`, `assignBadge`, `removeBadge`
-- `POST /api/admin/generate-habit-summary` — Generate WhatsApp habit summary
+- `POST /api/admin/generate-habit-summary` — Generate WhatsApp habit challenge update
 - `POST /api/admin/generate-competition-update` — Generate AI competition update (requires `ANTHROPIC_API_KEY`)
 
 ### Cron (requires `CRON_SECRET`)
@@ -525,6 +537,20 @@ Requires `SUPABASE_SERVICE_ROLE_KEY`. Deletes from: auth.users, strava_activitie
 ---
 
 ## Agent Update Log
+
+### Claude Fable 5.1 (2026-09-07): Habit Challenge Update Generator
+
+**Objective**: Repurpose the admin "WhatsApp Habit Summary" button for a habits-only side challenge starting 2026-09-07 with no fixed end date.
+
+**Changes**:
+- `lib/habits/weekly-summary-generator.ts`: rewritten. `generateHabitChallengeSummary(supabase?, now?)` replaces `generateHabitSummary(weekOffset)`. Computes points from `habit_entries` since `CHALLENGE_START`, scoring each week against the habits that existed during that week (first 5 by position). Three message blocks: overall standings, this week so far, last completed week. The previous last-week-only mode and its UTC week math are gone.
+- `app/api/admin/generate-habit-summary/route.ts`: no longer reads `weekOffset`.
+- `app/admin/HabitSummaryGenerator.tsx`: heading and description updated; no request body.
+- No base habit code or schema changes.
+
+**Verified**: `tsc --noEmit` clean; generator run against prod for real `now` (day one, all zeros) and a synthetic date two weeks in; a fake-client test covering pre-challenge entries ignored, archived habit locked for earlier weeks, first-5 cap, sixth habit promoted after a deletion, mid-week habit creation, tie ranking, excluded participants.
+
+**Follow-ups**: when the next season launches, the Competition Reset flow should stamp a season start so pre-season habit backfills cannot earn points (deferred since July 2026). `CHALLENGE_START` is a constant in the generator; it will need to move or be retired at that point.
 
 ### Claude Opus 4.7 (2026-04-21): Rivalry Results UI — History Tab + Celebration Modal
 
