@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { computeMetricScores, type MetricKey, type ActivityRow } from '@/lib/rivalries/metrics'
 import { rivalryTodayStr, periodStartUTC, periodEndUTC } from '@/lib/rivalries/time-window'
 
@@ -42,8 +43,13 @@ interface HistoryEntry {
 
 export async function GET() {
   try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const authClient = await createClient()
+    const { data: { user } } = await authClient.auth.getUser()
+
+    // Matchup data spans every participant, and RLS limits signed-in users to
+    // their own rows, so reads go through the admin client. Only display fields
+    // leave this route.
+    const supabase = createAdminClient()
 
     // All rivalry periods (for season schedule display)
     const { data: allPeriods } = await supabase

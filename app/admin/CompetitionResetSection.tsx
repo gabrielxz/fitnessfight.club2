@@ -4,12 +4,25 @@ import { useState, useEffect } from 'react'
 import { resetCompetition, getCompetitionStats } from './competition-reset-actions'
 
 interface CompetitionStats {
+  currentSeason: { name: string; starts_on: string } | null
   badgeCount: number
   activityCount: number
   habitEntryCount: number
   matchupCount: number
   usersWithPoints: number
   totalPoints: number
+}
+
+// Monday of the current week as YYYY-MM-DD, in the browser's local time.
+function thisMonday(): string {
+  const d = new Date()
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7))
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+function nextSeasonName(current: string | undefined): string {
+  const n = current?.match(/(\d+)\s*$/)
+  return n ? current!.replace(/\d+\s*$/, String(Number(n[1]) + 1)) : ''
 }
 
 export default function CompetitionResetSection() {
@@ -20,6 +33,8 @@ export default function CompetitionResetSection() {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
   const [countdown, setCountdown] = useState(10)
+  const [seasonName, setSeasonName] = useState('')
+  const [seasonStart, setSeasonStart] = useState(thisMonday())
 
   useEffect(() => {
     if (step === 1) {
@@ -38,6 +53,7 @@ export default function CompetitionResetSection() {
     try {
       const data = await getCompetitionStats()
       setStats(data)
+      setSeasonName(prev => prev || nextSeasonName(data.currentSeason?.name))
     } catch {
       setError('Failed to load statistics')
     }
@@ -53,7 +69,7 @@ export default function CompetitionResetSection() {
     setError('')
 
     try {
-      const result = await resetCompetition(confirmText)
+      const result = await resetCompetition(confirmText, seasonName, seasonStart)
       setSuccess(true)
       console.log('Reset successful:', result)
 
@@ -78,7 +94,7 @@ export default function CompetitionResetSection() {
     return (
       <div className="p-6 bg-green-900/30 border border-green-500 rounded-lg">
         <h3 className="text-2xl font-bold text-green-400 mb-3">✅ Competition Reset Complete!</h3>
-        <p className="text-green-300 mb-2">All competition data has been cleared successfully.</p>
+        <p className="text-green-300 mb-2">{seasonName} starts {seasonStart}. Competition data has been cleared.</p>
         <p className="text-sm text-gray-400">The page will refresh in 5 seconds...</p>
       </div>
     )
@@ -93,7 +109,7 @@ export default function CompetitionResetSection() {
       {step === 0 && (
         <>
           <p className="text-gray-300 mb-4">
-            This will completely reset the competition for a fresh start. Use this when starting a new competition period.
+            This starts a new season and clears competition data. Points only count for weeks on or after the season start, and Strava activities from before it are not imported.
           </p>
           <div className="p-4 bg-yellow-900/30 border border-yellow-500 rounded mb-4">
             <p className="text-yellow-300 font-semibold mb-2">⚠️ WARNING: This action will permanently delete:</p>
@@ -101,13 +117,12 @@ export default function CompetitionResetSection() {
               <li>• All earned badges and badge progress</li>
               <li>• All points (exercise, habit, and badge)</li>
               <li>• All Strava activity records</li>
-              <li>• All habit success/failure records</li>
               <li>• All rivalry matchups and kill marks (💀 skulls reset to 0)</li>
             </ul>
             <p className="text-green-300 font-semibold mt-3">✓ This will keep:</p>
             <ul className="text-green-200 text-sm space-y-1 ml-4">
               <li>• User accounts and profiles</li>
-              <li>• Habit definitions (but not their history)</li>
+              <li>• Habits and their full history (pre-season weeks do not score)</li>
               <li>• Strava connections</li>
               <li>• Rivalry period schedule</li>
             </ul>
@@ -130,13 +145,17 @@ export default function CompetitionResetSection() {
               <ul className="text-red-200 space-y-1">
                 <li>• {stats.badgeCount} earned badges</li>
                 <li>• {stats.activityCount} Strava activities</li>
-                <li>• {stats.habitEntryCount} habit tracking entries</li>
                 <li>• {stats.matchupCount} rivalry matchups (all kill marks)</li>
                 <li>• {stats.totalPoints.toLocaleString()} total points from {stats.usersWithPoints} users</li>
               </ul>
             </div>
           ) : (
             <p className="text-gray-400 mb-4">Loading statistics...</p>
+          )}
+          {stats && (
+            <p className="text-gray-300 mb-4">
+              Current season: {stats.currentSeason ? `${stats.currentSeason.name}, started ${stats.currentSeason.starts_on}` : 'none recorded'}
+            </p>
           )}
           <p className="text-yellow-300 mb-4">
             Are you absolutely sure you want to proceed? This cannot be undone.
@@ -195,6 +214,29 @@ export default function CompetitionResetSection() {
         <>
           <h4 className="text-lg font-semibold text-red-400 mb-3">Final Step - Type Confirmation</h4>
           <div className="p-4 bg-red-950/90 border-2 border-red-500 rounded mb-4">
+            <div className="grid sm:grid-cols-2 gap-3 mb-4">
+              <label className="text-sm text-red-200">
+                New season name
+                <input
+                  type="text"
+                  value={seasonName}
+                  onChange={(e) => setSeasonName(e.target.value)}
+                  placeholder="Season 5"
+                  className="mt-1 w-full px-3 py-2 bg-black/30 border border-red-500 rounded text-white placeholder-gray-500"
+                  disabled={loading}
+                />
+              </label>
+              <label className="text-sm text-red-200">
+                Season start (a Monday)
+                <input
+                  type="date"
+                  value={seasonStart}
+                  onChange={(e) => setSeasonStart(e.target.value)}
+                  className="mt-1 w-full px-3 py-2 bg-black/30 border border-red-500 rounded text-white"
+                  disabled={loading}
+                />
+              </label>
+            </div>
             <p className="text-red-300 font-bold mb-3">
               To proceed with the reset, type exactly: <span className="font-mono bg-black/50 px-2 py-1 rounded">RESET COMPETITION</span>
             </p>
@@ -217,7 +259,7 @@ export default function CompetitionResetSection() {
           <div className="flex gap-3 items-center">
             <button
               onClick={handleReset}
-              disabled={loading || confirmText !== 'RESET COMPETITION' || countdown > 0}
+              disabled={loading || confirmText !== 'RESET COMPETITION' || countdown > 0 || !seasonName.trim() || !seasonStart}
               className={`px-6 py-3 font-bold rounded transition-all ${
                 countdown > 0
                   ? 'bg-gray-700 text-gray-400 cursor-not-allowed'

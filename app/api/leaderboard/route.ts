@@ -1,12 +1,18 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { getWeekBoundaries } from '@/lib/date-helpers'
 import { rivalryTodayStr } from '@/lib/rivalries/time-window'
 
 export async function GET() {
   try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const authClient = await createClient()
+    const { data: { user } } = await authClient.auth.getUser()
+
+    // Leaderboard data spans every user, and RLS limits signed-in users to their
+    // own rows, so reads go through the admin client. Only display fields leave
+    // this route.
+    const supabase = createAdminClient()
 
     // Fetch all user profiles with cumulative points breakdown
     const { data: profiles } = await supabase

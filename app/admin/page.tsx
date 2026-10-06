@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { isAdminUser } from '@/lib/admin-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import AdminDashboard from './AdminDashboard'
 import Navigation from '@/app/components/Navigation'
@@ -14,9 +15,7 @@ export default async function AdminPage() {
   }
 
   // Hardcoded admin check
-  const isAdmin = user.email === 'gabrielbeal@gmail.com' ||
-                  user.user_metadata?.full_name === 'Gabriel Beal' ||
-                  user.user_metadata?.name === 'Gabriel Beal'
+  const isAdmin = isAdminUser(user)
 
   if (!isAdmin) {
     redirect('/')
@@ -30,8 +29,9 @@ export default async function AdminPage() {
     user_metadata?: Record<string, unknown>
   }> } | null = null
 
+  const adminClient = createAdminClient()
+
   try {
-    const adminClient = createAdminClient()
     const result = await adminClient.auth.admin.listUsers()
     authUsers = result.data
     if (result.error) {
@@ -43,7 +43,7 @@ export default async function AdminPage() {
   }
 
   // Fetch user profiles
-  const { data: userProfiles } = await supabase
+  const { data: userProfiles } = await adminClient
     .from('user_profiles')
     .select('*')
 
@@ -52,7 +52,7 @@ export default async function AdminPage() {
   )
 
   // Fetch Strava connections
-  const { data: stravaConnections } = await supabase
+  const { data: stravaConnections } = await adminClient
     .from('strava_connections')
     .select('user_id, strava_athlete_id, strava_firstname, strava_lastname')
 
@@ -88,14 +88,14 @@ export default async function AdminPage() {
   }) || []
 
   // Fetch all active badges
-  const { data: badges } = await supabase
+  const { data: badges } = await adminClient
     .from('badges')
     .select('*')
     .eq('active', true)
     .order('name')
 
   // Fetch user badges
-  const { data: userBadges } = await supabase
+  const { data: userBadges } = await adminClient
     .from('user_badges')
     .select('*')
 

@@ -1,5 +1,6 @@
 import { SupabaseClient } from '@supabase/supabase-js'
 import { getWeekBoundaries } from '@/lib/date-helpers'
+import { getSeasonStart, isBeforeSeason } from '@/lib/season'
 
 /**
  * Recalculates the total exercise points for a given week and applies the difference
@@ -20,6 +21,11 @@ export async function recalculateAndApplyExercisePointsForWeek(
   try {
     const { weekStart, weekEnd } = getWeekBoundaries(dateInWeek, timezone)
     const weekStartStr = weekStart.toISOString().split('T')[0]
+
+    // Pre-season weeks never earn points and get no tracking row.
+    if (isBeforeSeason(weekStartStr, await getSeasonStart(supabase))) {
+      return { pointDifference: 0 }
+    }
 
     // 1. Get all activities for the week from the DB
     const { data: activities, error: activitiesError } = await supabase
@@ -102,24 +108,28 @@ export async function recalculateAndApplyExercisePointsForWeek(
  * so if a week's activities or tracking row are removed out-of-band (bulk
  * deletes, partial resets) the cumulative counter keeps orphaned points that no
  * tracking row justifies. This reconcile heals that drift by summing the capped
- * weekly hours (min(hours_logged, 9)) across all of the user's tracking rows —
- * the exercise counterpart to lib/habits/reconcile.ts.
+ * weekly hours (min(hours_logged, 9)) across the user's tracking rows for weeks
+ * on or after the season start. It is the exercise counterpart to
+ * lib/habits/reconcile.ts.
  *
  * Returns the recomputed total, or null on a read error (stored value left
  * untouched — never zero someone out on a transient failure).
  */
 export async function reconcileExercisePointsForUser(
   supabase: SupabaseClient,
-  userId: string
+  userId: string,
+  seasonStart?: string | null
 ): Promise<number | null> {
+  const floor = seasonStart === undefined ? await getSeasonStart(supabase) : seasonStart
   const rows: { hours_logged: number | null }[] = []
   const pageSize = 1000
   for (let from = 0; ; from += pageSize) {
-    const { data, error } = await supabase
+    let query = supabase
       .from('weekly_exercise_tracking')
       .select('hours_logged')
       .eq('user_id', userId)
-      .range(from, from + pageSize - 1)
+    if (floor) query = query.gte('week_start', floor)
+    const { data, error } = await query.range(from, from + pageSize - 1)
 
     if (error) {
       console.error(`[Exercise Reconcile] Failed to load tracking for ${userId}`, error)
@@ -157,9 +167,10 @@ export async function reconcileAllExercisePoints(supabase: SupabaseClient): Prom
     return 0
   }
 
+  const seasonStart = await getSeasonStart(supabase)
   let reconciled = 0
   for (const profile of profiles ?? []) {
-    const result = await reconcileExercisePointsForUser(supabase, profile.id)
+    const result = await reconcileExercisePointsForUser(supabase, profile.id, seasonStart)
     if (result !== null) reconciled++
   }
   return reconciled

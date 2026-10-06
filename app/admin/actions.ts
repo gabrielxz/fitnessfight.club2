@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import { isAdminUser } from '@/lib/admin-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { revalidatePath } from 'next/cache'
 
@@ -11,9 +12,7 @@ export async function deleteUser(userId: string) {
   
   // Verify admin
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user || (user.email !== 'gabrielbeal@gmail.com' && 
-                 user.user_metadata?.full_name !== 'Gabriel Beal' &&
-                 user.user_metadata?.name !== 'Gabriel Beal')) {
+  if (!isAdminUser(user)) {
     throw new Error('Unauthorized')
   }
 

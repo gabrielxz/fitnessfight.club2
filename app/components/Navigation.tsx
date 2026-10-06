@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation'
 import { User } from '@supabase/supabase-js'
 import { useState } from 'react'
 import { createClient as createBrowserSupabase } from '@/lib/supabase/client'
+import { isAdminUser } from '@/lib/admin-auth'
 
 interface NavigationProps {
   user: User | null
@@ -18,9 +19,7 @@ export default function Navigation({ user }: NavigationProps) {
   const supabase = createBrowserSupabase()
 
   // Check if user is admin
-  const isAdmin = user?.email === 'gabrielbeal@gmail.com' || 
-                  user?.user_metadata?.full_name === 'Gabriel Beal' ||
-                  user?.user_metadata?.name === 'Gabriel Beal'
+  const isAdmin = isAdminUser(user)
 
   const navItems = [
     { href: '/', label: 'Leaderboard', icon: '🏆' },

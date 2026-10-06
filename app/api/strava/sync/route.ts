@@ -1,18 +1,25 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { BadgeCalculator } from '@/lib/badges/BadgeCalculator'
 import { recalculateAndApplyExercisePointsForWeek } from '@/lib/points-helpers'
 import { getWeekBoundaries } from '@/lib/date-helpers'
+import { getSeasonStart, isBeforeSeason } from '@/lib/season'
 
 export async function POST() {
   try {
-    const supabase = await createClient()
+    const authClient = await createClient()
     
-    const { data: { user } } = await supabase.auth.getUser()
+    const { data: { user } } = await authClient.auth.getUser()
     
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+
+    // Activities, points, and badges are written with the admin client, scoped to
+    // the authenticated user. RLS gives signed-in users read access to their own
+    // rows only.
+    const supabase = createAdminClient()
 
     // Get user's Strava connection
     const { data: connection } = await supabase
@@ -76,11 +83,16 @@ export async function POST() {
     // Create badge calculator instance
     const badgeCalculator = new BadgeCalculator(supabase)
 
+    const seasonStart = await getSeasonStart(supabase)
+
     // Store activities in database
     let syncedCount = 0
     const affectedDates: Date[] = []
     
     for (const activity of activities) {
+      // Pre-season activities are not stored, so they cannot earn points or badges.
+      if (isBeforeSeason(activity.start_date_local || activity.start_date, seasonStart)) continue
+
       const { error } = await supabase
         .from('strava_activities')
         .upsert({
@@ -162,33 +174,6 @@ export async function POST() {
       processedWeeks.add(weekKey)
     }
     
-    // Ensure user has a division assignment (if they don't have one yet)
-    const { data: userDivision } = await supabase
-      .from('user_divisions')
-      .select('id')
-      .eq('user_id', user.id)
-      .single()
-    
-    if (!userDivision) {
-      // Assign to bottom division (level 1) if not assigned
-      const { data: bottomDivision } = await supabase
-        .from('divisions')
-        .select('id')
-        .eq('level', 1)
-        .single()
-
-      if (bottomDivision) {
-        await supabase
-          .from('user_divisions')
-          .insert({
-            user_id: user.id,
-            division_id: bottomDivision.id
-          })
-
-        console.log(`Assigned user ${user.id} to bottom division (level 1)`)
-      }
-    }
-
     return NextResponse.json({ 
       success: true, 
       count: syncedCount,

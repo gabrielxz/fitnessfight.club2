@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/weekly-division-shuffle",
       "schedule": "5 7 * * 1"
+    },
+    {
+      "path": "/api/cron/weekly-division-shuffle",
+      "schedule": "5 8 * * 1"
     }
   ]
 }

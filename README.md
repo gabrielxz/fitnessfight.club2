@@ -4,7 +4,7 @@ A web app for tracking exercise data and creating custom leaderboards with frien
 
 ## Tech Stack
 
-- **Next.js 14** (App Router)
+- **Next.js 16** (App Router)
 - **Supabase** (Authentication & Database)
 - **Vercel** (Deployment)
 - **TypeScript**
