@@ -6,6 +6,7 @@ import { computeMetricScores, type MetricKey, type ActivityRow } from '@/lib/riv
 import { rivalryTodayStr, periodStartUTC, periodEndUTC, isRivalryMondayFirstHour } from '@/lib/rivalries/time-window'
 import { reconcileAllHabitPoints } from '@/lib/habits/reconcile'
 import { reconcileAllExercisePoints } from '@/lib/points-helpers'
+import { getSeasonWindow, isOutsideSeason } from '@/lib/season'
 
 // Helper to get the start of the *previous* week (Monday)
 function getLastWeekStart(date: Date): Date {
@@ -73,7 +74,10 @@ export async function GET(request: NextRequest) {
       .select('user_id')
       .is('archived_at', null)
 
-    if (allHabitUsers) {
+    const lastWeekStartStr = lastWeekStart.toISOString().split('T')[0]
+    if (isOutsideSeason(lastWeekStartStr, await getSeasonWindow(supabase))) {
+      console.log(`Week of ${lastWeekStartStr} is outside the season window; skipping habit badges.`)
+    } else if (allHabitUsers) {
       const uniqueUserIds = [...new Set(allHabitUsers.map(h => h.user_id))]
       console.log(`Evaluating habit badges for ${uniqueUserIds.length} users...`)
       for (const userId of uniqueUserIds) {

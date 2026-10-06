@@ -4,7 +4,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { BadgeCalculator } from '@/lib/badges/BadgeCalculator'
 import { recalculateAndApplyExercisePointsForWeek } from '@/lib/points-helpers'
 import { getWeekBoundaries } from '@/lib/date-helpers'
-import { getSeasonStart, isBeforeSeason } from '@/lib/season'
+import { getSeasonWindow, isBeforeSeason, isOutsideSeason } from '@/lib/season'
 
 export async function POST() {
   try {
@@ -83,7 +83,7 @@ export async function POST() {
     // Create badge calculator instance
     const badgeCalculator = new BadgeCalculator(supabase)
 
-    const seasonStart = await getSeasonStart(supabase)
+    const season = await getSeasonWindow(supabase)
 
     // Store activities in database
     let syncedCount = 0
@@ -91,7 +91,8 @@ export async function POST() {
     
     for (const activity of activities) {
       // Pre-season activities are not stored, so they cannot earn points or badges.
-      if (isBeforeSeason(activity.start_date_local || activity.start_date, seasonStart)) continue
+      const localDate = activity.start_date_local || activity.start_date
+      if (isBeforeSeason(localDate, season)) continue
 
       const { error } = await supabase
         .from('strava_activities')
@@ -144,22 +145,24 @@ export async function POST() {
         // Track the specific activity date for precise weekly recalculation
         affectedDates.push(new Date(activity.start_date_local || activity.start_date))
         
-        // Calculate badges for this activity
-        await badgeCalculator.calculateBadgesForActivity({
-          strava_activity_id: activity.id,
-          user_id: user.id,
-          start_date_local: activity.start_date_local,
-          distance: activity.distance,
-          moving_time: activity.moving_time,
-          elapsed_time: activity.elapsed_time,
-          calories: activity.calories || 0,
-          total_elevation_gain: activity.total_elevation_gain,
-          average_speed: activity.average_speed,
-          type: activity.type,
-          sport_type: activity.sport_type,
-          athlete_count: activity.athlete_count,
-          photo_count: activity.photo_count
-        })
+        // Badges are only awarded for activities inside the season window
+        if (!isOutsideSeason(localDate, season)) {
+          await badgeCalculator.calculateBadgesForActivity({
+            strava_activity_id: activity.id,
+            user_id: user.id,
+            start_date_local: activity.start_date_local,
+            distance: activity.distance,
+            moving_time: activity.moving_time,
+            elapsed_time: activity.elapsed_time,
+            calories: activity.calories || 0,
+            total_elevation_gain: activity.total_elevation_gain,
+            average_speed: activity.average_speed,
+            type: activity.type,
+            sport_type: activity.sport_type,
+            athlete_count: activity.athlete_count,
+            photo_count: activity.photo_count
+          })
+        }
       }
     }
     

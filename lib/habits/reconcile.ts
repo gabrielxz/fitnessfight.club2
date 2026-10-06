@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { getSeasonStart } from '@/lib/season'
+import { getSeasonWindow, type SeasonWindow } from '@/lib/season'
 
 /**
  * Recomputes a single user's cumulative habit points from scratch based on their
@@ -16,9 +16,10 @@ import { getSeasonStart } from '@/lib/season'
  * habits (ordered by position, then created_at) can earn points, and a habit
  * earns 0.5 for each week it meets its target_frequency.
  *
- * Only weeks on or after the current season start count (see lib/season.ts), so
- * entries backfilled for pre-season weeks never earn points. Pass `seasonStart`
- * when reconciling many users to avoid re-reading it per user.
+ * Only weeks inside the current season window count (see lib/season.ts), so
+ * entries backfilled for pre-season weeks and weeks after the season ends never
+ * earn points. Pass `window` when reconciling many users to avoid re-reading it
+ * per user.
  *
  * Returns the recomputed point total, or null if a read failed (in which case
  * the stored value is left untouched — we never zero someone out on a transient
@@ -27,9 +28,9 @@ import { getSeasonStart } from '@/lib/season'
 export async function recalculateHabitPointsForUser(
   supabase: SupabaseClient,
   userId: string,
-  seasonStart?: string | null
+  window?: SeasonWindow | null
 ): Promise<number | null> {
-  const floor = seasonStart === undefined ? await getSeasonStart(supabase) : seasonStart
+  const season = window === undefined ? await getSeasonWindow(supabase) : window
 
   const { data: habits, error: habitsError } = await supabase
     .from('habits')
@@ -63,7 +64,8 @@ export async function recalculateHabitPointsForUser(
         .select('habit_id, week_start')
         .eq('status', 'SUCCESS')
         .in('habit_id', habitIds)
-      if (floor) query = query.gte('week_start', floor)
+      if (season) query = query.gte('week_start', season.start)
+      if (season?.end) query = query.lte('week_start', season.end)
       const { data: rows, error } = await query.range(from, from + pageSize - 1)
 
       if (error) {
@@ -112,10 +114,10 @@ export async function reconcileAllHabitPoints(supabase: SupabaseClient): Promise
     return 0
   }
 
-  const seasonStart = await getSeasonStart(supabase)
+  const window = await getSeasonWindow(supabase)
   let reconciled = 0
   for (const profile of profiles ?? []) {
-    const result = await recalculateHabitPointsForUser(supabase, profile.id, seasonStart)
+    const result = await recalculateHabitPointsForUser(supabase, profile.id, window)
     if (result !== null) reconciled++
   }
   return reconciled

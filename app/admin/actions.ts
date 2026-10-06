@@ -30,8 +30,7 @@ export async function deleteUser(userId: string) {
     'division_history',
     'user_badges',
     'weekly_exercise_tracking', // New table
-    'habit_entries',
-    'habits'
+    'habits' // habit_entries cascade from habits (habit_entries has no user_id column)
   ];
 
   for (const table of tablesToDeleteFrom) {
