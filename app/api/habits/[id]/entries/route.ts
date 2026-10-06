@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { getWeekBoundaries } from '@/lib/date-helpers'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { getSeasonStart, isBeforeSeason } from '@/lib/season'
+import { getSeasonWindow, isOutsideSeason } from '@/lib/season'
 
 async function processHabitPointsChange(
   supabase: SupabaseClient,
@@ -45,8 +45,8 @@ async function processHabitPointsChange(
   const weekStartStr = weekStart.toISOString().split('T')[0]
   const weekEndStr = weekEnd.toISOString().split('T')[0]
 
-  // Entries for pre-season weeks are kept as history but never earn points.
-  if (isBeforeSeason(weekStartStr, await getSeasonStart(supabase))) return
+  // Entries for weeks outside the season are kept as history but never earn points.
+  if (isOutsideSeason(weekStartStr, await getSeasonWindow(supabase))) return
 
   const { data: successEntries, error: entriesError } = await supabase
     .from('habit_entries')

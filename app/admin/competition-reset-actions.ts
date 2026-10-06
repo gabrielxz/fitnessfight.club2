@@ -32,8 +32,15 @@ export async function resetCompetition(
   const supabase = createAdminClient()
 
   const current = await getCurrentSeason(supabase)
-  if (current && seasonStart < current.starts_on) {
-    throw new Error(`Season start must not be before the current season start (${current.starts_on})`)
+  // A retry after a partial failure finds the new season already in place.
+  const isRetry = current?.starts_on === seasonStart
+  if (current && !isRetry) {
+    if (seasonStart < current.starts_on) {
+      throw new Error(`Season start must be after the current season start (${current.starts_on})`)
+    }
+    if (current.ends_on && seasonStart <= current.ends_on) {
+      throw new Error(`Season start must be after the current season end (${current.ends_on})`)
+    }
   }
 
   try {
@@ -42,8 +49,17 @@ export async function resetCompetition(
     // 0. Stamp the new season first. Points only count for weeks on or after it
     //    and pre-season Strava activities are not stored, so backfills made after
     //    the reset cannot earn points. If this fails, nothing has been deleted.
-    //    A retry after a partial failure finds the row already in place.
-    if (current?.starts_on !== seasonStart) {
+    //    An open current season is closed on the Sunday before the new start.
+    if (!isRetry) {
+      if (current && !current.ends_on) {
+        const prevSunday = new Date(startDate)
+        prevSunday.setUTCDate(prevSunday.getUTCDate() - 1)
+        const { error: closeError } = await supabase
+          .from('seasons')
+          .update({ ends_on: prevSunday.toISOString().split('T')[0] })
+          .eq('id', current.id)
+        if (closeError) throw new Error(`Failed to close ${current.name}: ${closeError.message}`)
+      }
       const { error: seasonError } = await supabase
         .from('seasons')
         .insert({ name, starts_on: seasonStart })

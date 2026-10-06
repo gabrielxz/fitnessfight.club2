@@ -102,10 +102,29 @@ create policy habits_own on public.habits
   for all to authenticated
   using (user_id = (select auth.uid())) with check (user_id = (select auth.uid()));
 
+-- habit_entries has no user_id in production (migration 014 was never applied),
+-- so ownership goes through the parent habit.
 grant select, insert, update, delete on public.habit_entries to authenticated;
 create policy habit_entries_own on public.habit_entries
   for all to authenticated
-  using (user_id = (select auth.uid())) with check (user_id = (select auth.uid()));
+  using (exists (
+    select 1 from public.habits h
+    where h.id = habit_entries.habit_id and h.user_id = (select auth.uid())
+  ))
+  with check (exists (
+    select 1 from public.habits h
+    where h.id = habit_entries.habit_id and h.user_id = (select auth.uid())
+  ));
+
+-- seasons is created by migration 040; this keeps a re-run of 039 from
+-- dropping its read policy.
+do $$
+begin
+  if to_regclass('public.seasons') is not null then
+    grant select on public.seasons to authenticated;
+    create policy seasons_read on public.seasons for select to authenticated using (true);
+  end if;
+end $$;
 
 -- 6. Service-role only, no client grants or policies: strava_webhook_events,
 --    summary_participants, divisions, user_divisions, division_history, and any

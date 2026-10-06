@@ -139,9 +139,9 @@ Rules for new migrations:
    - `total_cumulative_points`: GENERATED column (sum of the three above; never update directly)
    - Owner can read their own row and insert/update only `id, email, full_name, avatar_url, timezone, updated_at` (column-level grants). Points and home location are service role only.
 
-5. **seasons** (migration 040): One row per season
-   - `name`, `starts_on` (DATE, must be a Monday, unique), `created_at`
-   - The current season is the row with the latest `starts_on`. Seeded with Season 4 (2026-04-06).
+5. **seasons** (migrations 040, 041): One row per season
+   - `name`, `starts_on` (DATE, a Monday, unique), `ends_on` (DATE, a Sunday, null while the season is open), `created_at`
+   - The current season is the row with the latest `starts_on`. Season 4 is 2026-04-06 to 2026-08-23.
    - Signed-in users can read. Writes are service role only (Competition Reset).
 
 ### Division System Tables (legacy, unused)
@@ -157,7 +157,7 @@ Rules for new migrations:
 
 ### Habit Tracker
 11. **habits**: User habit definitions (name, target_frequency 1-7, position, archived_at). Owner has full CRUD.
-12. **habit_entries**: Daily status per habit (SUCCESS/FAILURE/NEUTRAL), with `user_id` and `week_start`. Owner has full CRUD.
+12. **habit_entries**: Daily status per habit (SUCCESS/FAILURE/NEUTRAL), with `week_start`. There is no `user_id` column in production (migration 014 was never applied); ownership goes through `habit_id` → `habits.user_id`, and rows cascade-delete with their habit. Owner has full CRUD.
 
 ### Rivalries
 13. **rivalry_periods**: Bi-weekly competition windows
@@ -191,12 +191,13 @@ Rules for new migrations:
 
 ### Seasons
 
-The current season start (`lib/season.ts`) is the floor for everything that earns points:
-- Habit points: the award path in `app/api/habits/[id]/entries/route.ts` skips pre-season weeks, and the reconcile in `lib/habits/reconcile.ts` only counts entries with `week_start >= starts_on`. Pre-season entries stay in `habit_entries` as history.
-- Exercise points: `recalculateAndApplyExercisePointsForWeek` ignores pre-season weeks (no points, no tracking row), and `reconcileExercisePointsForUser` only sums tracking rows with `week_start >= starts_on`.
-- Strava ingestion: the webhook and manual sync do not store activities whose local start date is before `starts_on`, so pre-season activities cannot earn points, badges, or rivalry credit.
+The current season's window (`starts_on` to `ends_on`, from `lib/season.ts`) bounds everything that earns points or badges:
+- Habit points: the award path in `app/api/habits/[id]/entries/route.ts` skips weeks outside the window, and the reconcile in `lib/habits/reconcile.ts` only counts entries with `week_start` inside it. All entries stay in `habit_entries` as history.
+- Exercise points: `recalculateAndApplyExercisePointsForWeek` still records hours for weeks outside the window (the leaderboard shows hours this week) but applies no points; `reconcileExercisePointsForUser` only sums tracking rows inside the window.
+- Badges: the webhook and manual sync only run `calculateBadgesForActivity` for activities inside the window, and the cron skips habit badge evaluation for weeks outside it.
+- Strava ingestion: activities whose local start date is before `starts_on` are not stored. Activities after `ends_on` are stored but do not score, so extending a season (editing `ends_on`) lets the next reconcile count them.
 
-If the `seasons` read fails or the table is empty, the floor is treated as absent, so a transient error never zeroes anyone's points.
+Between seasons the current season is the previous one with `ends_on` set, so nothing scores. If the `seasons` read fails or the table is empty, no bounds apply, so a transient error never zeroes anyone's points.
 
 The comparisons are on `YYYY-MM-DD` strings. `week_start` values are the Monday in the user's timezone; all users currently use the `America/New_York` default.
 
@@ -232,7 +233,7 @@ The comparisons are on `YYYY-MM-DD` strings. `week_start` values are the Monday 
 - **Habits**: 0.5 pts per habit that meets its weekly target; first 5 active habits only (ordered by position, then created_at)
 - **Badges**: 3 pts (bronze) / 6 pts (silver) / 15 pts (gold), awarded once per tier
 - **Kill marks**: ×(1 + kills × 0.015) multiplier on total, applied at display/ranking time
-- Only weeks on or after the current season start earn exercise or habit points (see Seasons)
+- Only weeks inside the current season window earn exercise or habit points (see Seasons)
 - Exercise and habit totals are recomputed from source rows every Monday by the cron, which heals drift from the incremental award paths
 
 ### Badge System (12 active badge types)
@@ -315,7 +316,7 @@ A habits-only side competition that runs from `CHALLENGE_START` (2026-09-07, a M
 - **WhatsApp Competition Update**: AI-generated weekly recap (leaderboard, rank changes, badges, rivalry results, top exercisers); copy-to-clipboard for WhatsApp
 - **WhatsApp Habit Summary**: Habit challenge update for the group chat. See Habit Challenge section.
 - **Manage Summary Participants**: Control which users appear in the habit challenge update
-- **Competition Reset**: Starts a new season. The final step takes a season name and a start date (must be a Monday, not before the current season start). It inserts the `seasons` row first, then deletes user badges, badge progress, Strava activities, weekly exercise tracking, and rivalry matchups, and zeroes all cumulative points. It keeps user accounts, profiles, Strava connections, habits, habit entries, and the rivalry period schedule. Retrying after a partial failure with the same start date reuses the existing season row.
+- **Competition Reset**: Starts a new season. The final step takes a season name and a start date (a Monday after the current season's start and end). It closes the current season on the Sunday before the new start if it is still open, inserts the new `seasons` row, then deletes user badges, badge progress, Strava activities, weekly exercise tracking, and rivalry matchups, and zeroes all cumulative points. It keeps user accounts, profiles, Strava connections, habits, habit entries, and the rivalry period schedule. Retrying after a partial failure with the same start date reuses the existing season row.
 
 ---
 
@@ -360,7 +361,7 @@ A habits-only side competition that runs from `CHALLENGE_START` (2026-09-07, a M
 ### Cron (requires `Authorization: Bearer $CRON_SECRET`)
 - `GET /api/cron/weekly-division-shuffle`: scheduled in `vercel.json` at 07:05 and 08:05 UTC every Monday. The route runs only during the first hour of Monday in Pacific Time (`isRivalryMondayFirstHour`), so exactly one firing does the work under both PDT and PST and the other returns `{ skipped: true }`. Add `?force=1` to run it manually at any time. Steps in order:
   1. Capture leaderboard snapshot into `leaderboard_snapshots`
-  2. Evaluate habit badges for last week for all users with active habits
+  2. Evaluate habit badges for last week for all users with active habits (skipped when last week is outside the season window)
   3. Reconcile habit points for every user from `habit_entries` (season floor applied)
   4. Reconcile exercise points for every user from `weekly_exercise_tracking` (season floor applied)
   5. Reset weekly badge progress for all weekly badge types
@@ -463,7 +464,7 @@ WHERE id = 'matchup-uuid'::uuid;
 
 ## Database Migrations (run in order)
 
-Migrations are applied by pasting them into the Supabase SQL editor. Some early numbers are missing or duplicated; production has also drifted from the early files, which is why migration 039 drops and recreates every policy instead of editing them.
+Migrations are applied by pasting them into the Supabase SQL editor. 039, 040, and 041 are safe to re-run in any order. Some early numbers are missing or duplicated; production has also drifted from the early files, which is why migration 039 drops and recreates every policy instead of editing them.
 
 | # | File | Description |
 |---|------|-------------|
@@ -479,7 +480,7 @@ Migrations are applied by pasting them into the Supabase SQL editor. Some early 
 | 011 | add_cumulative_points.sql | Enhanced cumulative points |
 | 012 | refactor_user_points.sql | Split points columns |
 | 013 | add_increment_badge_points_fn.sql | Badge points function |
-| 014 | add_user_id_to_habit_entries.sql | Habit entries user_id |
+| 014 | add_user_id_to_habit_entries.sql | Habit entries user_id (never applied in production) |
 | 016 | disable_rls_habit_summaries.sql, fix_habit_summaries_rls.sql | Habit summaries (table no longer exists) |
 | 017 | reset_badges_add_dates.sql | Badge date fields |
 | 018 | add_suffer_score.sql | Relative Effort tracking |
@@ -501,6 +502,7 @@ Migrations are applied by pasting them into the Supabase SQL editor. Some early 
 | 038 | rivalry_tie_credit.sql | `tie_credit` on rivalry_matchups |
 | 039 | lock_down_rls.sql | RLS on every table, all policies recreated, client roles stripped, function EXECUTE restricted to service_role (see Data API access model) |
 | 040 | seasons.sql | `seasons` table, seeded with Season 4 |
+| 041 | season_end.sql | `seasons.ends_on`; Season 4 ends 2026-08-23 |
 
 ---
 
@@ -612,7 +614,9 @@ Strava does not sign webhook deliveries, so `POST /api/strava/webhook` accepts a
 - Webhook deletes scoped to the athlete's user.
 - Removed: legacy division code (`/api/divisions`, LoggedInView, DivisionLeaderboard, DivisionSelector, WeekProgress, AthleteCard, BadgeDisplay, division assignment in login/callback/sync), 85 one-off scripts, root test scripts, `@playwright/test`, test credentials from this file.
 
-**Verified**: `tsc --noEmit` and `npm run build` pass; time-window helpers checked against PDT, PST, and a period spanning the 2026-11-01 DST change, plus the cron gate at each firing time.
+**Follow-up (same day)**: the first attempt at 039 failed in production because `habit_entries` has no `user_id`; the policy now joins through `habits`. Migration 041 adds `seasons.ends_on` (Season 4 ends 2026-08-23), points and badges are bounded by the full season window, and Competition Reset closes the open season.
+
+**Verified**: `tsc --noEmit` and `npm run build` pass; time-window helpers checked against PDT, PST, and a period spanning the 2026-11-01 DST change, plus the cron gate at each firing time. Migrations 039 to 041 were run twice in sequence against a Postgres 17 stub of the production schema (including the missing `habit_entries.user_id` and drifted policies), with role checks for anon, an authenticated user, and service_role.
 
 ### Claude Fable 5.1 (2026-09-07): Habit Challenge Update Generator
 

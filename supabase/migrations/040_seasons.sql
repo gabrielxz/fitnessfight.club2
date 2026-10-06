@@ -14,6 +14,7 @@ alter table public.seasons enable row level security;
 grant select on public.seasons to authenticated;
 grant select, insert, update, delete on public.seasons to service_role;
 
+drop policy if exists seasons_read on public.seasons;
 create policy seasons_read on public.seasons
   for select to authenticated using (true);
 

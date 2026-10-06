@@ -1,6 +1,6 @@
 import { SupabaseClient } from '@supabase/supabase-js'
 import { getWeekBoundaries } from '@/lib/date-helpers'
-import { getSeasonStart, isBeforeSeason } from '@/lib/season'
+import { getSeasonWindow, isOutsideSeason, type SeasonWindow } from '@/lib/season'
 
 /**
  * Recalculates the total exercise points for a given week and applies the difference
@@ -22,10 +22,10 @@ export async function recalculateAndApplyExercisePointsForWeek(
     const { weekStart, weekEnd } = getWeekBoundaries(dateInWeek, timezone)
     const weekStartStr = weekStart.toISOString().split('T')[0]
 
-    // Pre-season weeks never earn points and get no tracking row.
-    if (isBeforeSeason(weekStartStr, await getSeasonStart(supabase))) {
-      return { pointDifference: 0 }
-    }
+    // Weeks outside the season window still record hours (for the weekly hours
+    // display) but never earn points. If a season is later extended, the weekly
+    // reconcile picks those weeks up.
+    const outsideSeason = isOutsideSeason(weekStartStr, await getSeasonWindow(supabase))
 
     // 1. Get all activities for the week from the DB
     const { data: activities, error: activitiesError } = await supabase
@@ -61,7 +61,7 @@ export async function recalculateAndApplyExercisePointsForWeek(
     const pointDifference = newTotalPointsForWeek - pointsAlreadyAwarded
 
     // 4. If there's a change, apply it to the cumulative score
-    if (pointDifference !== 0) {
+    if (pointDifference !== 0 && !outsideSeason) {
       const { error: rpcError } = await supabase.rpc('increment_exercise_points', {
         p_user_id: userId,
         p_points_to_add: pointDifference, // Can be positive or negative
@@ -109,7 +109,7 @@ export async function recalculateAndApplyExercisePointsForWeek(
  * deletes, partial resets) the cumulative counter keeps orphaned points that no
  * tracking row justifies. This reconcile heals that drift by summing the capped
  * weekly hours (min(hours_logged, 9)) across the user's tracking rows for weeks
- * on or after the season start. It is the exercise counterpart to
+ * inside the season window. It is the exercise counterpart to
  * lib/habits/reconcile.ts.
  *
  * Returns the recomputed total, or null on a read error (stored value left
@@ -118,9 +118,9 @@ export async function recalculateAndApplyExercisePointsForWeek(
 export async function reconcileExercisePointsForUser(
   supabase: SupabaseClient,
   userId: string,
-  seasonStart?: string | null
+  window?: SeasonWindow | null
 ): Promise<number | null> {
-  const floor = seasonStart === undefined ? await getSeasonStart(supabase) : seasonStart
+  const season = window === undefined ? await getSeasonWindow(supabase) : window
   const rows: { hours_logged: number | null }[] = []
   const pageSize = 1000
   for (let from = 0; ; from += pageSize) {
@@ -128,7 +128,8 @@ export async function reconcileExercisePointsForUser(
       .from('weekly_exercise_tracking')
       .select('hours_logged')
       .eq('user_id', userId)
-    if (floor) query = query.gte('week_start', floor)
+    if (season) query = query.gte('week_start', season.start)
+    if (season?.end) query = query.lte('week_start', season.end)
     const { data, error } = await query.range(from, from + pageSize - 1)
 
     if (error) {
@@ -167,10 +168,10 @@ export async function reconcileAllExercisePoints(supabase: SupabaseClient): Prom
     return 0
   }
 
-  const seasonStart = await getSeasonStart(supabase)
+  const window = await getSeasonWindow(supabase)
   let reconciled = 0
   for (const profile of profiles ?? []) {
-    const result = await reconcileExercisePointsForUser(supabase, profile.id, seasonStart)
+    const result = await reconcileExercisePointsForUser(supabase, profile.id, window)
     if (result !== null) reconciled++
   }
   return reconciled

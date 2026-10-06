@@ -3,7 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { BadgeCalculator } from '@/lib/badges/BadgeCalculator'
 import { recalculateAndApplyExercisePointsForWeek } from '@/lib/points-helpers'
-import { getSeasonStart, isBeforeSeason } from '@/lib/season'
+import { getSeasonWindow, isBeforeSeason, isOutsideSeason } from '@/lib/season'
 
 // GET handler for webhook subscription verification
 export async function GET(request: NextRequest) {
@@ -195,7 +195,9 @@ async function fetchAndStoreActivity(
     console.log(`Fetched activity: ${activity.name}, athlete: ${activity.athlete.id}`)
 
     // Pre-season activities are not stored, so they cannot earn points or badges.
-    if (isBeforeSeason(activity.start_date_local || activity.start_date, await getSeasonStart(supabase))) {
+    const season = await getSeasonWindow(supabase)
+    const localDate = activity.start_date_local || activity.start_date
+    if (isBeforeSeason(localDate, season)) {
       console.log(`Activity ${activityId} starts before the current season; not storing it`)
       return null
     }
@@ -258,9 +260,11 @@ async function fetchAndStoreActivity(
 
     console.log(`Activity ${activityId} stored successfully in database`)
     
-    // Calculate badges for this activity
-    const badgeCalculator = new BadgeCalculator(supabase)
-    await badgeCalculator.calculateBadgesForActivity(data)
+    // Badges are only awarded for activities inside the season window
+    if (!isOutsideSeason(localDate, season)) {
+      const badgeCalculator = new BadgeCalculator(supabase)
+      await badgeCalculator.calculateBadgesForActivity(data)
+    }
     
     return data
 

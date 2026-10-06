@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { resetCompetition, getCompetitionStats } from './competition-reset-actions'
 
 interface CompetitionStats {
-  currentSeason: { name: string; starts_on: string } | null
+  currentSeason: { name: string; starts_on: string; ends_on: string | null } | null
   badgeCount: number
   activityCount: number
   habitEntryCount: number
@@ -154,7 +154,7 @@ export default function CompetitionResetSection() {
           )}
           {stats && (
             <p className="text-gray-300 mb-4">
-              Current season: {stats.currentSeason ? `${stats.currentSeason.name}, started ${stats.currentSeason.starts_on}` : 'none recorded'}
+              Current season: {stats.currentSeason ? `${stats.currentSeason.name}, ${stats.currentSeason.starts_on} to ${stats.currentSeason.ends_on ?? 'open'}` : 'none recorded'}
             </p>
           )}
           <p className="text-yellow-300 mb-4">
