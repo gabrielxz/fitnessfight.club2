@@ -28,44 +28,6 @@ export async function GET(request: Request) {
         if (profileError) {
           console.error('Error saving user profile:', profileError)
         }
-        
-        // Check if user has a division assignment
-        const { data: userDivision } = await supabase
-          .from('user_divisions')
-          .select('*')
-          .eq('user_id', user.id)
-          .single()
-        
-        if (!userDivision) {
-          // New user or deleted user signing in - assign them to bottom division
-          console.log(`No division found for user ${user.id}, assigning to bottom division (level 1)`)
-
-          const { data: bottomDivision, error: divError } = await supabase
-            .from('divisions')
-            .select('id')
-            .eq('level', 1)
-            .single()
-
-          if (divError) {
-            console.error('Error fetching bottom division:', divError)
-          }
-
-          if (bottomDivision) {
-            const { error: insertError } = await supabase
-              .from('user_divisions')
-              .insert({
-                user_id: user.id,
-                division_id: bottomDivision.id,
-                joined_division_at: new Date().toISOString()
-              })
-
-            if (insertError) {
-              console.error('Error assigning user to division:', insertError)
-            } else {
-              console.log(`Successfully assigned user ${user.id} to bottom division (level 1)`)
-            }
-          }
-        }
       }
       
       return NextResponse.redirect(`${origin}${next}`)

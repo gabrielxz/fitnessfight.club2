@@ -14,7 +14,7 @@ export default function LoginPage() {
   const router = useRouter()
   const supabase = createClient()
 
-  // Helper function to ensure user has profile and division
+  // Ensure the user has a profile row
   const initializeUser = async (user: User) => {
     // Ensure user has profile (using upsert to handle existing profiles)
     const { error: profileError } = await supabase
@@ -27,36 +27,6 @@ export default function LoginPage() {
 
     if (profileError) {
       console.error('Error creating user profile:', profileError)
-    }
-
-    // Check if user has division assignment
-    const { data: userDivision } = await supabase
-      .from('user_divisions')
-      .select('*')
-      .eq('user_id', user.id)
-      .single()
-
-    if (!userDivision) {
-      // Assign to bottom division (level 1)
-      const { data: bottomDivision } = await supabase
-        .from('divisions')
-        .select('id')
-        .eq('level', 1)
-        .single()
-
-      if (bottomDivision) {
-        const { error: insertError } = await supabase
-          .from('user_divisions')
-          .insert({
-            user_id: user.id,
-            division_id: bottomDivision.id,
-            joined_division_at: new Date().toISOString()
-          })
-
-        if (insertError) {
-          console.error('Error assigning user to division:', insertError)
-        }
-      }
     }
   }
 

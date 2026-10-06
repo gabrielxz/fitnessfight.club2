@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { getSeasonStart } from '@/lib/season'
 
 /**
  * Recomputes a single user's cumulative habit points from scratch based on their
@@ -15,10 +16,9 @@ import type { SupabaseClient } from '@supabase/supabase-js'
  * habits (ordered by position, then created_at) can earn points, and a habit
  * earns 0.5 for each week it meets its target_frequency.
  *
- * NOTE: there is currently no season-start floor — every week present in
- * habit_entries counts. Pre-season entries must therefore be deleted separately
- * (see scripts/reconcile-habit-points.js). Once a season-start concept exists, a
- * week_start floor can be added to the entries query below.
+ * Only weeks on or after the current season start count (see lib/season.ts), so
+ * entries backfilled for pre-season weeks never earn points. Pass `seasonStart`
+ * when reconciling many users to avoid re-reading it per user.
  *
  * Returns the recomputed point total, or null if a read failed (in which case
  * the stored value is left untouched — we never zero someone out on a transient
@@ -26,8 +26,11 @@ import type { SupabaseClient } from '@supabase/supabase-js'
  */
 export async function recalculateHabitPointsForUser(
   supabase: SupabaseClient,
-  userId: string
+  userId: string,
+  seasonStart?: string | null
 ): Promise<number | null> {
+  const floor = seasonStart === undefined ? await getSeasonStart(supabase) : seasonStart
+
   const { data: habits, error: habitsError } = await supabase
     .from('habits')
     .select('id, target_frequency')
@@ -55,12 +58,13 @@ export async function recalculateHabitPointsForUser(
     // Paginate past PostgREST's implicit 1000-row cap.
     const pageSize = 1000
     for (let from = 0; ; from += pageSize) {
-      const { data: rows, error } = await supabase
+      let query = supabase
         .from('habit_entries')
         .select('habit_id, week_start')
         .eq('status', 'SUCCESS')
         .in('habit_id', habitIds)
-        .range(from, from + pageSize - 1)
+      if (floor) query = query.gte('week_start', floor)
+      const { data: rows, error } = await query.range(from, from + pageSize - 1)
 
       if (error) {
         console.error(`[Habit Reconcile] Failed to load entries for ${userId}`, error)
@@ -108,9 +112,10 @@ export async function reconcileAllHabitPoints(supabase: SupabaseClient): Promise
     return 0
   }
 
+  const seasonStart = await getSeasonStart(supabase)
   let reconciled = 0
   for (const profile of profiles ?? []) {
-    const result = await recalculateHabitPointsForUser(supabase, profile.id)
+    const result = await recalculateHabitPointsForUser(supabase, profile.id, seasonStart)
     if (result !== null) reconciled++
   }
   return reconciled

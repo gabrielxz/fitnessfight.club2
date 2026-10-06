@@ -2,8 +2,13 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { getCurrentSeason } from '@/lib/season'
 
-export async function resetCompetition(confirmationText: string) {
+export async function resetCompetition(
+  confirmationText: string,
+  seasonName: string,
+  seasonStart: string
+) {
   const authClient = await createClient()
   const { data: { user } } = await authClient.auth.getUser()
 
@@ -15,10 +20,36 @@ export async function resetCompetition(confirmationText: string) {
     throw new Error('Invalid confirmation text')
   }
 
+  const name = seasonName.trim()
+  if (!name) {
+    throw new Error('Season name is required')
+  }
+  const startDate = new Date(`${seasonStart}T12:00:00Z`)
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(seasonStart) || isNaN(startDate.getTime()) || startDate.getUTCDay() !== 1) {
+    throw new Error('Season start must be a Monday (YYYY-MM-DD)')
+  }
+
   const supabase = createAdminClient()
+
+  const current = await getCurrentSeason(supabase)
+  if (current && seasonStart < current.starts_on) {
+    throw new Error(`Season start must not be before the current season start (${current.starts_on})`)
+  }
 
   try {
     console.log('Starting competition reset...')
+
+    // 0. Stamp the new season first. Points only count for weeks on or after it
+    //    and pre-season Strava activities are not stored, so backfills made after
+    //    the reset cannot earn points. If this fails, nothing has been deleted.
+    //    A retry after a partial failure finds the row already in place.
+    if (current?.starts_on !== seasonStart) {
+      const { error: seasonError } = await supabase
+        .from('seasons')
+        .insert({ name, starts_on: seasonStart })
+      if (seasonError) throw new Error(`Failed to create season: ${seasonError.message}`)
+    }
+    console.log(`✓ Started ${name} on ${seasonStart}`)
 
     // 1. Delete all earned badges
     const { error: badgesError } = await supabase
@@ -44,15 +75,7 @@ export async function resetCompetition(confirmationText: string) {
     if (activitiesError) throw new Error(`Failed to delete Strava activities: ${activitiesError.message}`)
     console.log('✓ Deleted all Strava activities')
 
-    // 4. Delete all habit entries
-    const { error: habitEntriesError } = await supabase
-      .from('habit_entries')
-      .delete()
-      .neq('habit_id', '00000000-0000-0000-0000-000000000000')
-    if (habitEntriesError) throw new Error(`Failed to delete habit entries: ${habitEntriesError.message}`)
-    console.log('✓ Deleted all habit entries')
-
-    // 5. Delete all weekly exercise tracking
+    // 4. Delete all weekly exercise tracking
     const { error: weeklyError } = await supabase
       .from('weekly_exercise_tracking')
       .delete()
@@ -60,7 +83,7 @@ export async function resetCompetition(confirmationText: string) {
     if (weeklyError) throw new Error(`Failed to delete weekly tracking: ${weeklyError.message}`)
     console.log('✓ Deleted all weekly exercise tracking')
 
-    // 6. Delete all rivalry matchups (clears kill marks / skull counts)
+    // 5. Delete all rivalry matchups (clears kill marks / skull counts)
     const { error: matchupsError } = await supabase
       .from('rivalry_matchups')
       .delete()
@@ -68,7 +91,8 @@ export async function resetCompetition(confirmationText: string) {
     if (matchupsError) throw new Error(`Failed to delete rivalry matchups: ${matchupsError.message}`)
     console.log('✓ Deleted all rivalry matchups (kill marks reset to 0)')
 
-    // 7. Reset all cumulative points to 0
+    // 6. Reset all cumulative points to 0. Habit entries are kept as history;
+    //    the season floor stops pre-season weeks from scoring.
     const { data: profiles, error: fetchError } = await supabase
       .from('user_profiles')
       .select('id')
@@ -91,7 +115,7 @@ export async function resetCompetition(confirmationText: string) {
 
     return {
       success: true,
-      message: 'Competition reset complete. All points, badges, activities, habit records, and rivalry data have been cleared.',
+      message: `${name} started on ${seasonStart}. Points, badges, activities, and rivalry data have been cleared. Habit history is kept.`,
       timestamp: new Date().toISOString(),
       resetBy: user.email
     }
@@ -113,6 +137,7 @@ export async function getCompetitionStats() {
   const supabase = createAdminClient()
 
   try {
+    const currentSeason = await getCurrentSeason(supabase)
     const [
       { count: badgeCount },
       { count: activityCount },
@@ -133,10 +158,11 @@ export async function getCompetitionStats() {
       habitEntryCount: habitEntryCount || 0,
       matchupCount: matchupCount || 0,
       usersWithPoints: usersWithPoints?.length || 0,
-      totalPoints: usersWithPoints?.reduce((sum, u) => sum + (u.total_cumulative_points || 0), 0) || 0
+      totalPoints: usersWithPoints?.reduce((sum, u) => sum + (u.total_cumulative_points || 0), 0) || 0,
+      currentSeason
     }
   } catch (error) {
     console.error('Error getting competition stats:', error)
-    return { badgeCount: 0, activityCount: 0, habitEntryCount: 0, matchupCount: 0, usersWithPoints: 0, totalPoints: 0 }
+    return { badgeCount: 0, activityCount: 0, habitEntryCount: 0, matchupCount: 0, usersWithPoints: 0, totalPoints: 0, currentSeason: null }
   }
 }

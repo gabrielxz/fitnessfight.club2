@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { isAdminUser } from '@/lib/admin-auth'
 import { generateHabitChallengeSummary } from '@/lib/habits/weekly-summary-generator'
 
 export async function POST(_request: NextRequest) {
@@ -12,9 +13,7 @@ export async function POST(_request: NextRequest) {
     }
 
     // Verify admin access
-    const isAdmin = user.email === 'gabrielbeal@gmail.com' ||
-                    user.user_metadata?.full_name === 'Gabriel Beal' ||
-                    user.user_metadata?.name === 'Gabriel Beal'
+    const isAdmin = isAdminUser(user)
 
     if (!isAdmin) {
       return NextResponse.json({ error: 'Admin access required' }, { status: 403 })

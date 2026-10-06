@@ -3,7 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { BadgeCalculator } from '@/lib/badges/BadgeCalculator'
 import { computePairings, type RankedPlayer, type HistoricalMatchup } from '@/lib/rivalries/pairing'
 import { computeMetricScores, type MetricKey, type ActivityRow } from '@/lib/rivalries/metrics'
-import { rivalryTodayStr, periodStartUTC, periodEndUTC } from '@/lib/rivalries/time-window'
+import { rivalryTodayStr, periodStartUTC, periodEndUTC, isRivalryMondayFirstHour } from '@/lib/rivalries/time-window'
 import { reconcileAllHabitPoints } from '@/lib/habits/reconcile'
 import { reconcileAllExercisePoints } from '@/lib/points-helpers'
 
@@ -23,10 +23,19 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const now = new Date()
+
+    // vercel.json schedules this at 07:05 and 08:05 UTC on Mondays so one run
+    // lands just after midnight Pacific in both PDT and PST. The other run skips.
+    // `?force=1` runs it regardless, for manual invocations.
+    const force = request.nextUrl.searchParams.get('force') === '1'
+    if (!force && !isRivalryMondayFirstHour(now)) {
+      console.log('Weekly cron: not the first hour of Monday in Pacific Time, skipping.')
+      return NextResponse.json({ success: true, skipped: true })
+    }
+
     console.log('Starting weekly cron job...')
     const supabase = createAdminClient()
-
-    const now = new Date()
     const lastWeekStart = getLastWeekStart(now)
 
     // ── Leaderboard snapshot ─────────────────────────────────────────────────

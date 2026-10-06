@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { BadgeCalculator } from '@/lib/badges/BadgeCalculator'
 import { recalculateAndApplyExercisePointsForWeek } from '@/lib/points-helpers'
+import { getSeasonStart, isBeforeSeason } from '@/lib/season'
 
 // GET handler for webhook subscription verification
 export async function GET(request: NextRequest) {
@@ -112,7 +113,7 @@ export async function POST(request: NextRequest) {
           }
           break
         case 'delete':
-          const deletedActivity = await deleteActivity(object_id, supabase)
+          const deletedActivity = await deleteActivity(object_id, connection.user_id, supabase)
           if (deletedActivity) {
             // Use start_date (UTC) instead of start_date_local to avoid timezone parsing bugs
             activityDate = new Date(deletedActivity.start_date)
@@ -193,6 +194,12 @@ async function fetchAndStoreActivity(
     const activity = await response.json()
     console.log(`Fetched activity: ${activity.name}, athlete: ${activity.athlete.id}`)
 
+    // Pre-season activities are not stored, so they cannot earn points or badges.
+    if (isBeforeSeason(activity.start_date_local || activity.start_date, await getSeasonStart(supabase))) {
+      console.log(`Activity ${activityId} starts before the current season; not storing it`)
+      return null
+    }
+
     // Upsert the activity
     const { data, error: dbError } = await supabase
       .from('strava_activities')
@@ -263,13 +270,14 @@ async function fetchAndStoreActivity(
   }
 }
 
-async function deleteActivity(activityId: number, supabase: SupabaseClient) {
+async function deleteActivity(activityId: number, userId: string, supabase: SupabaseClient) {
   try {
     // Soft delete the activity and return it to get the date for recalculation
     const { data, error } = await supabase
       .from('strava_activities')
       .update({ deleted_at: new Date().toISOString() })
       .eq('strava_activity_id', activityId)
+      .eq('user_id', userId)
       .select()
       .single()
 
