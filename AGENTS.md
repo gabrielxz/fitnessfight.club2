@@ -59,7 +59,7 @@ A web application that syncs with Strava to track exercise data and create custo
 │   │   └── strava-connection.tsx         # Strava connection UI
 │   ├── faq/                              # FAQ page (server component + accordion client component)
 │   ├── habits/                           # Habit tracker page
-│   ├── history/                          # Season history page
+│   ├── history/                          # Hall of Champions (CHAMPIONS list in page.tsx, newest first)
 │   ├── login/                            # Login/signup page
 │   ├── offline/                          # PWA offline page
 │   ├── profile/                          # User profile page
@@ -594,6 +594,7 @@ Strava does not sign webhook deliveries, so `POST /api/strava/webhook` accepts a
 - ✅ **Season 3**: Badge system (7 badge types, 3 tiers), habit tracker, cumulative points
   - Champion: Brian Clonaris
 - ✅ **Season 4** (Apr 6 to Aug 23, 2026): Unified leaderboard, rivalries with kill marks (💀), podium top-3 treatment, score breakdown popout, FAQ page
+  - Champion: Carri Hilliard
 
 ---
 
