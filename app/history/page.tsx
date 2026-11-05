@@ -2,6 +2,49 @@ import { createClient } from '@/lib/supabase/server'
 import AnimatedBackground from '@/app/components/AnimatedBackground'
 import Navigation from '@/app/components/Navigation'
 
+interface Champion {
+  season: number
+  name: string
+  youtubeId: string
+  videoTitle: string
+  from?: string
+  fromDescription?: string
+}
+
+// Newest season first.
+const CHAMPIONS: Champion[] = [
+  {
+    season: 4,
+    name: 'Carri Hilliard',
+    youtubeId: 'pkyaNr2k_ik',
+    videoTitle: 'Congratulations to Carri Hilliard',
+  },
+  {
+    season: 3,
+    name: 'Brian Clonaris',
+    youtubeId: 'cnvI2NPkL5Q',
+    videoTitle: 'Tommy Chong congratulates Brian Clonaris',
+    from: 'Tommy Chong',
+    fromDescription: 'Comedy Legend & Star of “That ’70s Show”',
+  },
+  {
+    season: 2,
+    name: 'Omar Farías',
+    youtubeId: 'HcUORb-xyXE',
+    videoTitle: 'Jonathan Van Ness congratulates Omar Farías',
+    from: 'Jonathan Van Ness',
+    fromDescription: '“Queer Eye” Grooming Expert & Podcast Host',
+  },
+  {
+    season: 1,
+    name: 'Samantha Perlmutter',
+    youtubeId: '2J97Ry-fwbQ',
+    videoTitle: 'Hidetoshi Imura congratulates Samantha Perlmutter',
+    from: 'Hidetoshi Imura',
+    fromDescription: '“The Surgeon” from The Office',
+  },
+]
+
 export default async function HistoryPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -30,113 +73,50 @@ export default async function HistoryPage() {
             </div>
           </div>
 
-          {/* Season 3 - Brian Clonaris */}
-          <div className="mb-12 animate-fadeIn">
-            <div className="glass-card p-8 rounded-2xl">
-              <div className="flex items-center justify-between mb-6">
-                <div>
-                  <h2 className="text-3xl font-bold text-white mb-2">
-                    Season 3 Champion
-                  </h2>
-                  <p className="text-2xl gradient-text font-bold">
-                    Brian Clonaris
-                  </p>
+          {CHAMPIONS.map((champion, i) => (
+            <div
+              key={champion.season}
+              className="mb-12 animate-fadeIn"
+              style={i > 0 ? { animationDelay: `${i * 0.2}s` } : undefined}
+            >
+              <div className="glass-card p-8 rounded-2xl">
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h2 className="text-3xl font-bold text-white mb-2">
+                      Season {champion.season} Champion
+                    </h2>
+                    <p className="text-2xl gradient-text font-bold">
+                      {champion.name}
+                    </p>
+                  </div>
+                  <div className="text-5xl">🥇</div>
                 </div>
-                <div className="text-5xl">🥇</div>
-              </div>
 
-              <div className="mb-4">
-                <p className="text-gray-300 mb-2">
-                  Congratulations from <span className="font-semibold text-orange-400">Tommy Chong</span>
-                </p>
-                <p className="text-sm text-gray-400 italic">
-                  Comedy Legend &amp; Star of &ldquo;That &apos;70s Show&rdquo;
-                </p>
-              </div>
+                {champion.from && (
+                  <div className="mb-4">
+                    <p className="text-gray-300 mb-2">
+                      Congratulations from <span className="font-semibold text-orange-400">{champion.from}</span>
+                    </p>
+                    {champion.fromDescription && (
+                      <p className="text-sm text-gray-400 italic">
+                        {champion.fromDescription}
+                      </p>
+                    )}
+                  </div>
+                )}
 
-              <div className="relative aspect-video rounded-xl overflow-hidden">
-                <iframe
-                  src="https://www.youtube.com/embed/cnvI2NPkL5Q"
-                  title="Tommy Chong congratulates Brian Clonaris"
-                  className="absolute inset-0 w-full h-full"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                  allowFullScreen
-                />
+                <div className="relative aspect-video rounded-xl overflow-hidden">
+                  <iframe
+                    src={`https://www.youtube.com/embed/${champion.youtubeId}`}
+                    title={champion.videoTitle}
+                    className="absolute inset-0 w-full h-full"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                  />
+                </div>
               </div>
             </div>
-          </div>
-
-          {/* Season 2 - Omar Farías */}
-          <div className="mb-12 animate-fadeIn" style={{ animationDelay: '0.2s' }}>
-            <div className="glass-card p-8 rounded-2xl">
-              <div className="flex items-center justify-between mb-6">
-                <div>
-                  <h2 className="text-3xl font-bold text-white mb-2">
-                    Season 2 Champion
-                  </h2>
-                  <p className="text-2xl gradient-text font-bold">
-                    Omar Farías
-                  </p>
-                </div>
-                <div className="text-5xl">🥇</div>
-              </div>
-
-              <div className="mb-4">
-                <p className="text-gray-300 mb-2">
-                  Congratulations from <span className="font-semibold text-orange-400">Jonathan Van Ness</span>
-                </p>
-                <p className="text-sm text-gray-400 italic">
-                  &ldquo;Queer Eye&rdquo; Grooming Expert &amp; Podcast Host
-                </p>
-              </div>
-
-              <div className="relative aspect-video rounded-xl overflow-hidden">
-                <iframe
-                  src="https://www.youtube.com/embed/HcUORb-xyXE"
-                  title="Jonathan Van Ness congratulates Omar Farías"
-                  className="absolute inset-0 w-full h-full"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                  allowFullScreen
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Season 1 - Samantha Perlmutter */}
-          <div className="mb-12 animate-fadeIn" style={{ animationDelay: '0.4s' }}>
-            <div className="glass-card p-8 rounded-2xl">
-              <div className="flex items-center justify-between mb-6">
-                <div>
-                  <h2 className="text-3xl font-bold text-white mb-2">
-                    Season 1 Champion
-                  </h2>
-                  <p className="text-2xl gradient-text font-bold">
-                    Samantha Perlmutter
-                  </p>
-                </div>
-                <div className="text-5xl">🥇</div>
-              </div>
-              
-              <div className="mb-4">
-                <p className="text-gray-300 mb-2">
-                  Congratulations from <span className="font-semibold text-orange-400">Hidetoshi Imura</span>
-                </p>
-                <p className="text-sm text-gray-400 italic">
-                  &ldquo;The Surgeon&rdquo; from The Office
-                </p>
-              </div>
-              
-              <div className="relative aspect-video rounded-xl overflow-hidden">
-                <iframe
-                  src="https://www.youtube.com/embed/2J97Ry-fwbQ"
-                  title="Hidetoshi Imura congratulates Samantha Perlmutter"
-                  className="absolute inset-0 w-full h-full"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                  allowFullScreen
-                />
-              </div>
-            </div>
-          </div>
+          ))}
 
           {/* Legacy Section */}
           <div className="text-center mt-16 mb-8">
